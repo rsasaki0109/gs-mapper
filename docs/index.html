@@ -1,0 +1,1349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Gaussian Splatting Playground</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0d1117;
+  --bg-card: #161b22;
+  --bg-card-hover: #1c2333;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-muted: #8b949e;
+  --accent-blue: #58a6ff;
+  --accent-green: #3fb950;
+  --accent-orange: #d29922;
+  --accent-purple: #bc8cff;
+  --accent-red: #f85149;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* Sticky Header */
+header {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: rgba(13, 17, 23, 0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 2rem;
+}
+
+.header-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: var(--text);
+}
+
+.header-brand svg { flex-shrink: 0; }
+
+.header-brand span {
+  font-weight: 600;
+  font-size: 1.1rem;
+  white-space: nowrap;
+}
+
+nav { display: flex; gap: 8px; align-items: center; }
+
+nav a {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.875rem;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: color 0.2s, background 0.2s;
+}
+
+nav a:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+
+.gh-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.875rem;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.gh-link:hover { border-color: var(--accent-blue); background: rgba(88,166,255,0.08); }
+
+/* Hero */
+.hero {
+  text-align: center;
+  padding: 5rem 2rem 3rem;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.hero h1 {
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 1rem;
+}
+
+.hero p {
+  font-size: 1.15rem;
+  color: var(--text-muted);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Sections */
+section { padding: 4rem 2rem; max-width: 1400px; margin: 0 auto; }
+
+.section-title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.section-sub {
+  color: var(--text-muted);
+  margin-bottom: 2rem;
+  font-size: 1rem;
+}
+
+/* 3D Viewer */
+#viewer-section { max-width: 1400px; }
+
+.viewer-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.viewer-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(22,27,34,0.8);
+}
+
+.scene-tabs { display: flex; gap: 4px; }
+
+.scene-tab {
+  padding: 6px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.scene-tab:hover { border-color: var(--accent-blue); color: var(--text); }
+.scene-tab.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+
+.toolbar-sep { width: 1px; height: 24px; background: var(--border); }
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.toolbar-group input[type="range"] {
+  width: 100px;
+  accent-color: var(--accent-blue);
+}
+
+.toolbar-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.toolbar-btn:hover { border-color: var(--accent-blue); color: var(--text); }
+.toolbar-btn.active { background: rgba(88,166,255,0.15); color: var(--accent-blue); border-color: var(--accent-blue); }
+
+.point-count {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--accent-green);
+}
+
+#viewer-canvas {
+  width: 100%;
+  height: 650px;
+  display: block;
+  cursor: grab;
+}
+
+#viewer-canvas:active { cursor: grabbing; }
+
+/* Pipeline */
+.pipeline-wrapper {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 2.5rem;
+}
+
+.pipeline-flow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+
+.pipeline-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 1.2rem 1.5rem;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  transition: all 0.3s;
+  min-width: 130px;
+  position: relative;
+}
+
+.pipeline-step:hover { background: rgba(255,255,255,0.04); }
+.pipeline-step.active { border-color: var(--accent-blue); background: rgba(88,166,255,0.08); }
+
+.pipeline-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
+.pipeline-step-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-align: center;
+}
+
+.pipeline-arrow {
+  font-size: 1.5rem;
+  color: var(--text-muted);
+  animation: arrowPulse 2s infinite;
+  flex-shrink: 0;
+}
+
+@keyframes arrowPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.pipeline-desc {
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.5rem;
+  min-height: 100px;
+  transition: all 0.3s;
+}
+
+.pipeline-desc h3 {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+  color: var(--accent-blue);
+}
+
+.pipeline-desc p { color: var(--text-muted); font-size: 0.95rem; }
+
+/* Charts */
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 500px), 1fr));
+  gap: 1.5rem;
+}
+
+.chart-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.chart-card h3 {
+  font-size: 1rem;
+  font-weight: 500;
+  margin-bottom: 1rem;
+  color: var(--text);
+}
+
+.chart-card .plotly-chart { width: 100%; height: 320px; }
+
+/* Dataset Cards */
+.dataset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+
+.dataset-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.8rem;
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.dataset-card:hover { transform: translateY(-2px); border-color: var(--accent-blue); }
+
+.dataset-card .tag {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  padding: 3px 10px;
+  border-radius: 20px;
+  margin-bottom: 1rem;
+}
+
+.dataset-card h3 { font-size: 1.2rem; margin-bottom: 0.5rem; }
+.dataset-card .desc { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem; }
+
+.dataset-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 1rem;
+}
+
+.stat {
+  background: rgba(0,0,0,0.25);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.stat .label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.stat .value { font-size: 1rem; font-weight: 600; font-family: var(--font-mono); }
+
+.dataset-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent-blue);
+  text-decoration: none;
+  font-size: 0.875rem;
+  transition: opacity 0.2s;
+}
+
+.dataset-link:hover { opacity: 0.8; }
+
+/* Gallery */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 1.5rem;
+}
+
+.gallery-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: transform 0.2s;
+}
+
+.gallery-card:hover { transform: translateY(-2px); }
+
+.gallery-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 220px;
+  position: relative;
+}
+
+.gallery-side {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  position: relative;
+  overflow: hidden;
+}
+
+.gallery-side canvas { width: 100%; height: 100%; }
+
+.gallery-label {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.7);
+  padding: 2px 10px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  z-index: 1;
+}
+
+.gallery-divider {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+  z-index: 2;
+}
+
+.gallery-info {
+  padding: 1rem 1.2rem;
+  border-top: 1px solid var(--border);
+}
+
+.gallery-info h4 { font-size: 0.95rem; margin-bottom: 0.25rem; }
+.gallery-info p { font-size: 0.8rem; color: var(--text-muted); }
+
+/* Footer */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 3rem 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+footer a { color: var(--accent-blue); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+
+.footer-links {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  margin-bottom: 1rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  nav { display: none; }
+  .pipeline-flow { flex-direction: column; }
+  .pipeline-arrow { transform: rotate(90deg); }
+  #viewer-canvas { height: 400px; }
+  .viewer-toolbar { gap: 8px; }
+  .gallery-grid { grid-template-columns: 1fr; }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="header-inner">
+    <a href="#" class="header-brand">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4m-2.83-7.17l-2.83 2.83m-5.66 5.66l-2.83 2.83m11.32 0l-2.83-2.83M7.17 7.17L4.34 4.34"/>
+      </svg>
+      <span>3DGS Playground</span>
+    </a>
+    <nav>
+      <a href="#viewer-section">3D Viewer</a>
+      <a href="#pipeline-section">Pipeline</a>
+      <a href="#metrics-section">Metrics</a>
+      <a href="#datasets-section">Datasets</a>
+      <a href="#gallery-section">Gallery</a>
+    </nav>
+    <a href="https://github.com/rsasaki0109/nerf-gs-playground" class="gh-link" target="_blank">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      GitHub
+    </a>
+  </div>
+</header>
+
+<!-- Hero -->
+<div class="hero">
+  <h1>3D Gaussian Splatting Playground</h1>
+  <p>Interactive 3D scene reconstruction from robotics datasets. Explore point clouds, training metrics, and novel view synthesis results.</p>
+</div>
+
+<!-- Section 1: 3D Viewer -->
+<section id="viewer-section">
+  <h2 class="section-title">Interactive 3D Point Cloud Viewer</h2>
+  <p class="section-sub">Click and drag to orbit. Scroll to zoom. Right-click to pan.</p>
+  <div class="viewer-container">
+    <div class="viewer-toolbar">
+      <div class="scene-tabs">
+        <button class="scene-tab active" data-scene="street">Street</button>
+        <button class="scene-tab" data-scene="campus">Campus</button>
+        <button class="scene-tab" data-scene="indoor">Indoor</button>
+      </div>
+      <div class="toolbar-sep"></div>
+      <div class="toolbar-group">
+        <span class="toolbar-label">Size</span>
+        <input type="range" id="point-size" min="0.5" max="6" step="0.1" value="2.0">
+      </div>
+      <div class="toolbar-sep"></div>
+      <div class="toolbar-group">
+        <button class="toolbar-btn active" data-color="rgb">RGB</button>
+        <button class="toolbar-btn" data-color="height">Height</button>
+        <button class="toolbar-btn" data-color="class">Class</button>
+      </div>
+      <div class="toolbar-sep"></div>
+      <button class="toolbar-btn" id="bg-toggle">Light BG</button>
+      <button class="toolbar-btn" id="reset-cam">Reset Camera</button>
+      <span class="point-count" id="point-count">0 points</span>
+    </div>
+    <div id="viewer-canvas"></div>
+  </div>
+</section>
+
+<!-- Section 2: Pipeline -->
+<section id="pipeline-section">
+  <h2 class="section-title">3DGS Pipeline</h2>
+  <p class="section-sub">Click each step to learn more about the reconstruction pipeline.</p>
+  <div class="pipeline-wrapper">
+    <div class="pipeline-flow">
+      <div class="pipeline-step active" data-step="images">
+        <div class="pipeline-icon" style="background:rgba(88,166,255,0.15);color:var(--accent-blue);">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+        </div>
+        <span class="pipeline-step-label">Input Images</span>
+      </div>
+      <span class="pipeline-arrow">&rarr;</span>
+      <div class="pipeline-step" data-step="colmap">
+        <div class="pipeline-icon" style="background:rgba(63,185,80,0.15);color:var(--accent-green);">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.27 5.82 22 7 14.14l-5-4.87 6.91-1.01z"/></svg>
+        </div>
+        <span class="pipeline-step-label">COLMAP SfM</span>
+      </div>
+      <span class="pipeline-arrow">&rarr;</span>
+      <div class="pipeline-step" data-step="pointcloud">
+        <div class="pipeline-icon" style="background:rgba(210,153,34,0.15);color:var(--accent-orange);">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="6" cy="6" r="1"/><circle cx="18" cy="6" r="1"/><circle cx="6" cy="18" r="1"/><circle cx="18" cy="18" r="1"/><circle cx="12" cy="4" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="20" cy="12" r="1"/><circle cx="12" cy="20" r="1"/></svg>
+        </div>
+        <span class="pipeline-step-label">Point Cloud</span>
+      </div>
+      <span class="pipeline-arrow">&rarr;</span>
+      <div class="pipeline-step" data-step="training">
+        <div class="pipeline-icon" style="background:rgba(188,140,255,0.15);color:var(--accent-purple);">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        </div>
+        <span class="pipeline-step-label">3DGS Training</span>
+      </div>
+      <span class="pipeline-arrow">&rarr;</span>
+      <div class="pipeline-step" data-step="synthesis">
+        <div class="pipeline-icon" style="background:rgba(248,81,73,0.15);color:var(--accent-red);">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </div>
+        <span class="pipeline-step-label">Novel Views</span>
+      </div>
+    </div>
+    <div class="pipeline-desc" id="pipeline-desc">
+      <h3>Input Images</h3>
+      <p>Multi-view images are captured from different camera poses around a scene. For autonomous driving datasets, these come from vehicle-mounted cameras. The images should have sufficient overlap for feature matching and cover the scene from diverse viewpoints.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Section 3: Metrics -->
+<section id="metrics-section">
+  <h2 class="section-title">Training Metrics Dashboard</h2>
+  <p class="section-sub">Simulated training progress for 3D Gaussian Splatting optimization.</p>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h3>Training Loss (L1 + SSIM)</h3>
+      <div id="chart-loss" class="plotly-chart"></div>
+    </div>
+    <div class="chart-card">
+      <h3>Number of Gaussians</h3>
+      <div id="chart-gaussians" class="plotly-chart"></div>
+    </div>
+    <div class="chart-card">
+      <h3>PSNR over Training</h3>
+      <div id="chart-psnr" class="plotly-chart"></div>
+    </div>
+    <div class="chart-card">
+      <h3>Rendering Speed (FPS)</h3>
+      <div id="chart-fps" class="plotly-chart"></div>
+    </div>
+  </div>
+</section>
+
+<!-- Section 4: Datasets -->
+<section id="datasets-section">
+  <h2 class="section-title">Supported Datasets</h2>
+  <p class="section-sub">Robotics and autonomous driving datasets used for 3D reconstruction.</p>
+  <div class="dataset-grid">
+    <div class="dataset-card">
+      <span class="tag" style="background:rgba(88,166,255,0.15);color:var(--accent-blue);">Autonomous Driving</span>
+      <h3>GGRt</h3>
+      <p class="desc">Generalizable 3D Gaussians for Real-Time rendering of novel views from pose-free in-the-wild images, focused on outdoor driving scenarios.</p>
+      <div class="dataset-stats">
+        <div class="stat"><div class="label">Scene Type</div><div class="value">Outdoor</div></div>
+        <div class="stat"><div class="label">Images</div><div class="value">~10K+</div></div>
+        <div class="stat"><div class="label">Resolution</div><div class="value">1920x1080</div></div>
+        <div class="stat"><div class="label">Sensors</div><div class="value">Multi-cam</div></div>
+      </div>
+      <a href="https://arxiv.org/abs/2403.10147" class="dataset-link" target="_blank">View Paper &rarr;</a>
+    </div>
+    <div class="dataset-card">
+      <span class="tag" style="background:rgba(63,185,80,0.15);color:var(--accent-green);">Language + Vision</span>
+      <h3>CoVLA</h3>
+      <p class="desc">Comprehensive Vision-Language-Action dataset for autonomous driving, combining multi-view images with language annotations and driving actions.</p>
+      <div class="dataset-stats">
+        <div class="stat"><div class="label">Scene Type</div><div class="value">Urban</div></div>
+        <div class="stat"><div class="label">Scenes</div><div class="value">~40K</div></div>
+        <div class="stat"><div class="label">Modalities</div><div class="value">V+L+A</div></div>
+        <div class="stat"><div class="label">Annotations</div><div class="value">Rich</div></div>
+      </div>
+      <a href="https://arxiv.org/abs/2408.10845" class="dataset-link" target="_blank">View Paper &rarr;</a>
+    </div>
+    <div class="dataset-card">
+      <span class="tag" style="background:rgba(210,153,34,0.15);color:var(--accent-orange);">Multi-Camera</span>
+      <h3>MCD</h3>
+      <p class="desc">Multi-Camera Dataset designed for 3D reconstruction evaluation, providing calibrated multi-view images across diverse environments.</p>
+      <div class="dataset-stats">
+        <div class="stat"><div class="label">Scene Type</div><div class="value">Mixed</div></div>
+        <div class="stat"><div class="label">Cameras</div><div class="value">6+</div></div>
+        <div class="stat"><div class="label">Format</div><div class="value">Calibrated</div></div>
+        <div class="stat"><div class="label">Ground Truth</div><div class="value">LiDAR</div></div>
+      </div>
+      <a href="#" class="dataset-link">View Details &rarr;</a>
+    </div>
+  </div>
+</section>
+
+<!-- Section 5: Gallery -->
+<section id="gallery-section">
+  <h2 class="section-title">Reconstruction Gallery</h2>
+  <p class="section-sub">Before and after: input views vs. novel view synthesis results.</p>
+  <div class="gallery-grid" id="gallery-grid">
+    <!-- Generated by JS -->
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="footer-links">
+    <a href="https://github.com/rsasaki0109/nerf-gs-playground">GitHub</a>
+    <a href="https://repo-rasterizer.github.io/3d-gaussian-splatting/">3DGS Paper</a>
+    <a href="#viewer-section">Back to Top</a>
+  </div>
+  <p>3D Gaussian Splatting Playground &mdash; Built for exploring 3D reconstruction from robotics datasets.</p>
+</footer>
+
+<script>
+// ===== THREE.JS 3D VIEWER =====
+(function() {
+  const container = document.getElementById('viewer-canvas');
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(container.clientWidth, container.clientHeight);
+  renderer.setClearColor(0x0d1117);
+  container.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
+  camera.position.set(25, 20, 25);
+
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.target.set(0, 2, 0);
+  controls.update();
+
+  const axesHelper = new THREE.AxesHelper(5);
+  scene.add(axesHelper);
+  const gridHelper = new THREE.GridHelper(40, 40, 0x30363d, 0x21262d);
+  scene.add(gridHelper);
+
+  let currentPoints = null;
+  let sceneData = {};
+  let currentColorMode = 'rgb';
+  let darkBg = true;
+
+  const defaultCameras = {
+    street:  { pos: [30, 15, 30], target: [0, 2, 0] },
+    campus:  { pos: [25, 20, 25], target: [0, 1, 0] },
+    indoor:  { pos: [8, 6, 8],   target: [0, 2, 0] }
+  };
+
+  // -- Random helpers --
+  function rand(a, b) { return Math.random() * (b - a) + a; }
+  function gaussRand() { return Math.sqrt(-2*Math.log(Math.random())) * Math.cos(2*Math.PI*Math.random()); }
+
+  function addBox(positions, colors, idx, cx, cy, cz, sx, sy, sz, r, g, b, count) {
+    for (let i = 0; i < count; i++) {
+      const face = Math.floor(Math.random() * 6);
+      let x, y, z;
+      switch(face) {
+        case 0: x=cx+sx/2; y=cy+rand(0,sy); z=cz+rand(-sz/2,sz/2); break;
+        case 1: x=cx-sx/2; y=cy+rand(0,sy); z=cz+rand(-sz/2,sz/2); break;
+        case 2: x=cx+rand(-sx/2,sx/2); y=cy+sy; z=cz+rand(-sz/2,sz/2); break;
+        case 3: x=cx+rand(-sx/2,sx/2); y=cy; z=cz+rand(-sz/2,sz/2); break;
+        case 4: x=cx+rand(-sx/2,sx/2); y=cy+rand(0,sy); z=cz+sz/2; break;
+        case 5: x=cx+rand(-sx/2,sx/2); y=cy+rand(0,sy); z=cz-sz/2; break;
+      }
+      const n = (idx + i) * 3;
+      positions[n] = x + gaussRand()*0.05;
+      positions[n+1] = y + gaussRand()*0.05;
+      positions[n+2] = z + gaussRand()*0.05;
+      colors[n] = r + rand(-0.05, 0.05);
+      colors[n+1] = g + rand(-0.05, 0.05);
+      colors[n+2] = b + rand(-0.05, 0.05);
+    }
+    return idx + count;
+  }
+
+  function addSphere(positions, colors, idx, cx, cy, cz, radius, r, g, b, count) {
+    for (let i = 0; i < count; i++) {
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      const rad = radius * (0.7 + Math.random() * 0.3);
+      const n = (idx + i) * 3;
+      positions[n]   = cx + rad * Math.sin(phi) * Math.cos(theta);
+      positions[n+1] = cy + rad * Math.sin(phi) * Math.sin(theta);
+      positions[n+2] = cz + rad * Math.cos(phi);
+      colors[n]   = r + rand(-0.08, 0.08);
+      colors[n+1] = g + rand(-0.08, 0.08);
+      colors[n+2] = b + rand(-0.08, 0.08);
+    }
+    return idx + count;
+  }
+
+  function addPlane(positions, colors, idx, cx, cy, cz, sx, sz, r, g, b, count) {
+    for (let i = 0; i < count; i++) {
+      const n = (idx + i) * 3;
+      positions[n]   = cx + rand(-sx/2, sx/2);
+      positions[n+1] = cy + gaussRand() * 0.02;
+      positions[n+2] = cz + rand(-sz/2, sz/2);
+      colors[n]   = r + rand(-0.04, 0.04);
+      colors[n+1] = g + rand(-0.04, 0.04);
+      colors[n+2] = b + rand(-0.04, 0.04);
+    }
+    return idx + count;
+  }
+
+  // -- Scene generators --
+  function generateStreetScene(numPoints) {
+    numPoints = numPoints || 50000;
+    const positions = new Float32Array(numPoints * 3);
+    const colors = new Float32Array(numPoints * 3);
+    const classIds = new Float32Array(numPoints);
+    let idx = 0;
+
+    // Road
+    const roadPts = Math.floor(numPoints * 0.2);
+    for (let i = 0; i < roadPts; i++) {
+      classIds[idx + i] = 0;
+    }
+    idx = addPlane(positions, colors, idx, 0, 0, 0, 40, 8, 0.35, 0.35, 0.38, roadPts);
+
+    // Sidewalks
+    const swPts = Math.floor(numPoints * 0.06);
+    for (let i = 0; i < swPts; i++) classIds[idx+i] = 0;
+    idx = addPlane(positions, colors, idx, 0, 0.15, 6, 40, 3, 0.55, 0.53, 0.50, swPts);
+    for (let i = 0; i < swPts; i++) classIds[idx+i] = 0;
+    idx = addPlane(positions, colors, idx, 0, 0.15, -6, 40, 3, 0.55, 0.53, 0.50, swPts);
+
+    // Buildings left
+    const bldPts = Math.floor(numPoints * 0.12);
+    for (let i = 0; i < bldPts; i++) classIds[idx+i] = 1;
+    idx = addBox(positions, colors, idx, -15, 0, 10, 8, 12, 6, 0.65, 0.55, 0.45, bldPts);
+    for (let i = 0; i < bldPts; i++) classIds[idx+i] = 1;
+    idx = addBox(positions, colors, idx, 5, 0, 10, 10, 8, 6, 0.58, 0.52, 0.48, bldPts);
+
+    // Buildings right
+    for (let i = 0; i < bldPts; i++) classIds[idx+i] = 1;
+    idx = addBox(positions, colors, idx, -10, 0, -10, 12, 15, 6, 0.60, 0.50, 0.42, bldPts);
+    for (let i = 0; i < bldPts; i++) classIds[idx+i] = 1;
+    idx = addBox(positions, colors, idx, 10, 0, -10, 8, 10, 6, 0.55, 0.55, 0.50, bldPts);
+
+    // Cars
+    const carPts = Math.floor(numPoints * 0.03);
+    for (let i = 0; i < carPts; i++) classIds[idx+i] = 2;
+    idx = addBox(positions, colors, idx, -5, 0, -1, 4, 1.5, 2, 0.8, 0.15, 0.15, carPts);
+    for (let i = 0; i < carPts; i++) classIds[idx+i] = 2;
+    idx = addBox(positions, colors, idx, 8, 0, 1.5, 4.5, 1.8, 2, 0.2, 0.4, 0.8, carPts);
+    for (let i = 0; i < carPts; i++) classIds[idx+i] = 2;
+    idx = addBox(positions, colors, idx, -12, 0, 1, 4, 1.5, 2, 0.9, 0.9, 0.85, carPts);
+
+    // Trees
+    const treePts = Math.floor(numPoints * 0.025);
+    for (let xi = -15; xi <= 15; xi += 10) {
+      for (let i = 0; i < Math.floor(treePts/2); i++) classIds[idx+i] = 3;
+      idx = addBox(positions, colors, idx, xi, 0, 7.5, 0.3, 3, 0.3, 0.35, 0.22, 0.12, Math.floor(treePts/2));
+      for (let i = 0; i < treePts; i++) classIds[idx+i] = 3;
+      idx = addSphere(positions, colors, idx, xi, 4.5, 7.5, 2, 0.15, 0.5, 0.12, treePts);
+    }
+
+    // Fill remaining with scatter
+    while (idx < numPoints) {
+      const n = idx * 3;
+      positions[n] = rand(-20, 20);
+      positions[n+1] = rand(0, 0.5);
+      positions[n+2] = rand(-4, 4);
+      colors[n] = 0.35; colors[n+1] = 0.35; colors[n+2] = 0.38;
+      classIds[idx] = 0;
+      idx++;
+    }
+
+    return { positions, colors, classIds, count: numPoints };
+  }
+
+  function generateCampusScene(numPoints) {
+    numPoints = numPoints || 50000;
+    const positions = new Float32Array(numPoints * 3);
+    const colors = new Float32Array(numPoints * 3);
+    const classIds = new Float32Array(numPoints);
+    let idx = 0;
+
+    // Grass ground
+    const grassPts = Math.floor(numPoints * 0.25);
+    for (let i = 0; i < grassPts; i++) classIds[idx+i] = 0;
+    idx = addPlane(positions, colors, idx, 0, 0, 0, 40, 40, 0.18, 0.45, 0.12, grassPts);
+
+    // Paths (gray)
+    const pathPts = Math.floor(numPoints * 0.08);
+    for (let i = 0; i < pathPts; i++) classIds[idx+i] = 0;
+    idx = addPlane(positions, colors, idx, 0, 0.02, 0, 40, 3, 0.5, 0.48, 0.45, pathPts);
+    for (let i = 0; i < Math.floor(pathPts/2); i++) classIds[idx+i] = 0;
+    idx = addPlane(positions, colors, idx, 0, 0.02, 0, 3, 40, 0.5, 0.48, 0.45, Math.floor(pathPts/2));
+
+    // Main building
+    const mbPts = Math.floor(numPoints * 0.12);
+    for (let i = 0; i < mbPts; i++) classIds[idx+i] = 1;
+    idx = addBox(positions, colors, idx, -10, 0, -10, 12, 10, 10, 0.7, 0.65, 0.58, mbPts);
+
+    // Small building
+    const sbPts = Math.floor(numPoints * 0.08);
+    for (let i = 0; i < sbPts; i++) classIds[idx+i] = 1;
+    idx = addBox(positions, colors, idx, 10, 0, -8, 8, 6, 8, 0.62, 0.58, 0.55, sbPts);
+
+    // Library
+    for (let i = 0; i < sbPts; i++) classIds[idx+i] = 1;
+    idx = addBox(positions, colors, idx, 8, 0, 10, 10, 8, 8, 0.75, 0.7, 0.6, sbPts);
+
+    // Trees scattered
+    const treePositions = [[-5,12],[5,5],[-8,5],[12,0],[-15,8],[15,12],[-3,-5],[0,15]];
+    const tPts = Math.floor(numPoints * 0.02);
+    for (const [tx, tz] of treePositions) {
+      for (let i = 0; i < Math.floor(tPts/3); i++) classIds[idx+i] = 3;
+      idx = addBox(positions, colors, idx, tx, 0, tz, 0.25, 2.5, 0.25, 0.4, 0.25, 0.1, Math.floor(tPts/3));
+      for (let i = 0; i < tPts; i++) classIds[idx+i] = 3;
+      idx = addSphere(positions, colors, idx, tx, 4, tz, 2.2, 0.12, 0.48, 0.1, tPts);
+    }
+
+    // Benches
+    const benchPts = Math.floor(numPoints * 0.01);
+    for (const bx of [-2, 2, 6]) {
+      for (let i = 0; i < benchPts; i++) classIds[idx+i] = 4;
+      idx = addBox(positions, colors, idx, bx, 0, 1.8, 1.5, 0.5, 0.5, 0.45, 0.3, 0.15, benchPts);
+    }
+
+    // Lampposts
+    const lpPts = Math.floor(numPoints * 0.005);
+    for (const lx of [-8, 0, 8, 16]) {
+      for (let i = 0; i < lpPts; i++) classIds[idx+i] = 4;
+      idx = addBox(positions, colors, idx, lx, 0, 1.5, 0.15, 4, 0.15, 0.4, 0.4, 0.4, lpPts);
+      for (let i = 0; i < Math.floor(lpPts/2); i++) classIds[idx+i] = 4;
+      idx = addSphere(positions, colors, idx, lx, 4.2, 1.5, 0.3, 0.9, 0.85, 0.5, Math.floor(lpPts/2));
+    }
+
+    while (idx < numPoints) {
+      const n = idx * 3;
+      positions[n] = rand(-20, 20);
+      positions[n+1] = rand(0, 0.3);
+      positions[n+2] = rand(-20, 20);
+      colors[n] = 0.18; colors[n+1] = 0.42; colors[n+2] = 0.12;
+      classIds[idx] = 0;
+      idx++;
+    }
+
+    return { positions, colors, classIds, count: numPoints };
+  }
+
+  function generateIndoorScene(numPoints) {
+    numPoints = numPoints || 30000;
+    const positions = new Float32Array(numPoints * 3);
+    const colors = new Float32Array(numPoints * 3);
+    const classIds = new Float32Array(numPoints);
+    let idx = 0;
+
+    const rw = 8, rh = 3, rd = 6;
+
+    // Floor
+    const floorPts = Math.floor(numPoints * 0.15);
+    for (let i = 0; i < floorPts; i++) classIds[idx+i] = 0;
+    idx = addPlane(positions, colors, idx, 0, 0, 0, rw, rd, 0.55, 0.45, 0.35, floorPts);
+
+    // Ceiling
+    const ceilPts = Math.floor(numPoints * 0.1);
+    for (let i = 0; i < ceilPts; i++) classIds[idx+i] = 0;
+    idx = addPlane(positions, colors, idx, 0, rh, 0, rw, rd, 0.85, 0.85, 0.82, ceilPts);
+
+    // Walls
+    const wallPts = Math.floor(numPoints * 0.08);
+    // Back wall
+    for (let i = 0; i < wallPts; i++) classIds[idx+i] = 0;
+    idx = addBox(positions, colors, idx, 0, 0, -rd/2, rw, rh, 0.1, 0.82, 0.80, 0.75, wallPts);
+    // Left wall
+    for (let i = 0; i < wallPts; i++) classIds[idx+i] = 0;
+    idx = addBox(positions, colors, idx, -rw/2, 0, 0, 0.1, rh, rd, 0.80, 0.78, 0.73, wallPts);
+    // Right wall
+    for (let i = 0; i < wallPts; i++) classIds[idx+i] = 0;
+    idx = addBox(positions, colors, idx, rw/2, 0, 0, 0.1, rh, rd, 0.80, 0.78, 0.73, wallPts);
+    // Front wall (with window opening)
+    for (let i = 0; i < Math.floor(wallPts*0.6); i++) classIds[idx+i] = 0;
+    idx = addBox(positions, colors, idx, -2.5, 0, rd/2, 3, rh, 0.1, 0.82, 0.80, 0.75, Math.floor(wallPts*0.6));
+    for (let i = 0; i < Math.floor(wallPts*0.4); i++) classIds[idx+i] = 0;
+    idx = addBox(positions, colors, idx, 2.5, 0, rd/2, 3, rh, 0.1, 0.82, 0.80, 0.75, Math.floor(wallPts*0.4));
+
+    // Window (light blue glass)
+    const winPts = Math.floor(numPoints * 0.02);
+    for (let i = 0; i < winPts; i++) classIds[idx+i] = 5;
+    idx = addBox(positions, colors, idx, 0, 1, rd/2, 2, 1.5, 0.02, 0.6, 0.78, 0.9, winPts);
+
+    // Table
+    const tablePts = Math.floor(numPoints * 0.08);
+    for (let i = 0; i < tablePts; i++) classIds[idx+i] = 4;
+    idx = addBox(positions, colors, idx, 0, 0.7, 0, 2.5, 0.08, 1.2, 0.55, 0.35, 0.2, Math.floor(tablePts*0.6));
+    // Table legs
+    for (const [lx, lz] of [[-1.1,-0.5],[-1.1,0.5],[1.1,-0.5],[1.1,0.5]]) {
+      const legPts = Math.floor(tablePts * 0.1);
+      for (let i = 0; i < legPts; i++) classIds[idx+i] = 4;
+      idx = addBox(positions, colors, idx, lx, 0, lz, 0.08, 0.7, 0.08, 0.5, 0.32, 0.18, legPts);
+    }
+
+    // Chairs
+    const chairPts = Math.floor(numPoints * 0.04);
+    for (const cx of [-0.8, 0.8]) {
+      for (let i = 0; i < chairPts; i++) classIds[idx+i] = 4;
+      idx = addBox(positions, colors, idx, cx, 0, -1, 0.5, 0.45, 0.5, 0.3, 0.3, 0.35, Math.floor(chairPts*0.6));
+      for (let i = 0; i < Math.floor(chairPts*0.4); i++) classIds[idx+i] = 4;
+      idx = addBox(positions, colors, idx, cx, 0.45, -1.2, 0.5, 0.5, 0.06, 0.3, 0.3, 0.35, Math.floor(chairPts*0.4));
+    }
+
+    // Couch
+    const couchPts = Math.floor(numPoints * 0.1);
+    for (let i = 0; i < couchPts; i++) classIds[idx+i] = 4;
+    idx = addBox(positions, colors, idx, -3, 0, 0, 1.2, 0.5, 2.5, 0.3, 0.25, 0.5, Math.floor(couchPts*0.5));
+    for (let i = 0; i < Math.floor(couchPts*0.3); i++) classIds[idx+i] = 4;
+    idx = addBox(positions, colors, idx, -3.5, 0, 0, 0.3, 0.9, 2.5, 0.28, 0.22, 0.48, Math.floor(couchPts*0.3));
+    for (let i = 0; i < Math.floor(couchPts*0.2); i++) classIds[idx+i] = 4;
+    idx = addBox(positions, colors, idx, -3, 0, -1.2, 1.2, 0.7, 0.15, 0.28, 0.22, 0.48, Math.floor(couchPts*0.1));
+    idx = addBox(positions, colors, idx, -3, 0, 1.2, 1.2, 0.7, 0.15, 0.28, 0.22, 0.48, Math.floor(couchPts*0.1));
+
+    while (idx < numPoints) {
+      const n = idx * 3;
+      positions[n] = rand(-rw/2, rw/2);
+      positions[n+1] = rand(0, 0.1);
+      positions[n+2] = rand(-rd/2, rd/2);
+      colors[n] = 0.55; colors[n+1] = 0.45; colors[n+2] = 0.35;
+      classIds[idx] = 0;
+      idx++;
+    }
+
+    return { positions, colors, classIds, count: numPoints };
+  }
+
+  // Color modes
+  const classColorPalette = [
+    [0.5,0.5,0.5],[0.8,0.6,0.4],[0.9,0.2,0.2],[0.1,0.7,0.2],[0.9,0.7,0.1],[0.4,0.6,0.9]
+  ];
+
+  function applyColorMode(data, mode) {
+    const count = data.count;
+    const resultColors = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      const n = i * 3;
+      if (mode === 'rgb') {
+        resultColors[n] = data.colors[n];
+        resultColors[n+1] = data.colors[n+1];
+        resultColors[n+2] = data.colors[n+2];
+      } else if (mode === 'height') {
+        let minY = 0, maxY = 15;
+        const y = data.positions[n+1];
+        const t = Math.max(0, Math.min(1, (y - minY) / (maxY - minY)));
+        // Blue -> Cyan -> Green -> Yellow -> Red
+        if (t < 0.25) {
+          const s = t / 0.25;
+          resultColors[n] = 0; resultColors[n+1] = s; resultColors[n+2] = 1;
+        } else if (t < 0.5) {
+          const s = (t - 0.25) / 0.25;
+          resultColors[n] = 0; resultColors[n+1] = 1; resultColors[n+2] = 1 - s;
+        } else if (t < 0.75) {
+          const s = (t - 0.5) / 0.25;
+          resultColors[n] = s; resultColors[n+1] = 1; resultColors[n+2] = 0;
+        } else {
+          const s = (t - 0.75) / 0.25;
+          resultColors[n] = 1; resultColors[n+1] = 1 - s; resultColors[n+2] = 0;
+        }
+      } else if (mode === 'class') {
+        const cls = data.classIds[i] || 0;
+        const c = classColorPalette[cls % classColorPalette.length];
+        resultColors[n] = c[0]; resultColors[n+1] = c[1]; resultColors[n+2] = c[2];
+      }
+    }
+    return resultColors;
+  }
+
+  function loadScene(name) {
+    if (!sceneData[name]) {
+      if (name === 'street') sceneData[name] = generateStreetScene(50000);
+      else if (name === 'campus') sceneData[name] = generateCampusScene(50000);
+      else if (name === 'indoor') sceneData[name] = generateIndoorScene(30000);
+    }
+    const data = sceneData[name];
+    if (currentPoints) scene.remove(currentPoints);
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(data.positions, 3));
+    const colorArray = applyColorMode(data, currentColorMode);
+    geometry.setAttribute('color', new THREE.BufferAttribute(colorArray, 3));
+
+    const material = new THREE.PointsMaterial({
+      size: parseFloat(document.getElementById('point-size').value),
+      vertexColors: true,
+      sRGBEncoding: true,
+    });
+
+    currentPoints = new THREE.Points(geometry, material);
+    scene.add(currentPoints);
+
+    document.getElementById('point-count').textContent = data.count.toLocaleString() + ' points';
+
+    // Camera transition
+    const cam = defaultCameras[name];
+    const startPos = camera.position.clone();
+    const endPos = new THREE.Vector3(...cam.pos);
+    const startTarget = controls.target.clone();
+    const endTarget = new THREE.Vector3(...cam.target);
+    const duration = 800;
+    const startTime = performance.now();
+
+    function animateCam(now) {
+      const t = Math.min(1, (now - startTime) / duration);
+      const ease = t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2;
+      camera.position.lerpVectors(startPos, endPos, ease);
+      controls.target.lerpVectors(startTarget, endTarget, ease);
+      controls.update();
+      if (t < 1) requestAnimationFrame(animateCam);
+    }
+    requestAnimationFrame(animateCam);
+  }
+
+  // Controls
+  document.querySelectorAll('.scene-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.scene-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      loadScene(btn.dataset.scene);
+    });
+  });
+
+  document.getElementById('point-size').addEventListener('input', e => {
+    if (currentPoints) currentPoints.material.size = parseFloat(e.target.value);
+  });
+
+  document.querySelectorAll('[data-color]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-color]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentColorMode = btn.dataset.color;
+      const activeScene = document.querySelector('.scene-tab.active').dataset.scene;
+      const data = sceneData[activeScene];
+      if (data && currentPoints) {
+        const newColors = applyColorMode(data, currentColorMode);
+        currentPoints.geometry.setAttribute('color', new THREE.BufferAttribute(newColors, 3));
+      }
+    });
+  });
+
+  document.getElementById('bg-toggle').addEventListener('click', function() {
+    darkBg = !darkBg;
+    renderer.setClearColor(darkBg ? 0x0d1117 : 0xe8e8e8);
+    gridHelper.material.color.set(darkBg ? 0x30363d : 0xbbbbbb);
+    this.textContent = darkBg ? 'Light BG' : 'Dark BG';
+    this.classList.toggle('active', !darkBg);
+  });
+
+  document.getElementById('reset-cam').addEventListener('click', () => {
+    const activeScene = document.querySelector('.scene-tab.active').dataset.scene;
+    const cam = defaultCameras[activeScene];
+    camera.position.set(...cam.pos);
+    controls.target.set(...cam.target);
+    controls.update();
+  });
+
+  // Render loop
+  function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  // Resize
+  window.addEventListener('resize', () => {
+    const w = container.clientWidth, h = container.clientHeight;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+  });
+
+  // Initial load
+  loadScene('street');
+})();
+
+
+// ===== PIPELINE =====
+(function() {
+  const descriptions = {
+    images: {
+      title: 'Input Images',
+      text: 'Multi-view images are captured from different camera poses around a scene. For autonomous driving datasets, these come from vehicle-mounted cameras. The images should have sufficient overlap for feature matching and cover the scene from diverse viewpoints.'
+    },
+    colmap: {
+      title: 'COLMAP Structure-from-Motion',
+      text: 'COLMAP performs feature extraction (SIFT), feature matching across image pairs, and incremental Structure-from-Motion to estimate camera intrinsics, extrinsics, and a sparse 3D point cloud. This provides the initial geometry and camera parameters needed for Gaussian initialization.'
+    },
+    pointcloud: {
+      title: 'Initial Point Cloud',
+      text: 'The sparse point cloud from COLMAP serves as initialization for the 3D Gaussians. Each point becomes the center of an initial Gaussian with learnable parameters: position (mean), covariance (shape/orientation), opacity, and spherical harmonics coefficients (color).'
+    },
+    training: {
+      title: '3DGS Optimization',
+      text: 'The Gaussian parameters are optimized via gradient descent to minimize the rendering loss (L1 + D-SSIM) against ground truth images. Adaptive density control periodically densifies (clones/splits) under-reconstructed regions and prunes transparent or oversized Gaussians. Training typically runs for 30,000 iterations.'
+    },
+    synthesis: {
+      title: 'Novel View Synthesis',
+      text: 'The trained Gaussians are rendered from arbitrary viewpoints using differentiable tile-based rasterization. Gaussians are projected to 2D, sorted by depth, and alpha-composited front-to-back. This achieves real-time rendering (100+ FPS) at high quality, enabling interactive scene exploration.'
+    }
+  };
+
+  document.querySelectorAll('.pipeline-step').forEach(step => {
+    step.addEventListener('click', () => {
+      document.querySelectorAll('.pipeline-step').forEach(s => s.classList.remove('active'));
+      step.classList.add('active');
+      const d = descriptions[step.dataset.step];
+      document.getElementById('pipeline-desc').innerHTML = `<h3>${d.title}</h3><p>${d.text}</p>`;
+    });
+  });
+})();
+
+
+// ===== PLOTLY CHARTS =====
+(function() {
+  const plotlyLayout = {
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { color: '#8b949e', family: 'Inter, sans-serif', size: 12 },
+    margin: { l: 50, r: 20, t: 10, b: 40 },
+    xaxis: { gridcolor: '#21262d', zerolinecolor: '#30363d' },
+    yaxis: { gridcolor: '#21262d', zerolinecolor: '#30363d' },
+    legend: { x: 1, xanchor: 'right', y: 1, bgcolor: 'rgba(0,0,0,0)' },
+    modebar: { bgcolor: 'rgba(0,0,0,0)', color: '#8b949e', activecolor: '#58a6ff' }
+  };
+
+  // Loss curve
+  const iters = Array.from({length:300}, (_,i) => i * 100);
+  const l1Loss = iters.map(i => 0.15 * Math.exp(-i/5000) + 0.01 + (Math.random()-0.5)*0.003*Math.exp(-i/10000));
+  const ssimLoss = iters.map(i => 0.25 * Math.exp(-i/4000) + 0.02 + (Math.random()-0.5)*0.005*Math.exp(-i/8000));
+  const totalLoss = iters.map((_, i) => 0.8 * l1Loss[i] + 0.2 * ssimLoss[i]);
+
+  Plotly.newPlot('chart-loss', [
+    { x: iters, y: l1Loss, name: 'L1 Loss', line: { color: '#58a6ff', width: 2 } },
+    { x: iters, y: ssimLoss, name: 'SSIM Loss', line: { color: '#3fb950', width: 2 } },
+    { x: iters, y: totalLoss, name: 'Total', line: { color: '#d29922', width: 2, dash: 'dot' } }
+  ], { ...plotlyLayout, xaxis: { ...plotlyLayout.xaxis, title: 'Iteration' }, yaxis: { ...plotlyLayout.yaxis, title: 'Loss' } }, { responsive: true, displaylogo: false });
+
+  // Gaussians count
+  const gIters = Array.from({length:300}, (_,i) => i * 100);
+  const gaussians = gIters.map(i => {
+    let g = 100000;
+    if (i < 500) g = 100000 + i * 200;
+    else if (i < 3000) g = 200000 + (i-500) * 80;
+    else if (i < 5000) g = 400000 + (i-3000) * 40;
+    else if (i < 7000) g = 480000 - (i-5000) * 15; // pruning
+    else if (i < 15000) g = 450000 + (i-7000) * 20;
+    else if (i < 18000) g = 610000 - (i-15000) * 20; // pruning
+    else g = 550000 + (i-18000) * 5;
+    return g + (Math.random()-0.5) * 10000;
+  });
+
+  Plotly.newPlot('chart-gaussians', [
+    { x: gIters, y: gaussians, name: 'Gaussians', line: { color: '#bc8cff', width: 2 }, fill: 'tozeroy', fillcolor: 'rgba(188,140,255,0.1)' }
+  ], { ...plotlyLayout, xaxis: { ...plotlyLayout.xaxis, title: 'Iteration' }, yaxis: { ...plotlyLayout.yaxis, title: 'Count' } }, { responsive: true, displaylogo: false });
+
+  // PSNR
+  const psnr = iters.map(i => {
+    const base = 15 + 17 * (1 - Math.exp(-i/6000));
+    return base + (Math.random()-0.5) * 0.5 * Math.exp(-i/15000);
+  });
+
+  Plotly.newPlot('chart-psnr', [
+    { x: iters, y: psnr, name: 'PSNR', line: { color: '#3fb950', width: 2 }, fill: 'tozeroy', fillcolor: 'rgba(63,185,80,0.1)' }
+  ], { ...plotlyLayout, xaxis: { ...plotlyLayout.xaxis, title: 'Iteration' }, yaxis: { ...plotlyLayout.yaxis, title: 'PSNR (dB)' } }, { responsive: true, displaylogo: false });
+
+  // FPS bar chart
+  const resolutions = ['800x600', '1280x720', '1920x1080'];
+  Plotly.newPlot('chart-fps', [
+    { x: resolutions, y: [185, 142, 98], name: 'GGRt', type: 'bar', marker: { color: '#58a6ff' } },
+    { x: resolutions, y: [165, 128, 85], name: 'CoVLA', type: 'bar', marker: { color: '#3fb950' } },
+    { x: resolutions, y: [210, 160, 115], name: 'MCD', type: 'bar', marker: { color: '#d29922' } }
+  ], { ...plotlyLayout, barmode: 'group', xaxis: { ...plotlyLayout.xaxis, title: 'Resolution' }, yaxis: { ...plotlyLayout.yaxis, title: 'FPS' } }, { responsive: true, displaylogo: false });
+})();
+
+
+// ===== GALLERY =====
+(function() {
+  const galleryItems = [
+    { title: 'Street View - Front', desc: 'Urban driving scene reconstruction', hueInput: 220, hueOutput: 225 },
+    { title: 'Campus Aerial', desc: 'Top-down campus building view', hueInput: 140, hueOutput: 145 },
+    { title: 'Indoor Living Room', desc: 'Furniture and wall reconstruction', hueInput: 30, hueOutput: 35 },
+    { title: 'Street View - Side', desc: 'Lateral view of street scene', hueInput: 200, hueOutput: 205 },
+    { title: 'Campus Pathway', desc: 'Ground-level walkway view', hueInput: 100, hueOutput: 105 },
+    { title: 'Indoor Kitchen', desc: 'Kitchen area with appliances', hueInput: 50, hueOutput: 55 },
+  ];
+
+  const grid = document.getElementById('gallery-grid');
+
+  galleryItems.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'gallery-card';
+
+    const compare = document.createElement('div');
+    compare.className = 'gallery-compare';
+
+    // Input side
+    const leftSide = document.createElement('div');
+    leftSide.className = 'gallery-side';
+    const leftCanvas = document.createElement('canvas');
+    leftCanvas.width = 300; leftCanvas.height = 220;
+    const ctx1 = leftCanvas.getContext('2d');
+    const grad1 = ctx1.createLinearGradient(0, 0, 300, 220);
+    grad1.addColorStop(0, `hsl(${item.hueInput}, 40%, 25%)`);
+    grad1.addColorStop(0.5, `hsl(${item.hueInput}, 35%, 35%)`);
+    grad1.addColorStop(1, `hsl(${item.hueInput}, 30%, 20%)`);
+    ctx1.fillStyle = grad1;
+    ctx1.fillRect(0, 0, 300, 220);
+    // Add noise pattern
+    for (let i = 0; i < 200; i++) {
+      ctx1.fillStyle = `hsla(${item.hueInput}, 20%, ${30+Math.random()*30}%, 0.3)`;
+      const x = Math.random() * 300, y = Math.random() * 220;
+      ctx1.fillRect(x, y, 2+Math.random()*6, 2+Math.random()*6);
+    }
+    ctx1.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx1.font = '11px JetBrains Mono, monospace';
+    ctx1.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx1.fillText('Input View', 10, 20);
+    leftSide.appendChild(leftCanvas);
+    const leftLabel = document.createElement('span');
+    leftLabel.className = 'gallery-label'; leftLabel.textContent = 'Input';
+    leftSide.appendChild(leftLabel);
+
+    // Output side
+    const rightSide = document.createElement('div');
+    rightSide.className = 'gallery-side';
+    const rightCanvas = document.createElement('canvas');
+    rightCanvas.width = 300; rightCanvas.height = 220;
+    const ctx2 = rightCanvas.getContext('2d');
+    const grad2 = ctx2.createLinearGradient(0, 0, 300, 220);
+    grad2.addColorStop(0, `hsl(${item.hueOutput}, 50%, 28%)`);
+    grad2.addColorStop(0.5, `hsl(${item.hueOutput}, 45%, 38%)`);
+    grad2.addColorStop(1, `hsl(${item.hueOutput}, 40%, 22%)`);
+    ctx2.fillStyle = grad2;
+    ctx2.fillRect(0, 0, 300, 220);
+    // Smoother pattern (simulating cleaner reconstruction)
+    for (let i = 0; i < 120; i++) {
+      ctx2.fillStyle = `hsla(${item.hueOutput}, 30%, ${35+Math.random()*25}%, 0.25)`;
+      const x = Math.random() * 300, y = Math.random() * 220;
+      ctx2.beginPath();
+      ctx2.arc(x, y, 3+Math.random()*8, 0, Math.PI*2);
+      ctx2.fill();
+    }
+    ctx2.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx2.font = '11px JetBrains Mono, monospace';
+    ctx2.fillText('Novel View', 10, 20);
+    rightSide.appendChild(rightCanvas);
+    const rightLabel = document.createElement('span');
+    rightLabel.className = 'gallery-label'; rightLabel.textContent = 'Rendered';
+    rightSide.appendChild(rightLabel);
+
+    const divider = document.createElement('div');
+    divider.className = 'gallery-divider';
+
+    compare.appendChild(leftSide);
+    compare.appendChild(divider);
+    compare.appendChild(rightSide);
+
+    const info = document.createElement('div');
+    info.className = 'gallery-info';
+    info.innerHTML = `<h4>${item.title}</h4><p>${item.desc}</p>`;
+
+    card.appendChild(compare);
+    card.appendChild(info);
+    grid.appendChild(card);
+  });
+})();
+</script>
+</body>
+</html>
