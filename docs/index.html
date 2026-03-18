@@ -176,8 +176,19 @@ section { padding: 4rem 2rem; max-width: 1400px; margin: 0 auto; }
   transition: all 0.2s;
 }
 
-.scene-tab:hover { border-color: var(--accent-blue); color: var(--text); }
-.scene-tab.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+.scene-tab:hover, .gallery-tab:hover { border-color: var(--accent-blue); color: var(--text); }
+.scene-tab.active, .gallery-tab.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+.gallery-tab {
+  padding: 6px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
 
 .toolbar-sep { width: 1px; height: 24px; background: var(--border); }
 
@@ -706,9 +717,9 @@ footer a:hover { text-decoration: underline; }
   <h2 class="section-title">Input Image Gallery</h2>
   <p class="section-sub">Sample input images for 3D Gaussian Splatting reconstruction.</p>
   <div class="gallery-tabs" style="display:flex;gap:4px;margin-bottom:1.5rem;">
-    <button class="scene-tab active" data-gallery="street">Street</button>
-    <button class="scene-tab" data-gallery="campus">Campus</button>
-    <button class="scene-tab" data-gallery="indoor">Indoor</button>
+    <button class="gallery-tab active" data-gallery="street">Street</button>
+    <button class="gallery-tab" data-gallery="campus">Campus</button>
+    <button class="gallery-tab" data-gallery="indoor">Indoor</button>
   </div>
   <div class="gallery-scene-grid" id="gallery-street" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;">
     <div class="gallery-card"><img src="gallery/street/street_view_01.jpg" alt="Street view 1" style="width:100%;height:200px;object-fit:cover;display:block;"><div class="gallery-info"><h4>Street View 01</h4><p>CoVLA / Waymo &mdash; Urban driving scene</p></div></div>
@@ -1141,10 +1152,10 @@ footer a:hover { text-decoration: underline; }
     requestAnimationFrame(animateCam);
   }
 
-  // Controls
-  document.querySelectorAll('.scene-tab').forEach(btn => {
+  // Controls - only target scene tabs within the viewer toolbar
+  document.querySelectorAll('.scene-tabs .scene-tab').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.scene-tab').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.scene-tabs .scene-tab').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       loadScene(btn.dataset.scene);
     });
@@ -1159,7 +1170,7 @@ footer a:hover { text-decoration: underline; }
       document.querySelectorAll('[data-color]').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       currentColorMode = btn.dataset.color;
-      const activeScene = document.querySelector('.scene-tab.active').dataset.scene;
+      const activeScene = document.querySelector('.scene-tabs .scene-tab.active').dataset.scene;
       const data = sceneData[activeScene];
       if (data && currentPoints) {
         const newColors = applyColorMode(data, currentColorMode);
@@ -1177,7 +1188,7 @@ footer a:hover { text-decoration: underline; }
   });
 
   document.getElementById('reset-cam').addEventListener('click', () => {
-    const activeScene = document.querySelector('.scene-tab.active').dataset.scene;
+    const activeScene = document.querySelector('.scene-tabs .scene-tab.active').dataset.scene;
     const cam = defaultCameras[activeScene];
     camera.position.set(...cam.pos);
     controls.target.set(...cam.target);
@@ -1320,9 +1331,9 @@ footer a:hover { text-decoration: underline; }
 
 // ===== GALLERY TABS =====
 (function() {
-  document.querySelectorAll('[data-gallery]').forEach(btn => {
+  document.querySelectorAll('.gallery-tab').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('[data-gallery]').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.gallery-tab').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       const target = btn.dataset.gallery;
       document.querySelectorAll('.gallery-scene-grid').forEach(g => {
