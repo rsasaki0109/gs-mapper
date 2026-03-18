@@ -1,0 +1,35 @@
+{
+  "street": {
+    "name": "Street Scene (Driving)",
+    "dataset": "CoVLA / Waymo",
+    "description": "Urban street view for autonomous driving 3D reconstruction",
+    "images": [
+      "gallery/street/street_view_01.jpg",
+      "gallery/street/street_view_02.jpg",
+      "gallery/street/street_view_03.jpg",
+      "gallery/street/street_view_04.jpg"
+    ]
+  },
+  "campus": {
+    "name": "Campus Scene",
+    "dataset": "MCD",
+    "description": "University campus environment for robot navigation",
+    "images": [
+      "gallery/campus/campus_view_01.jpg",
+      "gallery/campus/campus_view_02.jpg",
+      "gallery/campus/campus_view_03.jpg",
+      "gallery/campus/campus_view_04.jpg"
+    ]
+  },
+  "indoor": {
+    "name": "Indoor Scene",
+    "dataset": "GGRt / HM3D",
+    "description": "Indoor room reconstruction for embodied navigation",
+    "images": [
+      "gallery/indoor/indoor_view_01.jpg",
+      "gallery/indoor/indoor_view_02.jpg",
+      "gallery/indoor/indoor_view_03.jpg",
+      "gallery/indoor/indoor_view_04.jpg"
+    ]
+  }
+}
