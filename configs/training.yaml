@@ -1,0 +1,49 @@
+# Default 3D Gaussian Splatting training hyperparameters
+
+# General
+num_iterations: 30000
+batch_size: 1
+seed: 42
+
+# Learning rates
+learning_rate:
+  position: 0.00016
+  feature: 0.0025
+  opacity: 0.05
+  scaling: 0.005
+  rotation: 0.001
+
+# Learning rate schedule
+lr_schedule:
+  position_lr_init: 0.00016
+  position_lr_final: 0.0000016
+  position_lr_delay_mult: 0.01
+  position_lr_max_steps: 30000
+
+# Spherical harmonics
+sh_degree: 3
+
+# Densification
+densify_from_iter: 500
+densify_until_iter: 15000
+densify_interval: 100
+densify_grad_threshold: 0.0002
+
+# Opacity
+opacity_reset_interval: 3000
+min_opacity: 0.005
+
+# Pruning
+percent_dense: 0.01
+max_screen_size: 20
+
+# Loss
+lambda_dssim: 0.2
+
+# Output
+save_iterations: [7000, 15000, 30000]
+test_iterations: [7000, 15000, 30000]
+
+# Resolution
+resolution: -1  # -1 means use original resolution
+white_background: false

@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nerf-gs-playground"
+version = "0.1.0"
+description = "Multi-dataset 3D Gaussian Splatting reconstruction playground"
+authors = [{ name = "rsasaki0109" }]
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = [
+    "torch",
+    "torchvision",
+    "numpy",
+    "opencv-python",
+    "Pillow",
+    "matplotlib",
+    "tqdm",
+    "pyyaml",
+    "huggingface-hub",
+    "gdown",
+    "viser",
+]
+
+[project.optional-dependencies]
+nerfstudio = ["nerfstudio"]
+gsplat = ["gsplat"]
+dev = ["pytest", "ruff", "mypy"]
+
+[project.scripts]
+gs-playground = "nerf_gs_playground.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

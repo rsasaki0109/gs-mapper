@@ -1,0 +1,68 @@
+# Dataset configurations for nerf-gs-playground
+# Each entry defines a supported dataset with download info and metadata.
+
+ggrt:
+  name: GGRt
+  description: >
+    Pose-free Generalizable 3D Gaussian Splatting.
+    GGRt enables 3D reconstruction without requiring known camera poses,
+    using a generalizable feed-forward approach.
+  paper_url: "https://arxiv.org/abs/2403.10147"
+  source_url: "https://github.com/abdullahamdi/ggrt"
+  repository: "https://github.com/abdullahamdi/ggrt"
+  download_method: git_clone
+  data_format: images
+  datasets:
+    waymo:
+      description: Waymo Open Dataset driving scenes
+      url: "https://waymo.com/open/"
+      type: driving
+    realestate10k:
+      description: RealEstate10K indoor/outdoor real estate video tours
+      url: "https://google.github.io/realestate10k/"
+      type: indoor_outdoor
+    acid:
+      description: "ACID: Aerial Coastline Image Dataset"
+      url: "https://infinite-nature.github.io/"
+      type: aerial
+  pose_free: true
+  default_split: waymo
+
+covla:
+  name: CoVLA
+  description: >
+    Large-scale driving scene dataset with front camera images.
+    Contains diverse driving scenarios for autonomous driving research.
+  paper_url: "https://arxiv.org/abs/2408.10680"
+  source_url: "https://huggingface.co/datasets/tier4/CoVLA_Dataset"
+  repository: "https://github.com/tier4/CoVLA"
+  huggingface: "tier4/CoVLA_Dataset"
+  download_method: huggingface_hub
+  data_format: images_jpg
+  sample_url: null
+  camera: front
+  type: driving
+  image_format: jpg
+
+mcd:
+  name: MCD
+  description: >
+    Multi-Campus Dataset featuring diverse outdoor campus scenes
+    captured with various camera configurations. Suitable for
+    large-scale outdoor 3D reconstruction.
+  paper_url: "https://arxiv.org/abs/2403.11755"
+  source_url: "https://mcdviral.github.io/"
+  repository: "https://github.com/mcdviral/mcdviral.github.io"
+  download_method: manual
+  data_format: rosbag
+  sample_url: null
+  url: "https://mcdviral.github.io/"
+  type: outdoor_campus
+  cameras:
+    - stereo
+    - lidar
+    - imu
+  environments:
+    - ntu
+    - kth
+    - tuhh
