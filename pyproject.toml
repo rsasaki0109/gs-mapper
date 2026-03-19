@@ -17,11 +17,6 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
-
-[project.urls]
-Homepage = "https://github.com/rsasaki0109/nerf-gs-playground"
-Documentation = "https://rsasaki0109.github.io/nerf-gs-playground/"
-Repository = "https://github.com/rsasaki0109/nerf-gs-playground"
 dependencies = [
     "torch",
     "torchvision",
@@ -36,9 +31,15 @@ dependencies = [
     "viser",
 ]
 
+[project.urls]
+Homepage = "https://github.com/rsasaki0109/nerf-gs-playground"
+Documentation = "https://rsasaki0109.github.io/nerf-gs-playground/"
+Repository = "https://github.com/rsasaki0109/nerf-gs-playground"
+
 [project.optional-dependencies]
 nerfstudio = ["nerfstudio"]
 gsplat = ["gsplat"]
+app = ["streamlit>=1.30", "plotly>=5.0"]
 dev = ["pytest", "ruff", "mypy"]
 
 [project.scripts]

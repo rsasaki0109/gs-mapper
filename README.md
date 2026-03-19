@@ -52,6 +52,19 @@ For gsplat backend:
 pip install -e ".[gsplat]"
 ```
 
+## Demo App
+
+A browser-based Streamlit interface is available for the full 3DGS pipeline
+(image upload, COLMAP preprocessing, training, 3D viewer, export).
+
+```bash
+pip install -e ".[app]"
+streamlit run app.py
+```
+
+The app opens at `http://localhost:8501` with a sidebar for pipeline settings
+and tabs for each stage of the workflow.
+
 ## Quick Start
 
 ### Full pipeline (download + preprocess + train + view)
