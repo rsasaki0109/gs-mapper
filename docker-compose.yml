@@ -1,0 +1,16 @@
+services:
+  playground:
+    build: .
+    ports:
+      - "8501:8501"  # Streamlit
+      - "8080:8080"  # Viser viewer
+    volumes:
+      - ./data:/app/data
+      - ./outputs:/app/outputs
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

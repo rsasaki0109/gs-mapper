@@ -44,6 +44,28 @@ covla:
   type: driving
   image_format: jpg
 
+waymo:
+  name: Waymo Open Dataset
+  description: >
+    Waymo Open Dataset - large-scale autonomous driving dataset with
+    multi-camera imagery, LiDAR point clouds, and high-quality labels.
+    Provides diverse urban driving scenes for 3D reconstruction.
+  paper_url: "https://arxiv.org/abs/1912.04838"
+  source_url: "https://waymo.com/open/"
+  download_method: manual
+  data_format: tfrecord
+  cameras:
+    - FRONT
+    - FRONT_LEFT
+    - FRONT_RIGHT
+    - SIDE_LEFT
+    - SIDE_RIGHT
+  type: driving
+  notes: >
+    Requires agreement to Waymo Open Dataset terms of use.
+    Download tfrecord files from https://waymo.com/open/download/
+    and place them in the data directory.
+
 mcd:
   name: MCD
   description: >

@@ -65,6 +65,24 @@ streamlit run app.py
 The app opens at `http://localhost:8501` with a sidebar for pipeline settings
 and tabs for each stage of the workflow.
 
+## Docker
+
+Build and run with Docker Compose (requires NVIDIA Container Toolkit):
+
+```bash
+docker compose up --build
+```
+
+The Streamlit app will be available at `http://localhost:8501`.
+
+To run a specific command inside the container instead of the default app:
+
+```bash
+docker compose run playground gs-playground run ggrt --backend gsplat
+```
+
+Dataset files in `data/` and training outputs in `outputs/` are mounted as volumes, so they persist on the host.
+
 ## Quick Start
 
 ### Full pipeline (download + preprocess + train + view)

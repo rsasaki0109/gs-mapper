@@ -38,11 +38,12 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument("--output", default="outputs/colmap", help="Output directory")
     pp.add_argument(
         "--method",
-        choices=["colmap", "frames", "pose-free", "dust3r", "simple"],
+        choices=["colmap", "frames", "pose-free", "dust3r", "simple", "waymo"],
         default="colmap",
         help="Preprocessing method (default: colmap). "
         "'pose-free' and 'dust3r' use DUSt3R for pose estimation; "
-        "'simple' uses circular camera initialization.",
+        "'simple' uses circular camera initialization; "
+        "'waymo' extracts frames from Waymo tfrecord files.",
     )
     pp.add_argument("--fps", type=float, default=2.0, help="FPS for frame extraction (default: 2)")
     pp.add_argument("--max-frames", type=int, default=100, help="Max frames to extract (default: 100)")
@@ -53,6 +54,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="COLMAP matching strategy (default: exhaustive)",
     )
     pp.add_argument("--no-gpu", action="store_true", help="Disable GPU for COLMAP")
+    pp.add_argument(
+        "--camera",
+        default="FRONT",
+        choices=["FRONT", "FRONT_LEFT", "FRONT_RIGHT", "SIDE_LEFT", "SIDE_RIGHT"],
+        help="Waymo camera to extract (default: FRONT)",
+    )
+    pp.add_argument("--every-n", type=int, default=1, help="Extract every N-th frame for Waymo (default: 1)")
 
     # train
     tr = subparsers.add_parser("train", help="Train a 3DGS model")
@@ -150,6 +158,29 @@ def cmd_preprocess(args: argparse.Namespace) -> None:
     """Handle the preprocess subcommand."""
     images_path = Path(args.images)
     output_dir = Path(args.output)
+
+    if args.method == "waymo":
+        from nerf_gs_playground.datasets.waymo import WaymoLoader
+
+        loader = WaymoLoader(data_dir=str(images_path))
+        images_out = loader.extract_frames(
+            output_dir=str(output_dir),
+            camera=args.camera,
+            max_frames=args.max_frames,
+            every_n=args.every_n,
+        )
+        # Convert to COLMAP format if camera_params.json exists
+        params_path = output_dir / "camera_params.json"
+        if params_path.exists():
+            sparse_dir = loader.to_colmap_format(
+                camera_params_path=str(params_path),
+                output_dir=str(output_dir),
+            )
+            print(f"Waymo frames extracted to: {images_out}")
+            print(f"COLMAP sparse model at: {sparse_dir}")
+        else:
+            print(f"Waymo frames loaded from: {images_out}")
+        return
 
     if args.method == "frames":
         from nerf_gs_playground.preprocess.extract_frames import (
