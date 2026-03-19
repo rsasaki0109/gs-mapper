@@ -74,6 +74,31 @@ def build_parser() -> argparse.ArgumentParser:
     vw.add_argument("--port", type=int, default=8080, help="Viewer port (default: 8080)")
     vw.add_argument("--colmap", action="store_true", help="View COLMAP sparse model instead of PLY")
 
+    # export
+    ex = subparsers.add_parser("export", help="Export PLY to web-friendly format")
+    ex.add_argument("--model", required=True, help="Path to the .ply file")
+    ex.add_argument(
+        "--format",
+        choices=["json", "binary"],
+        default="json",
+        help="Output format (default: json)",
+    )
+    ex.add_argument("--output", required=True, help="Output file path")
+    ex.add_argument("--max-points", type=int, default=100000, help="Max points to export (default: 100000)")
+
+    # benchmark
+    bm = subparsers.add_parser("benchmark", help="Benchmark training backends")
+    bm.add_argument("--data", required=True, help="Data directory for training")
+    bm.add_argument("--iterations", type=int, default=1000, help="Number of training iterations (default: 1000)")
+    bm.add_argument("--output", default="outputs/benchmark", help="Benchmark output directory")
+    bm.add_argument("--dataset-name", default="default", help="Dataset name label (default: default)")
+    bm.add_argument(
+        "--method",
+        choices=["gsplat", "nerfstudio", "both"],
+        default="both",
+        help="Backend to benchmark (default: both)",
+    )
+
     # run (full pipeline)
     rn = subparsers.add_parser("run", help="Run the full pipeline end-to-end")
     rn.add_argument("--images", required=True, help="Input image directory")
@@ -215,6 +240,39 @@ def cmd_view(args: argparse.Namespace) -> None:
         viewer.view_ply(args.model)
 
 
+def cmd_export(args: argparse.Namespace) -> None:
+    """Handle the export subcommand."""
+    if args.format == "json":
+        from nerf_gs_playground.viewer.web_export import ply_to_json
+
+        result = ply_to_json(args.model, args.output, max_points=args.max_points)
+    else:
+        from nerf_gs_playground.viewer.web_export import ply_to_binary
+
+        result = ply_to_binary(args.model, args.output, max_points=args.max_points)
+
+    print(f"Exported to: {result}")
+
+
+def cmd_benchmark(args: argparse.Namespace) -> None:
+    """Handle the benchmark subcommand."""
+    from nerf_gs_playground.benchmark import Benchmark
+
+    bench = Benchmark(data_dir=args.data, output_dir=args.output)
+
+    if args.method in ("gsplat", "both"):
+        print("Running gsplat benchmark...")
+        bench.run_gsplat(num_iterations=args.iterations, dataset_name=args.dataset_name)
+
+    if args.method in ("nerfstudio", "both"):
+        print("Running nerfstudio benchmark...")
+        bench.run_nerfstudio(num_iterations=args.iterations, dataset_name=args.dataset_name)
+
+    print("\n" + bench.compare())
+    bench.save_results()
+    print(f"\nResults saved to: {Path(args.output) / 'benchmark_results.json'}")
+
+
 def cmd_run(args: argparse.Namespace) -> None:
     """Handle the run subcommand (full pipeline)."""
     images_dir = Path(args.images)
@@ -297,6 +355,8 @@ def main(argv: list[str] | None = None) -> None:
         "preprocess": cmd_preprocess,
         "train": cmd_train,
         "view": cmd_view,
+        "export": cmd_export,
+        "benchmark": cmd_benchmark,
         "run": cmd_run,
     }
 
