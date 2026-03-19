@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68.0", "wheel"]
+requires = ["setuptools>=68.0", "setuptools-scm>=8.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,6 +10,18 @@ authors = [{ name = "rsasaki0109" }]
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
+keywords = ["3d-gaussian-splatting", "nerf", "3d-reconstruction", "point-cloud", "robotics"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.urls]
+Homepage = "https://github.com/rsasaki0109/nerf-gs-playground"
+Documentation = "https://rsasaki0109.github.io/nerf-gs-playground/"
+Repository = "https://github.com/rsasaki0109/nerf-gs-playground"
 dependencies = [
     "torch",
     "torchvision",

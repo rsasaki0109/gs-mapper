@@ -27,9 +27,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     # download
     dl = subparsers.add_parser("download", help="Download a dataset")
-    dl.add_argument("--dataset", required=True, help="Dataset name (e.g. ggrt, covla, mcd)")
+    dl.add_argument("--dataset", default=None, help="Dataset name (e.g. ggrt, covla, mcd)")
     dl.add_argument("--output", default=None, help="Output directory (default: data/)")
     dl.add_argument("--max-samples", type=int, default=None, help="Max samples to download")
+    dl.add_argument("--sample-images", action="store_true", help="Download sample images for quick testing")
 
     # preprocess
     pp = subparsers.add_parser("preprocess", help="Preprocess images with COLMAP or frame extraction")
@@ -91,6 +92,17 @@ def build_parser() -> argparse.ArgumentParser:
 
 def cmd_download(args: argparse.Namespace) -> None:
     """Handle the download subcommand."""
+    if args.sample_images:
+        from nerf_gs_playground.common.download import download_sample_images
+
+        output_dir = Path(args.output) if args.output else Path("data/sample")
+        download_sample_images(output_dir)
+        return
+
+    if args.dataset is None:
+        print("Error: --dataset is required (unless using --sample-images).")
+        sys.exit(1)
+
     from nerf_gs_playground.common.download import download_dataset
 
     output_dir = Path(args.output) if args.output else None
