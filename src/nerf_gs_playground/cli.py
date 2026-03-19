@@ -38,9 +38,11 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument("--output", default="outputs/colmap", help="Output directory")
     pp.add_argument(
         "--method",
-        choices=["colmap", "frames"],
+        choices=["colmap", "frames", "pose-free", "dust3r", "simple"],
         default="colmap",
-        help="Preprocessing method (default: colmap)",
+        help="Preprocessing method (default: colmap). "
+        "'pose-free' and 'dust3r' use DUSt3R for pose estimation; "
+        "'simple' uses circular camera initialization.",
     )
     pp.add_argument("--fps", type=float, default=2.0, help="FPS for frame extraction (default: 2)")
     pp.add_argument("--max-frames", type=int, default=100, help="Max frames to extract (default: 100)")
@@ -83,6 +85,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Training method (default: gsplat)",
     )
     rn.add_argument("--iterations", type=int, default=30000, help="Training iterations")
+    rn.add_argument(
+        "--preprocess-method",
+        choices=["colmap", "pose-free", "dust3r", "simple"],
+        default="colmap",
+        help="Preprocessing method (default: colmap)",
+    )
     rn.add_argument("--skip-preprocess", action="store_true", help="Skip COLMAP preprocessing")
     rn.add_argument("--no-viewer", action="store_true", help="Skip launching the viewer")
     rn.add_argument("--port", type=int, default=8080, help="Viewer port (default: 8080)")
@@ -141,6 +149,16 @@ def cmd_preprocess(args: argparse.Namespace) -> None:
         else:
             print(f"Error: '{images_path}' is not a file or directory.")
             sys.exit(1)
+    elif args.method in ("pose-free", "dust3r", "simple"):
+        from nerf_gs_playground.preprocess.pose_free import run_pose_free
+
+        # Map CLI method names to PoseFreeProcessor methods
+        method_map = {"pose-free": "dust3r", "dust3r": "dust3r", "simple": "simple"}
+        run_pose_free(
+            image_dir=images_path,
+            output_dir=output_dir,
+            method=method_map[args.method],
+        )
     else:
         from nerf_gs_playground.preprocess.colmap import run_colmap
 
@@ -205,17 +223,29 @@ def cmd_run(args: argparse.Namespace) -> None:
     colmap_dir = output_dir / "colmap"
     train_dir = output_dir / "train"
 
-    # Step 1: Preprocess with COLMAP
+    # Step 1: Preprocess
     if not args.skip_preprocess:
+        preprocess_method = args.preprocess_method
         print("=" * 60)
-        print("Step 1: COLMAP Preprocessing")
+        print(f"Step 1: Preprocessing ({preprocess_method})")
         print("=" * 60)
-        from nerf_gs_playground.preprocess.colmap import run_colmap
 
-        run_colmap(
-            image_dir=images_dir,
-            output_dir=colmap_dir,
-        )
+        if preprocess_method in ("pose-free", "dust3r", "simple"):
+            from nerf_gs_playground.preprocess.pose_free import run_pose_free
+
+            method_map = {"pose-free": "dust3r", "dust3r": "dust3r", "simple": "simple"}
+            run_pose_free(
+                image_dir=images_dir,
+                output_dir=colmap_dir,
+                method=method_map[preprocess_method],
+            )
+        else:
+            from nerf_gs_playground.preprocess.colmap import run_colmap
+
+            run_colmap(
+                image_dir=images_dir,
+                output_dir=colmap_dir,
+            )
     else:
         print("Skipping preprocessing (--skip-preprocess)")
 
