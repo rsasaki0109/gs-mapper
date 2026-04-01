@@ -288,10 +288,7 @@ def evaluate_readability(strategy: PoseAlignmentStrategy) -> dict[str, Any]:
     """Estimate readability from source shape. Heuristic, not normative."""
     source = textwrap.dedent(inspect.getsource(strategy.align))
     tree = ast.parse(source)
-    branch_count = sum(
-        isinstance(node, (ast.If, ast.For, ast.While, ast.Try, ast.Match))
-        for node in ast.walk(tree)
-    )
+    branch_count = sum(isinstance(node, (ast.If, ast.For, ast.While, ast.Try, ast.Match)) for node in ast.walk(tree))
     lines = [
         line
         for line in source.splitlines()
@@ -395,22 +392,14 @@ def build_localization_alignment_experiment_report(*, repetitions: int = 200) ->
         strategy_reports.append(summarize_strategy(strategy, fixture_reports, runtime_report))
 
     best_position = min(
-        (
-            report
-            for report in strategy_reports
-            if report["aggregate"]["meanPositionErrorMeters"] is not None
-        ),
+        (report for report in strategy_reports if report["aggregate"]["meanPositionErrorMeters"] is not None),
         key=lambda report: (
             float(report["aggregate"]["meanPositionErrorMeters"]),
             -float(report["aggregate"]["successRate"]),
         ),
     )
     fastest = min(
-        (
-            report
-            for report in strategy_reports
-            if report["runtime"].get("medianMs") is not None
-        ),
+        (report for report in strategy_reports if report["runtime"].get("medianMs") is not None),
         key=lambda report: float(report["runtime"]["medianMs"]),
     )
     most_readable = max(strategy_reports, key=lambda report: float(report["readability"]["score"]))
@@ -509,9 +498,7 @@ def build_localization_alignment_process_section(report: dict[str, Any]) -> dict
     for fixture in report["fixtures"]:
         rows = []
         for strategy in report["strategies"]:
-            fixture_report = next(
-                item for item in strategy["fixtures"] if item["fixtureId"] == fixture["fixtureId"]
-            )
+            fixture_report = next(item for item in strategy["fixtures"] if item["fixtureId"] == fixture["fixtureId"])
             rows.append(
                 [
                     strategy["label"],
@@ -677,9 +664,7 @@ def build_experiments_markdown(report: dict[str, Any]) -> str:
             ]
         )
         for strategy in report["strategies"]:
-            fixture_report = next(
-                item for item in strategy["fixtures"] if item["fixtureId"] == fixture["fixtureId"]
-            )
+            fixture_report = next(item for item in strategy["fixtures"] if item["fixtureId"] == fixture["fixtureId"])
             lines.append(
                 "| "
                 + " | ".join(
@@ -712,88 +697,94 @@ def build_experiments_markdown(report: dict[str, Any]) -> str:
 
 def build_decisions_markdown(report: dict[str, Any]) -> str:
     """Render the current convergence decisions as Markdown."""
-    return "\n".join(
-        [
-            "# Decisions",
-            "",
-            f"Updated: {report['createdAt']}",
-            "",
-            "## Accepted",
-            "",
-            "- Stable code uses `gs_sim2real.core.localization_alignment.align_pose_samples()` as the only contract that production callers should depend on.",
-            "- `auto` keeps two stable behaviors instead of one universal algorithm: `index` for order-only logs and `timestamp` for timestamped logs.",
-            "- New alignment ideas must land in `src/gs_sim2real/experiments/` first and only graduate after they outperform current core behavior on shared fixtures.",
-            "",
-            "## Deferred",
-            "",
-            "- `timestamp_nearest` stays experimental. It is fast and simple, but it loses the middle frame on sparse trajectories where interpolation clearly wins.",
-            "- We are not freezing a larger abstract interface yet. The current core keeps only `PoseSample`, `AlignmentPair`, and `align_pose_samples(...)`.",
-            "",
-            "## Operating Rules",
-            "",
-            "1. Start with at least three concrete strategies for any new alignment problem.",
-            "2. Keep inputs and metrics identical across strategies before discussing architecture.",
-            "3. Promote only the minimum surface that survived comparison; delete or quarantine the rest.",
-        ]
-    ) + "\n"
+    return (
+        "\n".join(
+            [
+                "# Decisions",
+                "",
+                f"Updated: {report['createdAt']}",
+                "",
+                "## Accepted",
+                "",
+                "- Stable code uses `gs_sim2real.core.localization_alignment.align_pose_samples()` as the only contract that production callers should depend on.",
+                "- `auto` keeps two stable behaviors instead of one universal algorithm: `index` for order-only logs and `timestamp` for timestamped logs.",
+                "- New alignment ideas must land in `src/gs_sim2real/experiments/` first and only graduate after they outperform current core behavior on shared fixtures.",
+                "",
+                "## Deferred",
+                "",
+                "- `timestamp_nearest` stays experimental. It is fast and simple, but it loses the middle frame on sparse trajectories where interpolation clearly wins.",
+                "- We are not freezing a larger abstract interface yet. The current core keeps only `PoseSample`, `AlignmentPair`, and `align_pose_samples(...)`.",
+                "",
+                "## Operating Rules",
+                "",
+                "1. Start with at least three concrete strategies for any new alignment problem.",
+                "2. Keep inputs and metrics identical across strategies before discussing architecture.",
+                "3. Promote only the minimum surface that survived comparison; delete or quarantine the rest.",
+            ]
+        )
+        + "\n"
+    )
 
 
 def build_interfaces_markdown() -> str:
     """Render the current minimal stable interface as Markdown."""
-    return "\n".join(
-        [
-            "# Interfaces",
-            "",
-            "## Stable Core",
-            "",
-            "The stable localization-alignment surface is intentionally small:",
-            "",
-            "```python",
-            "@dataclass(frozen=True)",
-            "class PoseSample:",
-            "    index: int",
-            "    label: str",
-            "    position: tuple[float, float, float]",
-            "    yaw_degrees: float",
-            "    timestamp_seconds: float | None",
-            "    response: dict[str, Any] | None = None",
-            "    relative_timestamp_seconds: float | None = None",
-            "",
-            "@dataclass(frozen=True)",
-            "class AlignmentPair:",
-            "    pair_index: int",
-            "    ground_truth: PoseSample",
-            "    estimate: PoseSample",
-            "    time_delta_seconds: float | None",
-            "    interpolation_kind: str",
-            "",
-            "def align_pose_samples(",
-            "    ground_truth_poses: Sequence[PoseSample],",
-            "    estimate_poses: Sequence[PoseSample],",
-            "    *,",
-            "    alignment: str = 'auto',",
-            ") -> tuple[str, list[AlignmentPair]]: ...",
-            "```",
-            "",
-            "## Experiment Contract",
-            "",
-            "Every experiment strategy must expose the same shape:",
-            "",
-            "- `name`, `label`, `style`, `tier`, `capabilities`",
-            "- `align(ground_truth_poses, estimate_poses) -> list[AlignmentPair]`",
-            "",
-            "## Comparable Inputs",
-            "",
-            "- Same `PoseSample` arrays for every strategy",
-            "- Same canonical fixtures (`ordered-index`, `reordered-timestamp`, `sparse-timestamp`)",
-            "- Same evaluation axes: quality, runtime, readability heuristic, extensibility heuristic",
-            "",
-            "## Boundary",
-            "",
-            "- `src/gs_sim2real/core/`: stable, minimal, dependency surface for production code",
-            "- `src/gs_sim2real/experiments/`: discardable strategies and comparison harnesses",
-        ]
-    ) + "\n"
+    return (
+        "\n".join(
+            [
+                "# Interfaces",
+                "",
+                "## Stable Core",
+                "",
+                "The stable localization-alignment surface is intentionally small:",
+                "",
+                "```python",
+                "@dataclass(frozen=True)",
+                "class PoseSample:",
+                "    index: int",
+                "    label: str",
+                "    position: tuple[float, float, float]",
+                "    yaw_degrees: float",
+                "    timestamp_seconds: float | None",
+                "    response: dict[str, Any] | None = None",
+                "    relative_timestamp_seconds: float | None = None",
+                "",
+                "@dataclass(frozen=True)",
+                "class AlignmentPair:",
+                "    pair_index: int",
+                "    ground_truth: PoseSample",
+                "    estimate: PoseSample",
+                "    time_delta_seconds: float | None",
+                "    interpolation_kind: str",
+                "",
+                "def align_pose_samples(",
+                "    ground_truth_poses: Sequence[PoseSample],",
+                "    estimate_poses: Sequence[PoseSample],",
+                "    *,",
+                "    alignment: str = 'auto',",
+                ") -> tuple[str, list[AlignmentPair]]: ...",
+                "```",
+                "",
+                "## Experiment Contract",
+                "",
+                "Every experiment strategy must expose the same shape:",
+                "",
+                "- `name`, `label`, `style`, `tier`, `capabilities`",
+                "- `align(ground_truth_poses, estimate_poses) -> list[AlignmentPair]`",
+                "",
+                "## Comparable Inputs",
+                "",
+                "- Same `PoseSample` arrays for every strategy",
+                "- Same canonical fixtures (`ordered-index`, `reordered-timestamp`, `sparse-timestamp`)",
+                "- Same evaluation axes: quality, runtime, readability heuristic, extensibility heuristic",
+                "",
+                "## Boundary",
+                "",
+                "- `src/gs_sim2real/core/`: stable, minimal, dependency surface for production code",
+                "- `src/gs_sim2real/experiments/`: discardable strategies and comparison harnesses",
+            ]
+        )
+        + "\n"
+    )
 
 
 def write_localization_alignment_docs(

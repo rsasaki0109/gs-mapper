@@ -85,9 +85,7 @@ class CancelRequestedOnlyQueryCancellationPolicy:
         if not request.target_request_id:
             return QueryCancellationDecision((), "no targeted queued request to cancel")
         cancel_ids = tuple(
-            item.request_id
-            for item in request.pending_items
-            if item.request_id == request.target_request_id
+            item.request_id for item in request.pending_items if item.request_id == request.target_request_id
         )
         return QueryCancellationDecision(cancel_ids, "canceled only the targeted queued request")
 
@@ -115,9 +113,7 @@ class CancelSourceBacklogQueryCancellationPolicy:
             None,
         )
         if source_id:
-            cancel_ids = tuple(
-                item.request_id for item in request.pending_items if item.source_id == source_id
-            )
+            cancel_ids = tuple(item.request_id for item in request.pending_items if item.source_id == source_id)
             return QueryCancellationDecision(cancel_ids, "canceled all queued requests for the disconnected source")
         if target_item is not None and target_item.source_id:
             cancel_ids = tuple(
@@ -126,7 +122,9 @@ class CancelSourceBacklogQueryCancellationPolicy:
             return QueryCancellationDecision(cancel_ids, "canceled all queued requests for the targeted source")
         if request.target_request_id:
             return QueryCancellationDecision(
-                tuple(item.request_id for item in request.pending_items if item.request_id == request.target_request_id),
+                tuple(
+                    item.request_id for item in request.pending_items if item.request_id == request.target_request_id
+                ),
                 "canceled only the targeted queued request because no source scope was available",
             )
         return QueryCancellationDecision((), "no matching queued source to cancel")

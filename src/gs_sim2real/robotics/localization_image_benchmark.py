@@ -137,9 +137,10 @@ def resolve_yaw_degrees(sample: dict[str, Any]) -> float:
     if yaw_radians is not None:
         return math.degrees(yaw_radians)
 
-    return quaternion_to_yaw_degrees(
-        sample.get("orientation") or sample.get("rotation") or sample.get("quaternion")
-    ) or 0.0
+    return (
+        quaternion_to_yaw_degrees(sample.get("orientation") or sample.get("rotation") or sample.get("quaternion"))
+        or 0.0
+    )
 
 
 def resolve_timestamp_seconds(container: dict[str, Any], sample: dict[str, Any]) -> float | None:
@@ -157,7 +158,9 @@ def resolve_timestamp_seconds(container: dict[str, Any], sample: dict[str, Any])
         sample.get("time"),
         container.get("capturedAt"),
         sample.get("capturedAt"),
-        container.get("response", {}).get("relativeTimeSeconds") if isinstance(container.get("response"), dict) else None,
+        container.get("response", {}).get("relativeTimeSeconds")
+        if isinstance(container.get("response"), dict)
+        else None,
         container.get("response", {}).get("timestampSeconds") if isinstance(container.get("response"), dict) else None,
         container.get("response", {}).get("timestamp") if isinstance(container.get("response"), dict) else None,
         container.get("response", {}).get("capturedAt") if isinstance(container.get("response"), dict) else None,
@@ -308,7 +311,9 @@ def decode_rgb_jpeg_base64(payload: str) -> np.ndarray:
 
 def compute_psnr(reference_rgb: np.ndarray, candidate_rgb: np.ndarray) -> float:
     """Compute PSNR in dB, clamped for exact matches."""
-    mse = float(np.mean(np.square(np.asarray(candidate_rgb, dtype=np.float32) - np.asarray(reference_rgb, dtype=np.float32))))
+    mse = float(
+        np.mean(np.square(np.asarray(candidate_rgb, dtype=np.float32) - np.asarray(reference_rgb, dtype=np.float32)))
+    )
     if mse <= 1e-12:
         return 120.0
     return float(10.0 * math.log10(1.0 / mse))
@@ -339,9 +344,7 @@ def compute_ssim(reference_rgb: np.ndarray, candidate_rgb: np.ndarray) -> float:
     sigma_y_sq = F.conv2d(y * y, window, padding=padding, groups=3) - mu_y_sq
     sigma_xy = F.conv2d(x * y, window, padding=padding, groups=3) - mu_xy
 
-    ssim_map = ((2 * mu_xy + c1) * (2 * sigma_xy + c2)) / (
-        (mu_x_sq + mu_y_sq + c1) * (sigma_x_sq + sigma_y_sq + c2)
-    )
+    ssim_map = ((2 * mu_xy + c1) * (2 * sigma_xy + c2)) / ((mu_x_sq + mu_y_sq + c1) * (sigma_x_sq + sigma_y_sq + c2))
     return float(ssim_map.mean().item())
 
 
@@ -383,16 +386,10 @@ class LPIPSMetric:
     def __call__(self, reference_rgb: np.ndarray, candidate_rgb: np.ndarray) -> float:
         torch = self._torch
         reference = (
-            torch.from_numpy(np.asarray(reference_rgb, dtype=np.float32))
-            .permute(2, 0, 1)
-            .unsqueeze(0)
-            .to(self.device)
+            torch.from_numpy(np.asarray(reference_rgb, dtype=np.float32)).permute(2, 0, 1).unsqueeze(0).to(self.device)
         )
         candidate = (
-            torch.from_numpy(np.asarray(candidate_rgb, dtype=np.float32))
-            .permute(2, 0, 1)
-            .unsqueeze(0)
-            .to(self.device)
+            torch.from_numpy(np.asarray(candidate_rgb, dtype=np.float32)).permute(2, 0, 1).unsqueeze(0).to(self.device)
         )
         reference = reference * 2.0 - 1.0
         candidate = candidate * 2.0 - 1.0
@@ -422,7 +419,9 @@ class LPIPSMetric:
             return float(self.model(reference, candidate).item())
 
 
-def ensure_metric_support(metrics: Sequence[str], *, lpips_net: str, device: str) -> dict[str, Callable[[np.ndarray, np.ndarray], float]]:
+def ensure_metric_support(
+    metrics: Sequence[str], *, lpips_net: str, device: str
+) -> dict[str, Callable[[np.ndarray, np.ndarray], float]]:
     """Resolve requested image metrics into callables."""
     supported: dict[str, Callable[[np.ndarray, np.ndarray], float]] = {}
     for metric in metrics:
@@ -534,7 +533,11 @@ def benchmark_localization_images(
         raise ValueError("image benchmark requires at least one matched pose")
 
     metric_functions = ensure_metric_support(metrics, lpips_net=lpips_net, device=device)
-    request_fn = query_fn or (lambda query_endpoint, payload, current_timeout_ms: send_render_query(query_endpoint, payload, timeout_ms=current_timeout_ms))
+    request_fn = query_fn or (
+        lambda query_endpoint, payload, current_timeout_ms: send_render_query(
+            query_endpoint, payload, timeout_ms=current_timeout_ms
+        )
+    )
 
     frames: list[dict[str, Any]] = []
     frame_artifacts: list[dict[str, Any]] = []
@@ -607,9 +610,7 @@ def benchmark_localization_images(
             }
         )
 
-    summary_metrics = {
-        metric_name: build_statistics(values) for metric_name, values in metric_values.items()
-    }
+    summary_metrics = {metric_name: build_statistics(values) for metric_name, values in metric_values.items()}
 
     return {
         "protocol": "dreamwalker-localization-image-benchmark/v1",
@@ -659,9 +660,15 @@ def build_benchmark_summary(report: dict[str, Any]) -> dict[str, Any]:
         "alignment": report.get("alignment"),
         "estimateLabel": report.get("estimate", {}).get("label"),
         "matchedCount": report.get("matching", {}).get("matchedCount"),
-        "psnrMean": metric_summary.get("psnr", {}).get("mean") if isinstance(metric_summary.get("psnr"), dict) else None,
-        "ssimMean": metric_summary.get("ssim", {}).get("mean") if isinstance(metric_summary.get("ssim"), dict) else None,
-        "lpipsMean": metric_summary.get("lpips", {}).get("mean") if isinstance(metric_summary.get("lpips"), dict) else None,
+        "psnrMean": metric_summary.get("psnr", {}).get("mean")
+        if isinstance(metric_summary.get("psnr"), dict)
+        else None,
+        "ssimMean": metric_summary.get("ssim", {}).get("mean")
+        if isinstance(metric_summary.get("ssim"), dict)
+        else None,
+        "lpipsMean": metric_summary.get("lpips", {}).get("mean")
+        if isinstance(metric_summary.get("lpips"), dict)
+        else None,
     }
 
 

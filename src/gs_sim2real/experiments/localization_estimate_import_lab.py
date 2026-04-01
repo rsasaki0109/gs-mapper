@@ -16,7 +16,6 @@ from time import perf_counter
 from typing import Any, Sequence
 
 from gs_sim2real.core.localization_estimate_import import (
-    CORE_LOCALIZATION_ESTIMATE_IMPORT_POLICIES,
     FallbackCascadeImportPolicy,
     LocalizationEstimateImportPolicy,
     LocalizationEstimateImportRequest,
@@ -216,10 +215,7 @@ def evaluate_readability(policy: LocalizationEstimateImportPolicy) -> dict[str, 
     """Estimate readability from source shape. Heuristic, not normative."""
     source = textwrap.dedent(inspect.getsource(policy.import_document))
     tree = ast.parse(source)
-    branch_count = sum(
-        isinstance(node, (ast.If, ast.For, ast.While, ast.Try, ast.Match))
-        for node in ast.walk(tree)
-    )
+    branch_count = sum(isinstance(node, (ast.If, ast.For, ast.While, ast.Try, ast.Match)) for node in ast.walk(tree))
     lines = [
         line
         for line in source.splitlines()
@@ -407,7 +403,9 @@ def build_localization_estimate_import_process_section(report: dict[str, Any]) -
                     fixture_report.get("sourceType", "n/a"),
                     str(fixture_report.get("poseCount", "n/a")),
                     "yes" if fixture_report.get("labelMatch") else "no",
-                    f"{float(fixture_report.get('schemaMatchScore') or 0.0):.2f}" if fixture_report["status"] == "ok" else "n/a",
+                    f"{float(fixture_report.get('schemaMatchScore') or 0.0):.2f}"
+                    if fixture_report["status"] == "ok"
+                    else "n/a",
                 ]
             )
         fixture_sections.append(

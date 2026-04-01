@@ -144,8 +144,7 @@ def canonicalize_query_request_type(raw_value: str, *, default: str = "render") 
     if canonical:
         return canonical
     raise ValueError(
-        f"unsupported query payload type: {normalized}. Expected one of "
-        f"{', '.join(sorted(REQUEST_TYPE_ALIASES))}"
+        f"unsupported query payload type: {normalized}. Expected one of {', '.join(sorted(REQUEST_TYPE_ALIASES))}"
     )
 
 
@@ -181,9 +180,7 @@ def _normalize_metrics(metrics_payload: Any) -> tuple[str, ...]:
     if not isinstance(metrics_payload, (list, tuple)) or not metrics_payload:
         raise ValueError("localization-image-benchmark metrics must be a non-empty list")
     metrics = tuple(
-        read_non_empty_string(metric).lower()
-        for metric in metrics_payload
-        if read_non_empty_string(metric)
+        read_non_empty_string(metric).lower() for metric in metrics_payload if read_non_empty_string(metric)
     )
     if not metrics:
         raise ValueError("localization-image-benchmark metrics must include at least one metric name")
@@ -281,15 +278,9 @@ def _parse_benchmark_query_spec(
         estimate=estimate_value,
         alignment=read_non_empty_string(alignment_value) or "auto",
         timeout_ms=(
-            defaults.timeout_ms
-            if timeout_value is None
-            else normalize_positive_int(timeout_value, "timeoutMs")
+            defaults.timeout_ms if timeout_value is None else normalize_positive_int(timeout_value, "timeoutMs")
         ),
-        max_frames=(
-            None
-            if max_frames_value is None
-            else normalize_positive_int(max_frames_value, "maxFrames")
-        ),
+        max_frames=(None if max_frames_value is None else normalize_positive_int(max_frames_value, "maxFrames")),
         metrics=_normalize_metrics(metrics_value),
         lpips_net=read_non_empty_string(lpips_net_value) or "alex",
         device=read_non_empty_string(device_value) or "cpu",
@@ -438,7 +429,18 @@ class AliasFriendlyQueryRequestImportPolicy:
         )
         if explicit_type:
             request_type = canonicalize_query_request_type(explicit_type)
-        elif any(key in payload for key in ("benchmark", "localizationImageBenchmark", "groundTruthBundle", "groundTruth", "estimate", "trajectory", "estimateTrajectory")):
+        elif any(
+            key in payload
+            for key in (
+                "benchmark",
+                "localizationImageBenchmark",
+                "groundTruthBundle",
+                "groundTruth",
+                "estimate",
+                "trajectory",
+                "estimateTrajectory",
+            )
+        ):
             request_type = "localization-image-benchmark"
         else:
             request_type = "render"
@@ -499,7 +501,6 @@ def import_query_request(
     }
     if policy not in policies:
         raise RuntimeError(
-            f"unsupported query request import policy: {policy}. "
-            f"Expected one of {', '.join(sorted(policies))}"
+            f"unsupported query request import policy: {policy}. Expected one of {', '.join(sorted(policies))}"
         )
     return policies[policy].import_request(request)

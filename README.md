@@ -16,6 +16,8 @@ One-command pipelines to go from robotics/autonomous driving dataset images to 3
 
 The demo page features an interactive Three.js 3D point cloud viewer and Plotly.js training metrics charts. You can explore reconstructed scenes directly in the browser without any local setup.
 
+GitHub Pages is deployed by [`.github/workflows/pages.yml`](/media/sasaki/aiueo/ai_coding_ws/nerf-gs-playground/.github/workflows/pages.yml) on `push` to `main`, so changes in a feature branch do not appear until they are merged and the Pages workflow finishes.
+
 The viewer now also accepts exported static scene bundles, so a trained PLY can
 be published on GitHub Pages and opened as a browser-only 3DGS space.
 
@@ -91,6 +93,9 @@ Then either:
 
 The GitHub Pages viewer also accepts direct exported `.json` / `.bin` point
 assets through the `Load Asset` button in `docs/index.html`.
+
+If the live site still shows the old content after merge, check the latest
+`Deploy to GitHub Pages` action run and wait for that deployment to complete.
 
 ## Prototype Apps
 

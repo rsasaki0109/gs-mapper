@@ -34,9 +34,7 @@ class QuerySourceIdentityFixture:
     expected_summary: dict[str, Any]
 
 
-EXPERIMENT_QUERY_SOURCE_IDENTITY_POLICIES: tuple[QuerySourceIdentityPolicy, ...] = (
-    CORE_QUERY_SOURCE_IDENTITY_POLICIES
-)
+EXPERIMENT_QUERY_SOURCE_IDENTITY_POLICIES: tuple[QuerySourceIdentityPolicy, ...] = CORE_QUERY_SOURCE_IDENTITY_POLICIES
 
 
 def build_query_source_identity_fixtures() -> list[QuerySourceIdentityFixture]:
@@ -145,7 +143,11 @@ def evaluate_readability(policy: QuerySourceIdentityPolicy) -> dict[str, Any]:
     source = textwrap.dedent(inspect.getsource(policy.identify))
     tree = ast.parse(source)
     branch_count = sum(isinstance(node, (ast.If, ast.For, ast.While, ast.Try, ast.Match)) for node in ast.walk(tree))
-    lines = [line for line in source.splitlines() if line.strip() and not line.strip().startswith(("def ", '"""', "'''", "#"))]
+    lines = [
+        line
+        for line in source.splitlines()
+        if line.strip() and not line.strip().startswith(("def ", '"""', "'''", "#"))
+    ]
     lines_of_code = len(lines)
     score = max(1.0, 10.0 - max(0, lines_of_code - 8) * 0.2 - max(0, branch_count - 2) * 0.8)
     return {"score": round(score, 1), "linesOfCode": lines_of_code, "branchCount": branch_count}
@@ -289,7 +291,9 @@ def build_query_source_identity_process_section(report: dict[str, Any]) -> dict[
                 [
                     policy["label"],
                     fixture_report["status"],
-                    f"{float(fixture_report.get('matchScore') or 0.0):.3f}" if fixture_report["status"] == "ok" else "n/a",
+                    f"{float(fixture_report.get('matchScore') or 0.0):.3f}"
+                    if fixture_report["status"] == "ok"
+                    else "n/a",
                     "yes" if fixture_report.get("exactMatch") else "no",
                     fixture_report.get("summary", {}).get("sourceId", "n/a"),
                 ]
@@ -307,7 +311,15 @@ def build_query_source_identity_process_section(report: dict[str, Any]) -> dict[
         "updatedAt": report["createdAt"],
         "problemStatement": report["problem"]["statement"],
         "comparisonHeaders": [
-            "Policy", "Tier", "Style", "Success", "Exact", "Shape", "Runtime (ms)", "Readability", "Extensibility"
+            "Policy",
+            "Tier",
+            "Style",
+            "Success",
+            "Exact",
+            "Shape",
+            "Runtime (ms)",
+            "Readability",
+            "Extensibility",
         ],
         "comparisonRows": comparison_rows,
         "fixtureSections": fixture_sections,

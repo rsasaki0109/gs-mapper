@@ -69,7 +69,9 @@ def build_sim2real_websocket_protocol_process_section(report: dict[str, Any]) ->
                     policy["label"],
                     fixture_report["status"],
                     fixture_report.get("summary", {}).get("type", "n/a"),
-                    f"{float(fixture_report.get('matchScore') or 0.0):.3f}" if fixture_report["status"] == "ok" else "n/a",
+                    f"{float(fixture_report.get('matchScore') or 0.0):.3f}"
+                    if fixture_report["status"] == "ok"
+                    else "n/a",
                     "yes" if fixture_report.get("exactMatch") else "no",
                 ]
             )

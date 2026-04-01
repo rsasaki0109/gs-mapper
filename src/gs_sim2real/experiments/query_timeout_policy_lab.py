@@ -180,10 +180,7 @@ def evaluate_readability(policy: QueryTimeoutPolicy) -> dict[str, Any]:
     """Estimate readability from source shape. Heuristic, not normative."""
     source = textwrap.dedent(inspect.getsource(policy.resolve_timeout_plan))
     tree = ast.parse(source)
-    branch_count = sum(
-        isinstance(node, (ast.If, ast.For, ast.While, ast.Try, ast.Match))
-        for node in ast.walk(tree)
-    )
+    branch_count = sum(isinstance(node, (ast.If, ast.For, ast.While, ast.Try, ast.Match)) for node in ast.walk(tree))
     lines = [
         line
         for line in source.splitlines()
@@ -345,7 +342,9 @@ def build_query_timeout_policy_process_section(report: dict[str, Any]) -> dict[s
                 [
                     policy["label"],
                     fixture_report["status"],
-                    f"{float(fixture_report.get('matchScore') or 0.0):.3f}" if fixture_report["status"] == "ok" else "n/a",
+                    f"{float(fixture_report.get('matchScore') or 0.0):.3f}"
+                    if fixture_report["status"] == "ok"
+                    else "n/a",
                     "yes" if fixture_report.get("exactMatch") else "no",
                     fixture_report.get("summary", {}).get("maxAttempts", "n/a"),
                 ]

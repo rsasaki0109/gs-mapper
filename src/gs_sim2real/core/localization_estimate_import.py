@@ -105,9 +105,10 @@ def resolve_yaw_degrees(sample: dict[str, Any]) -> float:
     if yaw_radians is not None:
         return math.degrees(yaw_radians)
 
-    return quaternion_to_yaw_degrees(
-        sample.get("orientation") or sample.get("rotation") or sample.get("quaternion")
-    ) or 0.0
+    return (
+        quaternion_to_yaw_degrees(sample.get("orientation") or sample.get("rotation") or sample.get("quaternion"))
+        or 0.0
+    )
 
 
 def resolve_timestamp_seconds(container: dict[str, Any], sample: dict[str, Any]) -> float | None:
@@ -125,7 +126,9 @@ def resolve_timestamp_seconds(container: dict[str, Any], sample: dict[str, Any])
         sample.get("time"),
         container.get("capturedAt"),
         sample.get("capturedAt"),
-        container.get("response", {}).get("relativeTimeSeconds") if isinstance(container.get("response"), dict) else None,
+        container.get("response", {}).get("relativeTimeSeconds")
+        if isinstance(container.get("response"), dict)
+        else None,
         container.get("response", {}).get("timestampSeconds") if isinstance(container.get("response"), dict) else None,
         container.get("response", {}).get("timestamp") if isinstance(container.get("response"), dict) else None,
         container.get("response", {}).get("capturedAt") if isinstance(container.get("response"), dict) else None,

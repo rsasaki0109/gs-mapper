@@ -72,9 +72,7 @@ def build_query_queue_policy_fixtures() -> list[QueryQueueFixture]:
             label="Benchmark Then Render",
             intent="Interactive render work should leap ahead of queued background benchmark work.",
             state=QueryQueueState(
-                pending_items=(
-                    _item("benchmark-1", "localization-image-benchmark", 1, work=12),
-                ),
+                pending_items=(_item("benchmark-1", "localization-image-benchmark", 1, work=12),),
                 max_pending=3,
             ),
             incoming_item=_item("render-1", "render", 2),
@@ -130,9 +128,7 @@ def evaluate_query_queue_fixture(
                 if admit.accepted and item.request_id in set(admit.pending_request_ids)
             )
             dispatch_state = QueryQueueState(
-                pending_items=tuple(
-                    sorted(dispatch_state_items, key=lambda item: admitted_ids.index(item.request_id))
-                ),
+                pending_items=tuple(sorted(dispatch_state_items, key=lambda item: admitted_ids.index(item.request_id))),
                 max_pending=fixture.state.max_pending,
             )
         else:
@@ -208,10 +204,7 @@ def evaluate_readability(policy: QueryQueuePolicy) -> dict[str, Any]:
     """Estimate readability from source shape. Heuristic, not normative."""
     source = textwrap.dedent(inspect.getsource(policy.__class__))
     tree = ast.parse(source)
-    branch_count = sum(
-        isinstance(node, (ast.If, ast.For, ast.While, ast.Try, ast.Match))
-        for node in ast.walk(tree)
-    )
+    branch_count = sum(isinstance(node, (ast.If, ast.For, ast.While, ast.Try, ast.Match)) for node in ast.walk(tree))
     lines = [
         line
         for line in source.splitlines()
@@ -370,7 +363,9 @@ def build_query_queue_policy_process_section(report: dict[str, Any]) -> dict[str
                 [
                     policy["label"],
                     fixture_report["status"],
-                    f"{float(fixture_report.get('matchScore') or 0.0):.3f}" if fixture_report["status"] == "ok" else "n/a",
+                    f"{float(fixture_report.get('matchScore') or 0.0):.3f}"
+                    if fixture_report["status"] == "ok"
+                    else "n/a",
                     "yes" if fixture_report.get("exactMatch") else "no",
                     fixture_report.get("summary", {}).get("dispatchRequestId", "n/a"),
                 ]

@@ -164,9 +164,7 @@ def decode_render_query_response(response: dict[str, Any]) -> DecodedRenderQuery
     depth_bytes = base64.b64decode(depth_b64, validate=True)
     expected_depth_bytes = width * height * 4
     if len(depth_bytes) != expected_depth_bytes:
-        raise ValueError(
-            f"depth payload size mismatch: expected {expected_depth_bytes} bytes, got {len(depth_bytes)}"
-        )
+        raise ValueError(f"depth payload size mismatch: expected {expected_depth_bytes} bytes, got {len(depth_bytes)}")
     depth = np.frombuffer(depth_bytes, dtype="<f4").reshape(height, width).copy()
 
     return DecodedRenderQueryResult(

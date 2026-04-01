@@ -172,9 +172,7 @@ def ply_to_scene_bundle(
     resolved_scene_id = _sanitize_scene_id(scene_id or Path(ply_path).stem)
     resolved_label = str(label or Path(ply_path).stem.replace("_", " ").replace("-", " ")).strip() or "Scene"
     asset_name = (
-        f"{resolved_scene_id}.points.json"
-        if normalized_asset_format == "json"
-        else f"{resolved_scene_id}.points.bin"
+        f"{resolved_scene_id}.points.json" if normalized_asset_format == "json" else f"{resolved_scene_id}.points.bin"
     )
     asset_path = bundle_dir / asset_name
     if normalized_asset_format == "json":

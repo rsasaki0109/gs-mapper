@@ -57,9 +57,7 @@ def build_query_coalescing_policy_fixtures() -> list[QueryCoalescingFixture]:
             label="Benchmark Plus Render",
             intent="A render should coexist with queued background benchmark work.",
             request=QueryCoalescingRequest(
-                pending_items=(
-                    _item("benchmark-1", "localization-image-benchmark", "socket-a", 1),
-                ),
+                pending_items=(_item("benchmark-1", "localization-image-benchmark", "socket-a", 1),),
                 incoming_item=_item("render-1", "render", "socket-a", 2, dedupe_key="pose-a"),
             ),
             expected_summary={
@@ -73,9 +71,7 @@ def build_query_coalescing_policy_fixtures() -> list[QueryCoalescingFixture]:
             label="Duplicate Render Same Source",
             intent="If the same source repeats a render, the latest request should replace the older pending one.",
             request=QueryCoalescingRequest(
-                pending_items=(
-                    _item("render-1", "render", "socket-a", 1, dedupe_key="pose-a"),
-                ),
+                pending_items=(_item("render-1", "render", "socket-a", 1, dedupe_key="pose-a"),),
                 incoming_item=_item("render-2", "render", "socket-a", 2, dedupe_key="pose-a"),
             ),
             expected_summary={
@@ -171,7 +167,11 @@ def evaluate_readability(policy: QueryCoalescingPolicy) -> dict[str, Any]:
     source = textwrap.dedent(inspect.getsource(policy.coalesce))
     tree = ast.parse(source)
     branch_count = sum(isinstance(node, (ast.If, ast.For, ast.While, ast.Try, ast.Match)) for node in ast.walk(tree))
-    lines = [line for line in source.splitlines() if line.strip() and not line.strip().startswith(("def ", '"""', "'''", "#"))]
+    lines = [
+        line
+        for line in source.splitlines()
+        if line.strip() and not line.strip().startswith(("def ", '"""', "'''", "#"))
+    ]
     lines_of_code = len(lines)
     score = max(1.0, 10.0 - max(0, lines_of_code - 8) * 0.2 - max(0, branch_count - 2) * 0.8)
     return {"score": round(score, 1), "linesOfCode": lines_of_code, "branchCount": branch_count}
@@ -312,7 +312,9 @@ def build_query_coalescing_policy_process_section(report: dict[str, Any]) -> dic
                 [
                     policy["label"],
                     fixture_report["status"],
-                    f"{float(fixture_report.get('matchScore') or 0.0):.3f}" if fixture_report["status"] == "ok" else "n/a",
+                    f"{float(fixture_report.get('matchScore') or 0.0):.3f}"
+                    if fixture_report["status"] == "ok"
+                    else "n/a",
                     "yes" if fixture_report.get("exactMatch") else "no",
                     ",".join(fixture_report.get("summary", {}).get("evictedRequestIds", ())) or "none",
                 ]
@@ -330,7 +332,15 @@ def build_query_coalescing_policy_process_section(report: dict[str, Any]) -> dic
         "updatedAt": report["createdAt"],
         "problemStatement": report["problem"]["statement"],
         "comparisonHeaders": [
-            "Policy", "Tier", "Style", "Success", "Exact", "Shape", "Runtime (ms)", "Readability", "Extensibility"
+            "Policy",
+            "Tier",
+            "Style",
+            "Success",
+            "Exact",
+            "Shape",
+            "Runtime (ms)",
+            "Readability",
+            "Extensibility",
         ],
         "comparisonRows": comparison_rows,
         "fixtureSections": fixture_sections,

@@ -241,9 +241,7 @@ def summarize_imported_query_request(imported: ImportedQueryRequest) -> dict[str
         raise ValueError("benchmark import result is missing the image benchmark spec")
     benchmark = imported.image_benchmark
     ground_truth_type = (
-        benchmark.ground_truth_bundle.get("type")
-        if isinstance(benchmark.ground_truth_bundle, dict)
-        else None
+        benchmark.ground_truth_bundle.get("type") if isinstance(benchmark.ground_truth_bundle, dict) else None
     )
     return {
         "requestType": "localization-image-benchmark",
@@ -323,10 +321,7 @@ def evaluate_readability(policy: QueryRequestImportPolicy) -> dict[str, Any]:
     """Estimate readability from source shape. Heuristic, not normative."""
     source = textwrap.dedent(inspect.getsource(policy.import_request))
     tree = ast.parse(source)
-    branch_count = sum(
-        isinstance(node, (ast.If, ast.For, ast.While, ast.Try, ast.Match))
-        for node in ast.walk(tree)
-    )
+    branch_count = sum(isinstance(node, (ast.If, ast.For, ast.While, ast.Try, ast.Match)) for node in ast.walk(tree))
     lines = [
         line
         for line in source.splitlines()
@@ -398,18 +393,13 @@ def build_query_request_import_experiment_report(*, repetitions: int = 200) -> d
     ]
     policy_reports = []
     for policy in EXPERIMENT_QUERY_REQUEST_IMPORT_POLICIES:
-        fixture_reports = [
-            evaluate_query_request_import_fixture(policy, fixture)
-            for fixture in fixtures
-        ]
+        fixture_reports = [evaluate_query_request_import_fixture(policy, fixture) for fixture in fixtures]
         runtime_report = benchmark_query_request_import_policy_runtime(
             policy,
             fixtures,
             repetitions=repetitions,
         )
-        policy_reports.append(
-            summarize_query_request_import_policy(policy, fixture_reports, runtime_report)
-        )
+        policy_reports.append(summarize_query_request_import_policy(policy, fixture_reports, runtime_report))
 
     best_fit = max(
         policy_reports,
@@ -499,7 +489,9 @@ def build_query_request_import_process_section(report: dict[str, Any]) -> dict[s
                     policy["label"],
                     fixture_report["status"],
                     fixture_report.get("requestType", "n/a"),
-                    f"{float(fixture_report.get('matchScore') or 0.0):.3f}" if fixture_report["status"] == "ok" else "n/a",
+                    f"{float(fixture_report.get('matchScore') or 0.0):.3f}"
+                    if fixture_report["status"] == "ok"
+                    else "n/a",
                     "yes" if fixture_report.get("exactMatch") else "no",
                 ]
             )

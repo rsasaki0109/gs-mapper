@@ -64,11 +64,15 @@ class ExplicitOnlyQueryTransportPolicy:
         if requested_transport == "zmq":
             if not runtime.zmq_available:
                 raise RuntimeError("query-transport=zmq requires the optional `pyzmq` package")
-            return QueryTransportSelection("zmq", resolve_query_transport_endpoint("zmq", request.endpoint), "forced by --query-transport zmq")
+            return QueryTransportSelection(
+                "zmq", resolve_query_transport_endpoint("zmq", request.endpoint), "forced by --query-transport zmq"
+            )
         if requested_transport == "ws":
             if not runtime.ws_available:
                 raise RuntimeError("query-transport=ws requires the optional `websockets` package")
-            return QueryTransportSelection("ws", resolve_query_transport_endpoint("ws", request.endpoint), "forced by --query-transport ws")
+            return QueryTransportSelection(
+                "ws", resolve_query_transport_endpoint("ws", request.endpoint), "forced by --query-transport ws"
+            )
         if requested_transport != "auto":
             raise RuntimeError(f"unsupported query transport: {requested_transport}")
 
@@ -305,10 +309,7 @@ def evaluate_readability(policy: QueryTransportPolicy) -> dict[str, Any]:
     """Estimate readability from source shape. Heuristic, not normative."""
     source = textwrap.dedent(inspect.getsource(policy.select))
     tree = ast.parse(source)
-    branch_count = sum(
-        isinstance(node, (ast.If, ast.For, ast.While, ast.Try, ast.Match))
-        for node in ast.walk(tree)
-    )
+    branch_count = sum(isinstance(node, (ast.If, ast.For, ast.While, ast.Try, ast.Match)) for node in ast.walk(tree))
     lines = [
         line
         for line in source.splitlines()

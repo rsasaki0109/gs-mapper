@@ -186,9 +186,7 @@ class PendingRenderQueryStore:
 
             existing_by_id = {entry.queue_item.request_id: entry for entry in self._entries}
             evicted_ids = set(coalesce_decision.evicted_request_ids)
-            evicted_entries.extend(
-                entry for entry in self._entries if entry.queue_item.request_id in evicted_ids
-            )
+            evicted_entries.extend(entry for entry in self._entries if entry.queue_item.request_id in evicted_ids)
             kept_entries = [
                 existing_by_id[current_id]
                 for current_id in coalesce_decision.pending_request_ids
@@ -205,9 +203,7 @@ class PendingRenderQueryStore:
             existing_by_id = {entry.queue_item.request_id: entry for entry in kept_entries}
             existing_by_id[request_id] = PendingRenderQueryEntry(queue_item=queue_item, pending=pending)
             evicted_ids = set(decision.evicted_request_ids)
-            evicted_entries.extend(
-                entry for entry in kept_entries if entry.queue_item.request_id in evicted_ids
-            )
+            evicted_entries.extend(entry for entry in kept_entries if entry.queue_item.request_id in evicted_ids)
             self._entries = [existing_by_id[current_id] for current_id in decision.pending_request_ids]
 
         combined_reason = " / ".join(
@@ -260,12 +256,8 @@ class PendingRenderQueryStore:
             canceled_ids = set(decision.canceled_request_ids)
             if not canceled_ids:
                 return False
-            canceled_entries = [
-                entry for entry in self._entries if entry.queue_item.request_id in canceled_ids
-            ]
-            self._entries = [
-                entry for entry in self._entries if entry.queue_item.request_id not in canceled_ids
-            ]
+            canceled_entries = [entry for entry in self._entries if entry.queue_item.request_id in canceled_ids]
+            self._entries = [entry for entry in self._entries if entry.queue_item.request_id not in canceled_ids]
         for entry in canceled_entries:
             entry.pending.response = build_query_event_error_response(
                 "query_canceled",
@@ -292,12 +284,8 @@ class PendingRenderQueryStore:
             canceled_ids = set(decision.canceled_request_ids)
             if not canceled_ids:
                 return False
-            canceled_entries = [
-                entry for entry in self._entries if entry.queue_item.request_id in canceled_ids
-            ]
-            self._entries = [
-                entry for entry in self._entries if entry.queue_item.request_id not in canceled_ids
-            ]
+            canceled_entries = [entry for entry in self._entries if entry.queue_item.request_id in canceled_ids]
+            self._entries = [entry for entry in self._entries if entry.queue_item.request_id not in canceled_ids]
         for entry in canceled_entries:
             entry.pending.response = build_query_event_error_response(
                 "query_canceled",
@@ -318,12 +306,8 @@ class PendingRenderQueryStore:
                 policy=self.cancellation_policy,
             )
             canceled_ids = set(decision.canceled_request_ids)
-            drained_entries = [
-                entry for entry in self._entries if entry.queue_item.request_id in canceled_ids
-            ]
-            self._entries = [
-                entry for entry in self._entries if entry.queue_item.request_id not in canceled_ids
-            ]
+            drained_entries = [entry for entry in self._entries if entry.queue_item.request_id in canceled_ids]
+            self._entries = [entry for entry in self._entries if entry.queue_item.request_id not in canceled_ids]
         for entry in drained_entries:
             entry.pending.response = build_query_event_error_response(
                 "server_shutdown",

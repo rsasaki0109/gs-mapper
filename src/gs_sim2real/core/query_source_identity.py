@@ -108,7 +108,9 @@ class EndpointScopedQuerySourceIdentityPolicy:
         endpoint_scope = _build_endpoint_scope(request.endpoint)
         if endpoint_scope:
             source_id = f"{prefix}-{endpoint_scope}-client-{max(1, int(request.connection_serial))}"
-            return QuerySourceIdentity(source_id, "built a source id from the transport, endpoint, and connection serial")
+            return QuerySourceIdentity(
+                source_id, "built a source id from the transport, endpoint, and connection serial"
+            )
         return SerialOnlyQuerySourceIdentityPolicy().identify(request)
 
 

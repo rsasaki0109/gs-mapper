@@ -216,10 +216,7 @@ def evaluate_readability(policy: RouteCaptureBundleImportPolicy) -> dict[str, An
     """Estimate readability from source shape. Heuristic, not normative."""
     source = textwrap.dedent(inspect.getsource(policy.import_bundle))
     tree = ast.parse(source)
-    branch_count = sum(
-        isinstance(node, (ast.If, ast.For, ast.While, ast.Try, ast.Match))
-        for node in ast.walk(tree)
-    )
+    branch_count = sum(isinstance(node, (ast.If, ast.For, ast.While, ast.Try, ast.Match)) for node in ast.walk(tree))
     lines = [
         line
         for line in source.splitlines()
@@ -259,7 +256,9 @@ def summarize_bundle_import_policy(
     aggregate = {
         "successRate": float(len(successful) / max(1, len(fixture_reports))),
         "schemaMatchRate": _mean_or_none([report.get("schemaMatchScore") for report in successful]),
-        "fragmentLabelMatchRate": _mean_or_none([1.0 if report.get("fragmentLabelMatch") else 0.0 for report in successful]),
+        "fragmentLabelMatchRate": _mean_or_none(
+            [1.0 if report.get("fragmentLabelMatch") else 0.0 for report in successful]
+        ),
         "failedFixtures": [report["fixtureId"] for report in fixture_reports if report["status"] != "ok"],
     }
     return {
@@ -385,7 +384,9 @@ def build_route_capture_bundle_import_process_section(report: dict[str, Any]) ->
                     fixture_report["status"],
                     fixture_report.get("captureCount", "n/a"),
                     "yes" if fixture_report.get("fragmentLabelMatch") else "no",
-                    f"{float(fixture_report.get('schemaMatchScore') or 0.0):.3f}" if fixture_report["status"] == "ok" else "n/a",
+                    f"{float(fixture_report.get('schemaMatchScore') or 0.0):.3f}"
+                    if fixture_report["status"] == "ok"
+                    else "n/a",
                 ]
             )
         fixture_sections.append(

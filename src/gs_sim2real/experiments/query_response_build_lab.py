@@ -178,9 +178,7 @@ def summarize_query_response_document(response: dict[str, Any]) -> dict[str, Any
         "type": response.get("type"),
         "protocol": response.get("protocol"),
         "keys": tuple(sorted(response.keys())),
-        "metaKeys": tuple(sorted(response.get("meta", {}).keys()))
-        if isinstance(response.get("meta"), dict)
-        else (),
+        "metaKeys": tuple(sorted(response.get("meta", {}).keys())) if isinstance(response.get("meta"), dict) else (),
     }
     if response.get("type") == "render-result":
         pose = response.get("pose") if isinstance(response.get("pose"), dict) else {}
@@ -294,10 +292,7 @@ def evaluate_readability(policy: QueryResponseBuildPolicy) -> dict[str, Any]:
     """Estimate readability from source shape. Heuristic, not normative."""
     source = textwrap.dedent(inspect.getsource(policy.__class__))
     tree = ast.parse(source)
-    branch_count = sum(
-        isinstance(node, (ast.If, ast.For, ast.While, ast.Try, ast.Match))
-        for node in ast.walk(tree)
-    )
+    branch_count = sum(isinstance(node, (ast.If, ast.For, ast.While, ast.Try, ast.Match)) for node in ast.walk(tree))
     lines = [
         line
         for line in source.splitlines()
@@ -376,9 +371,7 @@ def build_query_response_build_experiment_report(*, repetitions: int = 200) -> d
             fixtures,
             repetitions=repetitions,
         )
-        policy_reports.append(
-            summarize_query_response_build_policy(policy, fixture_reports, runtime_report)
-        )
+        policy_reports.append(summarize_query_response_build_policy(policy, fixture_reports, runtime_report))
 
     best_fit = max(
         policy_reports,

@@ -98,15 +98,10 @@ def write_repo_experiment_process_docs(
     backend_report = render_backend_report or build_render_backend_selection_experiment_report()
     import_report = localization_import_report or build_localization_estimate_import_experiment_report()
     review_bundle_import_report = (
-        localization_review_bundle_import_report
-        or build_localization_review_bundle_import_experiment_report()
+        localization_review_bundle_import_report or build_localization_review_bundle_import_experiment_report()
     )
-    cancellation_policy_report = (
-        query_cancellation_policy_report or build_query_cancellation_policy_experiment_report()
-    )
-    coalescing_policy_report = (
-        query_coalescing_policy_report or build_query_coalescing_policy_experiment_report()
-    )
+    cancellation_policy_report = query_cancellation_policy_report or build_query_cancellation_policy_experiment_report()
+    coalescing_policy_report = query_coalescing_policy_report or build_query_coalescing_policy_experiment_report()
     error_mapping_report = query_error_mapping_report or build_query_error_mapping_experiment_report()
     source_identity_report = query_source_identity_report or build_query_source_identity_experiment_report()
     transport_report = query_transport_report or build_query_transport_selection_experiment_report()
@@ -115,16 +110,11 @@ def write_repo_experiment_process_docs(
     timeout_policy_report = query_timeout_policy_report or build_query_timeout_policy_experiment_report()
     response_build_report = query_response_build_report or build_query_response_build_experiment_report()
     live_stream_report = (
-        live_localization_stream_import_report
-        or build_live_localization_stream_import_experiment_report()
+        live_localization_stream_import_report or build_live_localization_stream_import_experiment_report()
     )
-    bundle_import_report = (
-        route_capture_bundle_import_report
-        or build_route_capture_bundle_import_experiment_report()
-    )
+    bundle_import_report = route_capture_bundle_import_report or build_route_capture_bundle_import_experiment_report()
     websocket_protocol_report = (
-        sim2real_websocket_protocol_report
-        or build_sim2real_websocket_protocol_experiment_report()
+        sim2real_websocket_protocol_report or build_sim2real_websocket_protocol_experiment_report()
     )
     sections = [
         build_localization_alignment_process_section(alignment_report),

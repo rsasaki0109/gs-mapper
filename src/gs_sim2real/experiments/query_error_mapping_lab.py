@@ -34,9 +34,7 @@ class QueryErrorMappingFixture:
     expected_summary: dict[str, Any]
 
 
-EXPERIMENT_QUERY_ERROR_MAPPING_POLICIES: tuple[QueryErrorMappingPolicy, ...] = (
-    CORE_QUERY_ERROR_MAPPING_POLICIES
-)
+EXPERIMENT_QUERY_ERROR_MAPPING_POLICIES: tuple[QueryErrorMappingPolicy, ...] = CORE_QUERY_ERROR_MAPPING_POLICIES
 
 
 def build_query_error_mapping_fixtures() -> list[QueryErrorMappingFixture]:
@@ -190,7 +188,11 @@ def evaluate_readability(policy: QueryErrorMappingPolicy) -> dict[str, Any]:
     source = textwrap.dedent(inspect.getsource(policy.map_error))
     tree = ast.parse(source)
     branch_count = sum(isinstance(node, (ast.If, ast.For, ast.While, ast.Try, ast.Match)) for node in ast.walk(tree))
-    lines = [line for line in source.splitlines() if line.strip() and not line.strip().startswith(("def ", '"""', "'''", "#"))]
+    lines = [
+        line
+        for line in source.splitlines()
+        if line.strip() and not line.strip().startswith(("def ", '"""', "'''", "#"))
+    ]
     lines_of_code = len(lines)
     score = max(1.0, 10.0 - max(0, lines_of_code - 10) * 0.18 - max(0, branch_count - 3) * 0.8)
     return {"score": round(score, 1), "linesOfCode": lines_of_code, "branchCount": branch_count}
@@ -334,7 +336,9 @@ def build_query_error_mapping_process_section(report: dict[str, Any]) -> dict[st
                 [
                     policy["label"],
                     fixture_report["status"],
-                    f"{float(fixture_report.get('matchScore') or 0.0):.3f}" if fixture_report["status"] == "ok" else "n/a",
+                    f"{float(fixture_report.get('matchScore') or 0.0):.3f}"
+                    if fixture_report["status"] == "ok"
+                    else "n/a",
                     "yes" if fixture_report.get("exactMatch") else "no",
                     fixture_report.get("summary", {}).get("errorCode", "n/a"),
                 ]
@@ -352,7 +356,15 @@ def build_query_error_mapping_process_section(report: dict[str, Any]) -> dict[st
         "updatedAt": report["createdAt"],
         "problemStatement": report["problem"]["statement"],
         "comparisonHeaders": [
-            "Policy", "Tier", "Style", "Success", "Exact", "Shape", "Runtime (ms)", "Readability", "Extensibility"
+            "Policy",
+            "Tier",
+            "Style",
+            "Success",
+            "Exact",
+            "Shape",
+            "Runtime (ms)",
+            "Readability",
+            "Extensibility",
         ],
         "comparisonRows": comparison_rows,
         "fixtureSections": fixture_sections,

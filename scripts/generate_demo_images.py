@@ -2,13 +2,13 @@
 """Generate demo images for gs-sim2real README."""
 
 import matplotlib
-matplotlib.use('Agg')
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import json
-from pathlib import Path
-import numpy as np
 import os
+from pathlib import Path
 
 os.chdir(Path(__file__).resolve().parent.parent)
 
@@ -23,7 +23,7 @@ def generate_training_metrics():
     scene_labels = {"street": "Street (CoVLA)", "campus": "Campus (MCD)", "indoor": "Indoor (HM3D)"}
 
     fig, axes = plt.subplots(2, 2, figsize=(14, 9))
-    fig.suptitle("3D Gaussian Splatting Training Metrics", fontsize=16, fontweight='bold', y=0.98)
+    fig.suptitle("3D Gaussian Splatting Training Metrics", fontsize=16, fontweight="bold", y=0.98)
 
     metrics = [
         ("loss", "Loss", "Training Loss"),
@@ -43,14 +43,14 @@ def generate_training_metrics():
 
         ax.set_xlabel("Iteration")
         ax.set_ylabel(ylabel)
-        ax.set_title(title, fontweight='bold')
+        ax.set_title(title, fontweight="bold")
         ax.legend(fontsize=8, framealpha=0.9)
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
         ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig("docs/demo_training.png", dpi=150, bbox_inches='tight', facecolor='white')
+    plt.savefig("docs/demo_training.png", dpi=150, bbox_inches="tight", facecolor="white")
     print("Saved docs/demo_training.png")
     plt.close()
 
@@ -60,7 +60,7 @@ def generate_pipeline_overview():
     fig, ax = plt.subplots(figsize=(14, 4))
     ax.set_xlim(0, 10)
     ax.set_ylim(0, 3)
-    ax.axis('off')
+    ax.axis("off")
 
     # Pipeline stages
     stages = [
@@ -74,22 +74,24 @@ def generate_pipeline_overview():
 
     for x, y, text, facecolor, edgecolor in stages:
         rect = mpatches.FancyBboxPatch(
-            (x - box_w / 2, y - box_h / 2), box_w, box_h,
-            boxstyle="round,pad=0.15", facecolor=facecolor,
-            edgecolor=edgecolor, linewidth=2.5
+            (x - box_w / 2, y - box_h / 2),
+            box_w,
+            box_h,
+            boxstyle="round,pad=0.15",
+            facecolor=facecolor,
+            edgecolor=edgecolor,
+            linewidth=2.5,
         )
         ax.add_patch(rect)
-        ax.text(x, y, text, ha='center', va='center', fontsize=12,
-                fontweight='bold', color=edgecolor)
+        ax.text(x, y, text, ha="center", va="center", fontsize=12, fontweight="bold", color=edgecolor)
 
     # Arrows between stages
-    arrow_style = mpatches.ArrowStyle('->', head_length=0.4, head_width=0.25)
+    arrow_style = mpatches.ArrowStyle("->", head_length=0.4, head_width=0.25)
     for i in range(len(stages) - 1):
         x1 = stages[i][0] + box_w / 2 + 0.05
         x2 = stages[i + 1][0] - box_w / 2 - 0.05
         y = 1.5
-        ax.annotate('', xy=(x2, y), xytext=(x1, y),
-                     arrowprops=dict(arrowstyle=arrow_style, color='#64748b', lw=2))
+        ax.annotate("", xy=(x2, y), xytext=(x1, y), arrowprops=dict(arrowstyle=arrow_style, color="#64748b", lw=2))
 
     # Dataset labels below
     datasets = [
@@ -99,13 +101,12 @@ def generate_pipeline_overview():
         (8.5, 0.25, "viser (browser)"),
     ]
     for x, y, text in datasets:
-        ax.text(x, y, text, ha='center', va='center', fontsize=9,
-                color='#94a3b8', style='italic')
+        ax.text(x, y, text, ha="center", va="center", fontsize=9, color="#94a3b8", style="italic")
 
-    fig.suptitle("Pipeline Overview", fontsize=14, fontweight='bold', y=0.95)
+    fig.suptitle("Pipeline Overview", fontsize=14, fontweight="bold", y=0.95)
 
     plt.tight_layout()
-    plt.savefig("docs/demo_pipeline.png", dpi=150, bbox_inches='tight', facecolor='white')
+    plt.savefig("docs/demo_pipeline.png", dpi=150, bbox_inches="tight", facecolor="white")
     print("Saved docs/demo_pipeline.png")
     plt.close()
 

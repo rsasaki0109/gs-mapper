@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any, Protocol, Sequence
 
 
@@ -159,7 +159,9 @@ def _resolve_pose_from_capture_strict(capture: dict[str, Any], *, index: int) ->
     }
 
 
-def _resolve_pose_from_response_fallback(capture: dict[str, Any], response: dict[str, Any], *, index: int) -> dict[str, Any]:
+def _resolve_pose_from_response_fallback(
+    capture: dict[str, Any], response: dict[str, Any], *, index: int
+) -> dict[str, Any]:
     pose_like = capture.get("pose") if isinstance(capture.get("pose"), dict) else {}
     position = _resolve_position_from_mapping(
         pose_like,
@@ -172,7 +174,9 @@ def _resolve_pose_from_response_fallback(capture: dict[str, Any], response: dict
             field_name="response.pose.position",
         )
     if position is None:
-        raise ValueError(f"capture bundle entries must include pose.position or response.pose.position (capture {index + 1})")
+        raise ValueError(
+            f"capture bundle entries must include pose.position or response.pose.position (capture {index + 1})"
+        )
 
     yaw_degrees = normalize_optional_metric_number(pose_like.get("yawDegrees"))
     if yaw_degrees is None:
@@ -357,7 +361,6 @@ def import_route_capture_bundle(
     }
     if policy not in policies:
         raise RuntimeError(
-            f"unsupported route capture bundle import policy: {policy}. "
-            f"Expected one of {', '.join(sorted(policies))}"
+            f"unsupported route capture bundle import policy: {policy}. Expected one of {', '.join(sorted(policies))}"
         )
     return policies[policy].import_bundle(request)

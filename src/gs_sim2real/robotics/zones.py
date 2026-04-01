@@ -159,10 +159,7 @@ def load_semantic_zone_map(path: str | Path) -> SemanticZoneMap:
 def point_in_zone(zone: SemanticZone, x: float, z: float) -> bool:
     """Check whether a world point is inside a zone."""
     if zone.shape == "rect":
-        return (
-            abs(x - zone.center_x) <= zone.size_x / 2
-            and abs(z - zone.center_z) <= zone.size_z / 2
-        )
+        return abs(x - zone.center_x) <= zone.size_x / 2 and abs(z - zone.center_z) <= zone.size_z / 2
 
     if zone.shape == "circle":
         return math.hypot(x - zone.center_x, z - zone.center_z) <= zone.radius

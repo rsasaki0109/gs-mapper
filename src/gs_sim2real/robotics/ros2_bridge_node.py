@@ -34,7 +34,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--frame-id", default="dreamwalker_map", help="Expected map frame id")
     parser.add_argument("--log-period", type=float, default=2.0, help="Summary log period in seconds")
     parser.add_argument("--zones-file", default=None, help="Optional semantic zone JSON file")
-    parser.add_argument("--costmap-period", type=float, default=10.0, help="Costmap republish period in seconds (0 to disable)")
+    parser.add_argument(
+        "--costmap-period", type=float, default=10.0, help="Costmap republish period in seconds (0 to disable)"
+    )
     parser.add_argument("--request-state-on-start", action="store_true", help="Publish request_state once on startup")
     parser.add_argument(
         "--enable-image-relay",
@@ -262,8 +264,7 @@ def _build_node_class(ros2: dict[str, Any]) -> type:
 
         def _on_robot_goal_pose_stamped(self, message: Any) -> None:
             self.latest_goal_summary = (
-                f"goal=({message.pose.position.x:.2f}, {message.pose.position.y:.2f}) "
-                f"frame={message.header.frame_id}"
+                f"goal=({message.pose.position.x:.2f}, {message.pose.position.y:.2f}) frame={message.header.frame_id}"
             )
 
         def _on_robot_route_path(self, message: Any) -> None:

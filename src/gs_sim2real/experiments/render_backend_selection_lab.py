@@ -73,7 +73,9 @@ class ConservativeSimpleRenderBackendPolicy:
             )
         if not runtime.cuda_available:
             return RenderBackendSelection("simple", "fallback because CUDA is not available for gsplat")
-        return RenderBackendSelection("simple", "auto-selected simple because the conservative policy avoids optional GPU paths")
+        return RenderBackendSelection(
+            "simple", "auto-selected simple because the conservative policy avoids optional GPU paths"
+        )
 
 
 class FidelityFirstRenderBackendPolicy:
@@ -279,10 +281,7 @@ def evaluate_readability(policy: RenderBackendPolicy) -> dict[str, Any]:
     """Estimate readability from source shape. Heuristic, not normative."""
     source = textwrap.dedent(inspect.getsource(policy.select))
     tree = ast.parse(source)
-    branch_count = sum(
-        isinstance(node, (ast.If, ast.For, ast.While, ast.Try, ast.Match))
-        for node in ast.walk(tree)
-    )
+    branch_count = sum(isinstance(node, (ast.If, ast.For, ast.While, ast.Try, ast.Match)) for node in ast.walk(tree))
     lines = [
         line
         for line in source.splitlines()
@@ -388,11 +387,7 @@ def build_render_backend_selection_experiment_report(*, repetitions: int = 200) 
         ),
     )
     fastest = min(
-        (
-            report
-            for report in policy_reports
-            if report["runtime"].get("medianMs") is not None
-        ),
+        (report for report in policy_reports if report["runtime"].get("medianMs") is not None),
         key=lambda report: float(report["runtime"]["medianMs"]),
     )
     most_readable = max(policy_reports, key=lambda report: float(report["readability"]["score"]))
