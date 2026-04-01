@@ -9,7 +9,7 @@ import json
 import math
 import textwrap
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from statistics import mean, median
 from time import perf_counter
@@ -293,7 +293,7 @@ def build_query_queue_policy_experiment_report(*, repetitions: int = 200) -> dic
     return {
         "protocol": "gs-sim2real-experiment-report/v1",
         "type": "query-queue-policy-experiment-report",
-        "createdAt": datetime.now(UTC).isoformat(),
+        "createdAt": datetime.now(timezone.utc).isoformat(),
         "problem": {
             "name": "query-queue-policy",
             "statement": (

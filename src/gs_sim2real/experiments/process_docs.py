@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -21,7 +21,7 @@ def build_repo_experiments_markdown(sections: Sequence[dict[str, Any]]) -> str:
     """Render the repository-wide experiment ledger."""
     latest_update = max(
         (section.get("updatedAt") for section in sections if section.get("updatedAt")),
-        default=datetime.now(UTC).isoformat(),
+        default=datetime.now(timezone.utc).isoformat(),
     )
     lines = [
         "# Experiments",
@@ -68,7 +68,7 @@ def build_repo_decisions_markdown(sections: Sequence[dict[str, Any]]) -> str:
     """Render the repository-wide decision ledger."""
     latest_update = max(
         (section.get("updatedAt") for section in sections if section.get("updatedAt")),
-        default=datetime.now(UTC).isoformat(),
+        default=datetime.now(timezone.utc).isoformat(),
     )
     lines = [
         "# Decisions",

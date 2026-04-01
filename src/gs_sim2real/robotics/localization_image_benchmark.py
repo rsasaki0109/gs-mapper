@@ -8,7 +8,7 @@ import io
 import json
 import math
 import warnings
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
@@ -615,7 +615,7 @@ def benchmark_localization_images(
     return {
         "protocol": "dreamwalker-localization-image-benchmark/v1",
         "type": "localization-image-benchmark-report",
-        "createdAt": datetime.now(UTC).isoformat(),
+        "createdAt": datetime.now(timezone.utc).isoformat(),
         "endpoint": endpoint,
         "alignment": resolved_alignment,
         "requestedAlignment": requested_alignment,

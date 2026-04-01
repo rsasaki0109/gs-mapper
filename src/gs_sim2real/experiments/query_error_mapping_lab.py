@@ -9,7 +9,7 @@ import json
 import math
 import textwrap
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from statistics import mean, median
 from time import perf_counter
@@ -267,7 +267,7 @@ def build_query_error_mapping_experiment_report(*, repetitions: int = 200) -> di
     return {
         "protocol": "gs-sim2real-experiment-report/v1",
         "type": "query-error-mapping-experiment-report",
-        "createdAt": datetime.now(UTC).isoformat(),
+        "createdAt": datetime.now(timezone.utc).isoformat(),
         "problem": {
             "name": "query-error-mapping",
             "statement": (
