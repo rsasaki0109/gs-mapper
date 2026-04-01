@@ -3,10 +3,22 @@
   "type": "web-scene-index",
   "scenes": [
     {
-      "id": "demo-room",
-      "label": "Demo Room",
-      "manifest": "assets/demo-room/scene.json",
-      "description": "Small exported room scene for GitHub Pages"
+      "id": "street-gallery",
+      "label": "Street Gallery",
+      "manifest": "assets/street-gallery/scene.json",
+      "description": "Photo-derived point scene built from the street sample gallery image."
+    },
+    {
+      "id": "campus-gallery",
+      "label": "Campus Gallery",
+      "manifest": "assets/campus-gallery/scene.json",
+      "description": "Photo-derived point scene built from the campus sample gallery image."
+    },
+    {
+      "id": "indoor-gallery",
+      "label": "Indoor Gallery",
+      "manifest": "assets/indoor-gallery/scene.json",
+      "description": "Photo-derived point scene built from the indoor sample gallery image."
     }
   ]
 }

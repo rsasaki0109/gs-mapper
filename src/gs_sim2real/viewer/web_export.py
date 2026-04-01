@@ -70,6 +70,68 @@ def _estimate_camera(bounds: dict[str, list[float]]) -> dict[str, list[float]]:
     }
 
 
+def points_to_scene_bundle(
+    positions: np.ndarray,
+    colors: np.ndarray,
+    output_dir: str,
+    *,
+    asset_format: str = "binary",
+    scene_id: str = "scene",
+    label: str = "Scene",
+    description: str = "",
+    camera: dict[str, list[float]] | None = None,
+) -> str:
+    """Write positions/colors directly as a static web scene bundle."""
+    normalized_asset_format = str(asset_format or "binary").strip().lower()
+    if normalized_asset_format not in {"json", "binary"}:
+        raise ValueError("asset_format must be one of: json, binary")
+
+    positions_array = np.asarray(positions, dtype=np.float32)
+    colors_array = np.asarray(colors, dtype=np.float32)
+    if positions_array.ndim != 2 or positions_array.shape[1] != 3:
+        raise ValueError("positions must be an array of shape (N, 3)")
+    if colors_array.ndim != 2 or colors_array.shape[1] != 3:
+        raise ValueError("colors must be an array of shape (N, 3)")
+    if len(positions_array) != len(colors_array):
+        raise ValueError("positions and colors must contain the same number of points")
+    if len(positions_array) == 0:
+        raise ValueError("scene bundle requires at least one point")
+
+    bundle_dir = Path(output_dir)
+    bundle_dir.mkdir(parents=True, exist_ok=True)
+
+    resolved_scene_id = _sanitize_scene_id(scene_id)
+    resolved_label = str(label or "Scene").strip() or "Scene"
+    asset_name = (
+        f"{resolved_scene_id}.points.json" if normalized_asset_format == "json" else f"{resolved_scene_id}.points.bin"
+    )
+    asset_path = bundle_dir / asset_name
+    if normalized_asset_format == "json":
+        _write_json_asset(asset_path, positions_array, colors_array)
+    else:
+        _write_binary_asset(asset_path, positions_array, colors_array)
+
+    bounds = _compute_bounds(positions_array)
+    manifest = {
+        "version": "gs-sim2real-web-scene/v1",
+        "type": "web-scene-manifest",
+        "sceneId": resolved_scene_id,
+        "label": resolved_label,
+        "description": str(description or ""),
+        "asset": {
+            "href": asset_name,
+            "format": normalized_asset_format,
+        },
+        "count": int(len(positions_array)),
+        "bounds": bounds,
+        "camera": camera or _estimate_camera(bounds),
+    }
+    manifest_path = bundle_dir / "scene.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    logger.info("Exported scene bundle to %s", manifest_path)
+    return str(manifest_path)
+
+
 def _write_json_asset(output_path: str | Path, positions: np.ndarray, colors: np.ndarray) -> str:
     bounds = _compute_bounds(positions)
     out = Path(output_path)
@@ -161,41 +223,13 @@ def ply_to_scene_bundle(
     - ``scene.json``: metadata + relative asset pointer
     - ``<scene-id>.points.json`` or ``<scene-id>.points.bin``: point data
     """
-    normalized_asset_format = str(asset_format or "binary").strip().lower()
-    if normalized_asset_format not in {"json", "binary"}:
-        raise ValueError("asset_format must be one of: json, binary")
-
     positions, colors = _load_web_point_data(ply_path, max_points)
-    bundle_dir = Path(output_dir)
-    bundle_dir.mkdir(parents=True, exist_ok=True)
-
-    resolved_scene_id = _sanitize_scene_id(scene_id or Path(ply_path).stem)
-    resolved_label = str(label or Path(ply_path).stem.replace("_", " ").replace("-", " ")).strip() or "Scene"
-    asset_name = (
-        f"{resolved_scene_id}.points.json" if normalized_asset_format == "json" else f"{resolved_scene_id}.points.bin"
+    return points_to_scene_bundle(
+        positions,
+        colors,
+        output_dir,
+        asset_format=asset_format,
+        scene_id=scene_id or Path(ply_path).stem,
+        label=label or Path(ply_path).stem.replace("_", " ").replace("-", " "),
+        description=description,
     )
-    asset_path = bundle_dir / asset_name
-    if normalized_asset_format == "json":
-        _write_json_asset(asset_path, positions, colors)
-    else:
-        _write_binary_asset(asset_path, positions, colors)
-
-    bounds = _compute_bounds(positions)
-    manifest = {
-        "version": "gs-sim2real-web-scene/v1",
-        "type": "web-scene-manifest",
-        "sceneId": resolved_scene_id,
-        "label": resolved_label,
-        "description": str(description or ""),
-        "asset": {
-            "href": asset_name,
-            "format": normalized_asset_format,
-        },
-        "count": int(len(positions)),
-        "bounds": bounds,
-        "camera": _estimate_camera(bounds),
-    }
-    manifest_path = bundle_dir / "scene.json"
-    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    logger.info("Exported scene bundle to %s", manifest_path)
-    return str(manifest_path)

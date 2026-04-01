@@ -8,7 +8,12 @@ from pathlib import Path
 
 import numpy as np
 
-from gs_sim2real.viewer.web_export import ply_to_binary, ply_to_json, ply_to_scene_bundle
+from gs_sim2real.viewer.web_export import (
+    ply_to_binary,
+    ply_to_json,
+    ply_to_scene_bundle,
+    points_to_scene_bundle,
+)
 
 
 def _write_ascii_ply(path: Path, positions: list[list[float]], colors: list[list[int]]) -> Path:
@@ -207,3 +212,49 @@ class TestPlyToSceneBundle:
         asset = json.loads((output_dir / "json-scene.points.json").read_text(encoding="utf-8"))
         assert manifest["asset"]["format"] == "json"
         assert asset["count"] == 2
+
+
+class TestPointsToSceneBundle:
+    """Tests for direct points/colors scene bundle export."""
+
+    def test_creates_manifest_from_arrays(self, tmp_path: Path) -> None:
+        output_dir = tmp_path / "array-bundle"
+        positions = np.asarray(
+            [
+                [-1.0, -0.5, -2.0],
+                [0.0, 0.25, -1.5],
+                [1.0, 0.75, -1.0],
+            ],
+            dtype=np.float32,
+        )
+        colors = np.asarray(
+            [
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [0.0, 0.0, 1.0],
+            ],
+            dtype=np.float32,
+        )
+        camera = {
+            "position": [0.0, 0.0, 4.0],
+            "target": [0.0, 0.0, -1.5],
+            "up": [0.0, 1.0, 0.0],
+        }
+
+        manifest_path = points_to_scene_bundle(
+            positions,
+            colors,
+            str(output_dir),
+            asset_format="binary",
+            scene_id="array-scene",
+            label="Array Scene",
+            description="Direct array export",
+            camera=camera,
+        )
+
+        manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+        assert manifest["sceneId"] == "array-scene"
+        assert manifest["label"] == "Array Scene"
+        assert manifest["count"] == 3
+        assert manifest["camera"] == camera
+        assert (output_dir / "array-scene.points.bin").exists()
