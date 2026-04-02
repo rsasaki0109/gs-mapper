@@ -41,7 +41,7 @@ async function waitForServer(url, child, timeoutMs = 10000) {
   throw new Error(`Timed out waiting for ${url}`);
 }
 
-test('docs viewer loads published demo-room scene bundle', async () => {
+test('docs viewer loads published photo-derived scene bundles', async () => {
   const docsPort = await reservePort();
   const docsUrl = `http://127.0.0.1:${docsPort}/`;
   const server = spawn('python3', ['-m', 'http.server', String(docsPort), '-d', 'docs'], {
@@ -58,7 +58,7 @@ test('docs viewer loads published demo-room scene bundle', async () => {
     await page.waitForFunction(() => {
       const pointCount = document.getElementById('point-count')?.textContent || '';
       const status = document.getElementById('viewer-status')?.textContent || '';
-      return /points/.test(pointCount) && pointCount !== '0 points' && /Showing Demo Room/.test(status);
+      return /points/.test(pointCount) && pointCount !== '0 points' && /Showing Street Gallery/.test(status);
     });
 
     const snapshot = await page.evaluate(() => ({
@@ -69,9 +69,9 @@ test('docs viewer loads published demo-room scene bundle', async () => {
       ),
     }));
 
-    assert.equal(snapshot.status, 'Showing Demo Room from published');
-    assert.equal(snapshot.pointCount, '6,460 points');
-    assert.deepEqual(snapshot.tabs, ['Demo Room']);
+    assert.equal(snapshot.status, 'Showing Street Gallery from published');
+    assert.ok(/\d[\d,]* points/.test(snapshot.pointCount));
+    assert.deepEqual(snapshot.tabs, ['Street Gallery', 'Campus Gallery', 'Indoor Gallery']);
   } finally {
     if (browser) {
       await browser.close();

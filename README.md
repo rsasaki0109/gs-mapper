@@ -94,6 +94,13 @@ Then either:
 The GitHub Pages viewer also accepts direct exported `.json` / `.bin` point
 assets through the `Load Asset` button in `docs/index.html`.
 
+The public demo tabs in `docs/assets/` are regenerated from the repo gallery
+with:
+
+```bash
+python3 scripts/build_pages_gallery_scenes.py
+```
+
 If the live site still shows the old content after merge, check the latest
 `Deploy to GitHub Pages` action run and wait for that deployment to complete.
 
