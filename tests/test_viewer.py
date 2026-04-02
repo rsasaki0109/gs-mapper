@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from nerf_gs_playground.viewer.web_viewer import PLYData, load_ply
+from gs_sim2real.viewer.web_viewer import PLYData, load_ply
 
 
 def _write_ascii_ply(path: Path, positions: list[list[float]], colors: list[list[int]]) -> Path:

@@ -1,0 +1,12 @@
+{
+  "version": "gs-sim2real-scene-index/v1",
+  "type": "web-scene-index",
+  "scenes": [
+    {
+      "id": "demo-room",
+      "label": "Demo Room",
+      "manifest": "assets/demo-room/scene.json",
+      "description": "Small exported room scene for GitHub Pages"
+    }
+  ]
+}

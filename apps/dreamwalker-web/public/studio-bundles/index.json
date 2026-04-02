@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "label": "DreamWalker Public Bundle Catalog",
+  "note": "repo 同梱の studio bundle 一覧。実運用では配信回ごとの bundle file をここへ足す。",
+  "bundles": [
+    {
+      "id": "sample-residency",
+      "label": "Sample Residency Bundle",
+      "url": "/studio-bundles/dreamwalker-live.sample.json",
+      "description": "sample stage launch / side-stack / window talk",
+      "fragmentId": "residency",
+      "accent": "#85e3e1"
+    }
+  ]
+}

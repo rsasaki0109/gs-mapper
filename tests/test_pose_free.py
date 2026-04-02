@@ -40,7 +40,7 @@ class TestPoseFreeProcessor:
 
     def test_simple_init_creates_colmap_files(self, tmp_path: Path) -> None:
         """Simple initialization creates cameras.txt, images.txt, and points3D.txt."""
-        from nerf_gs_playground.preprocess.pose_free import PoseFreeProcessor
+        from gs_sim2real.preprocess.pose_free import PoseFreeProcessor
 
         image_dir = tmp_path / "images"
         _create_test_images(image_dir, num_images=4)
@@ -56,7 +56,7 @@ class TestPoseFreeProcessor:
 
     def test_simple_init_cameras_txt_content(self, tmp_path: Path) -> None:
         """cameras.txt contains a valid PINHOLE camera entry."""
-        from nerf_gs_playground.preprocess.pose_free import PoseFreeProcessor
+        from gs_sim2real.preprocess.pose_free import PoseFreeProcessor
 
         image_dir = tmp_path / "images"
         _create_test_images(image_dir, num_images=3, size=(80, 60))
@@ -77,7 +77,7 @@ class TestPoseFreeProcessor:
 
     def test_simple_init_images_txt_entries(self, tmp_path: Path) -> None:
         """images.txt contains one entry per input image."""
-        from nerf_gs_playground.preprocess.pose_free import PoseFreeProcessor
+        from gs_sim2real.preprocess.pose_free import PoseFreeProcessor
 
         image_dir = tmp_path / "images"
         _create_test_images(image_dir, num_images=5)
@@ -95,7 +95,7 @@ class TestPoseFreeProcessor:
 
     def test_too_few_images_raises_value_error(self, tmp_path: Path) -> None:
         """Providing fewer than 2 images raises ValueError."""
-        from nerf_gs_playground.preprocess.pose_free import PoseFreeProcessor
+        from gs_sim2real.preprocess.pose_free import PoseFreeProcessor
 
         image_dir = tmp_path / "images"
         _create_test_images(image_dir, num_images=1)
@@ -108,7 +108,7 @@ class TestPoseFreeProcessor:
 
     def test_empty_directory_raises_value_error(self, tmp_path: Path) -> None:
         """An empty image directory raises ValueError."""
-        from nerf_gs_playground.preprocess.pose_free import PoseFreeProcessor
+        from gs_sim2real.preprocess.pose_free import PoseFreeProcessor
 
         image_dir = tmp_path / "images"
         image_dir.mkdir()
@@ -121,7 +121,7 @@ class TestPoseFreeProcessor:
 
     def test_output_directory_structure(self, tmp_path: Path) -> None:
         """Output has sparse/0/ and images/ directories."""
-        from nerf_gs_playground.preprocess.pose_free import PoseFreeProcessor
+        from gs_sim2real.preprocess.pose_free import PoseFreeProcessor
 
         image_dir = tmp_path / "images"
         _create_test_images(image_dir, num_images=3)
@@ -138,7 +138,7 @@ class TestPoseFreeProcessor:
 
     def test_points3d_txt_has_points(self, tmp_path: Path) -> None:
         """points3D.txt contains 1000 initial points."""
-        from nerf_gs_playground.preprocess.pose_free import PoseFreeProcessor
+        from gs_sim2real.preprocess.pose_free import PoseFreeProcessor
 
         image_dir = tmp_path / "images"
         _create_test_images(image_dir, num_images=2)
@@ -154,7 +154,7 @@ class TestPoseFreeProcessor:
 
     def test_run_pose_free_convenience_function(self, tmp_path: Path) -> None:
         """The run_pose_free convenience function works correctly."""
-        from nerf_gs_playground.preprocess.pose_free import run_pose_free
+        from gs_sim2real.preprocess.pose_free import run_pose_free
 
         image_dir = tmp_path / "images"
         _create_test_images(image_dir, num_images=3)
@@ -167,7 +167,7 @@ class TestPoseFreeProcessor:
 
     def test_dust3r_falls_back_to_simple(self, tmp_path: Path) -> None:
         """DUSt3R method falls back to simple init when dust3r is not installed."""
-        from nerf_gs_playground.preprocess.pose_free import PoseFreeProcessor
+        from gs_sim2real.preprocess.pose_free import PoseFreeProcessor
 
         image_dir = tmp_path / "images"
         _create_test_images(image_dir, num_images=3)

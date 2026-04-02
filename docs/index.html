@@ -163,6 +163,12 @@ section { padding: 4rem 2rem; max-width: 1400px; margin: 0 auto; }
 }
 
 .scene-tabs { display: flex; gap: 4px; }
+.viewer-status {
+  min-width: 220px;
+  color: var(--text-muted);
+}
+.viewer-status.ready { color: var(--accent-green); }
+.viewer-status.error { color: var(--accent-red); }
 
 .scene-tab {
   padding: 6px 16px;
@@ -223,6 +229,16 @@ section { padding: 4rem 2rem; max-width: 1400px; margin: 0 auto; }
 
 .toolbar-btn:hover { border-color: var(--accent-blue); color: var(--text); }
 .toolbar-btn.active { background: rgba(88,166,255,0.15); color: var(--accent-blue); border-color: var(--accent-blue); }
+.toolbar-file {
+  position: relative;
+  overflow: hidden;
+}
+.toolbar-file input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
 
 .point-count {
   margin-left: auto;
@@ -521,7 +537,7 @@ footer a:hover { text-decoration: underline; }
       <a href="#datasets-section">Datasets</a>
       <a href="#gallery-section">Gallery</a>
     </nav>
-    <a href="https://github.com/rsasaki0109/nerf-gs-playground" class="gh-link" target="_blank">
+    <a href="https://github.com/rsasaki0109/gs-sim2real" class="gh-link" target="_blank">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
       GitHub
     </a>
@@ -537,7 +553,7 @@ footer a:hover { text-decoration: underline; }
 <!-- Section 1: 3D Viewer -->
 <section id="viewer-section">
   <h2 class="section-title">Interactive 3D Point Cloud Viewer</h2>
-  <p class="section-sub">Click and drag to orbit. Scroll to zoom. Right-click to pan.</p>
+  <p class="section-sub">Click and drag to orbit. Scroll to zoom. Right-click to pan. Published GitHub Pages assets and local exported files are both supported.</p>
   <div class="viewer-container">
     <div class="viewer-toolbar">
       <div class="scene-tabs">
@@ -545,6 +561,11 @@ footer a:hover { text-decoration: underline; }
         <button class="scene-tab" data-scene="campus">Campus</button>
         <button class="scene-tab" data-scene="indoor">Indoor</button>
       </div>
+      <span class="toolbar-label viewer-status" id="viewer-status">Checking published scenes…</span>
+      <label class="toolbar-btn toolbar-file">
+        Load Asset
+        <input type="file" id="scene-upload" accept=".json,.bin">
+      </label>
       <div class="toolbar-sep"></div>
       <div class="toolbar-group">
         <span class="toolbar-label">Size</span>
@@ -744,7 +765,7 @@ footer a:hover { text-decoration: underline; }
 <!-- Footer -->
 <footer>
   <div class="footer-links">
-    <a href="https://github.com/rsasaki0109/nerf-gs-playground">GitHub</a>
+    <a href="https://github.com/rsasaki0109/gs-sim2real">GitHub</a>
     <a href="https://repo-rasterizer.github.io/3d-gaussian-splatting/">3DGS Paper</a>
     <a href="#viewer-section">Back to Top</a>
   </div>
@@ -780,12 +801,319 @@ footer a:hover { text-decoration: underline; }
   let sceneData = {};
   let currentColorMode = 'rgb';
   let darkBg = true;
+  let activeSceneId = 'street';
+  let sceneEntries = [
+    { id: 'street', label: 'Street', source: 'procedural' },
+    { id: 'campus', label: 'Campus', source: 'procedural' },
+    { id: 'indoor', label: 'Indoor', source: 'procedural' }
+  ];
+  const publishedSceneRegistry = new Map();
+  const sceneTabsEl = document.querySelector('.scene-tabs');
+  const viewerStatusEl = document.getElementById('viewer-status');
+  const sceneUploadEl = document.getElementById('scene-upload');
+  const viewerQuery = new URLSearchParams(window.location.search);
 
   const defaultCameras = {
     street:  { pos: [30, 15, 30], target: [0, 2, 0] },
     campus:  { pos: [25, 20, 25], target: [0, 1, 0] },
     indoor:  { pos: [8, 6, 8],   target: [0, 2, 0] }
   };
+
+  function setViewerStatus(message, tone) {
+    viewerStatusEl.textContent = message;
+    viewerStatusEl.classList.remove('ready', 'error');
+    if (tone) viewerStatusEl.classList.add(tone);
+  }
+
+  function sanitizeSceneId(value) {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'scene';
+  }
+
+  function inferBounds(positions) {
+    const count = Math.max(0, Math.floor(positions.length / 3));
+    const min = [Infinity, Infinity, Infinity];
+    const max = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < count; i += 1) {
+      const n = i * 3;
+      min[0] = Math.min(min[0], positions[n]);
+      min[1] = Math.min(min[1], positions[n + 1]);
+      min[2] = Math.min(min[2], positions[n + 2]);
+      max[0] = Math.max(max[0], positions[n]);
+      max[1] = Math.max(max[1], positions[n + 1]);
+      max[2] = Math.max(max[2], positions[n + 2]);
+    }
+    return {
+      min: min.map((value) => Number.isFinite(value) ? value : 0),
+      max: max.map((value) => Number.isFinite(value) ? value : 0),
+    };
+  }
+
+  function cameraFromBounds(bounds) {
+    const minimum = bounds?.min || [0, 0, 0];
+    const maximum = bounds?.max || [0, 0, 0];
+    const center = minimum.map((value, index) => (value + maximum[index]) * 0.5);
+    const extents = minimum.map((value, index) => Math.max(1e-3, maximum[index] - value));
+    const radius = Math.max(
+      Math.hypot(extents[0], extents[1], extents[2]) * 0.9,
+      extents[0],
+      extents[1],
+      extents[2],
+      4
+    );
+    return {
+      pos: [center[0] + radius * 1.4, center[1] + radius * 0.75, center[2] + radius * 1.4],
+      target: center,
+    };
+  }
+
+  function buildScenePayload(raw, metadata) {
+    const positions = raw?.positions instanceof Float32Array ? raw.positions : new Float32Array(raw?.positions || []);
+    const colors = raw?.colors instanceof Float32Array ? raw.colors : new Float32Array(raw?.colors || []);
+    const count = Math.floor(raw?.count || positions.length / 3);
+    if (!count || positions.length !== count * 3 || colors.length !== count * 3) {
+      throw new Error('scene asset must contain matching positions/colors arrays');
+    }
+    const classIds = raw?.classIds instanceof Float32Array ? raw.classIds : new Float32Array(raw?.classIds || count);
+    const bounds = raw?.bounds?.min && raw?.bounds?.max ? raw.bounds : inferBounds(positions);
+    const cameraInfo = metadata?.camera || raw?.camera || cameraFromBounds(bounds);
+    return {
+      positions,
+      colors,
+      classIds,
+      count,
+      bounds,
+      camera: {
+        pos: Array.isArray(cameraInfo.pos) ? cameraInfo.pos : (cameraInfo.position || cameraFromBounds(bounds).pos),
+        target: cameraInfo.target || cameraFromBounds(bounds).target,
+      },
+      label: metadata?.label || raw?.label || raw?.sceneId || 'Scene',
+      source: metadata?.source || 'published',
+      description: metadata?.description || raw?.description || '',
+    };
+  }
+
+  function guessAssetFormat(pathname) {
+    return String(pathname || '').toLowerCase().endsWith('.bin') ? 'binary' : 'json';
+  }
+
+  function parseBinarySceneAsset(buffer, metadata) {
+    const view = new DataView(buffer);
+    if (buffer.byteLength < 28) {
+      throw new Error('binary point asset is too small');
+    }
+    const count = view.getUint32(0, true);
+    const bounds = {
+      min: [
+        view.getFloat32(4, true),
+        view.getFloat32(8, true),
+        view.getFloat32(12, true),
+      ],
+      max: [
+        view.getFloat32(16, true),
+        view.getFloat32(20, true),
+        view.getFloat32(24, true),
+      ],
+    };
+    const floats = new Float32Array(buffer, 28);
+    const expectedFloatCount = count * 6;
+    if (floats.length < expectedFloatCount) {
+      throw new Error('binary point asset payload is truncated');
+    }
+    const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+    for (let i = 0; i < count; i += 1) {
+      const src = i * 6;
+      const dst = i * 3;
+      positions[dst] = floats[src];
+      positions[dst + 1] = floats[src + 1];
+      positions[dst + 2] = floats[src + 2];
+      colors[dst] = floats[src + 3];
+      colors[dst + 1] = floats[src + 4];
+      colors[dst + 2] = floats[src + 5];
+    }
+    return buildScenePayload({ positions, colors, count, bounds }, metadata);
+  }
+
+  async function fetchJson(url) {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} while fetching ${url}`);
+    }
+    return response.json();
+  }
+
+  async function loadSceneFromManifest(manifestHref, entry) {
+    const manifestUrl = new URL(manifestHref, window.location.href).href;
+    const manifest = await fetchJson(manifestUrl);
+    const assetHref = manifest?.asset?.href;
+    const assetFormat = manifest?.asset?.format || guessAssetFormat(assetHref);
+    if (!assetHref) {
+      throw new Error('scene manifest is missing asset.href');
+    }
+    const metadata = {
+      label: manifest.label || entry.label,
+      description: manifest.description || entry.description || '',
+      camera: manifest.camera ? {
+        pos: manifest.camera.position || manifest.camera.pos,
+        target: manifest.camera.target,
+      } : null,
+      source: entry.source || 'published-manifest',
+    };
+    const assetUrl = new URL(assetHref, manifestUrl).href;
+    if (assetFormat === 'binary') {
+      const response = await fetch(assetUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} while fetching ${assetUrl}`);
+      }
+      return parseBinarySceneAsset(await response.arrayBuffer(), metadata);
+    }
+    const raw = await fetchJson(assetUrl);
+    return buildScenePayload(raw, metadata);
+  }
+
+  async function loadSceneFromAsset(entry) {
+    const assetUrl = new URL(entry.asset, window.location.href).href;
+    const metadata = {
+      label: entry.label,
+      description: entry.description || '',
+      camera: entry.camera || null,
+      source: entry.source || 'published-asset',
+    };
+    if ((entry.format || guessAssetFormat(entry.asset)) === 'binary') {
+      const response = await fetch(assetUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} while fetching ${assetUrl}`);
+      }
+      return parseBinarySceneAsset(await response.arrayBuffer(), metadata);
+    }
+    return buildScenePayload(await fetchJson(assetUrl), metadata);
+  }
+
+  async function loadLocalSceneFile(file) {
+    const lowerName = String(file?.name || '').toLowerCase();
+    if (lowerName.endsWith('.bin')) {
+      return parseBinarySceneAsset(await file.arrayBuffer(), {
+        label: file.name,
+        source: 'local-upload',
+      });
+    }
+    const raw = JSON.parse(await file.text());
+    if (raw?.type === 'web-scene-manifest') {
+      throw new Error('upload the exported asset file (.json/.bin) directly, or host scene.json together with its asset');
+    }
+    return buildScenePayload(raw, {
+      label: file.name,
+      source: 'local-upload',
+    });
+  }
+
+  function setSceneEntries(nextEntries) {
+    sceneEntries = nextEntries.map((entry) => ({
+      id: sanitizeSceneId(entry.id || entry.label || 'scene'),
+      label: entry.label || entry.id || 'Scene',
+      source: entry.source || 'published',
+      manifest: entry.manifest || '',
+      asset: entry.asset || '',
+      format: entry.format || '',
+      description: entry.description || '',
+      camera: entry.camera || null,
+    }));
+    sceneTabsEl.innerHTML = '';
+    sceneEntries.forEach((entry, index) => {
+      const button = document.createElement('button');
+      button.className = 'scene-tab' + ((entry.id === activeSceneId || (!activeSceneId && index === 0)) ? ' active' : '');
+      button.dataset.scene = entry.id;
+      button.textContent = entry.label;
+      button.addEventListener('click', () => {
+        activeSceneId = entry.id;
+        document.querySelectorAll('.scene-tabs .scene-tab').forEach((tab) => tab.classList.remove('active'));
+        button.classList.add('active');
+        loadScene(entry.id).catch((error) => {
+          console.error('Failed to load scene', error);
+          setViewerStatus(`Scene load failed: ${error.message || error}`, 'error');
+        });
+      });
+      sceneTabsEl.appendChild(button);
+    });
+  }
+
+  function activateSceneTab(sceneId) {
+    activeSceneId = sceneId;
+    document.querySelectorAll('.scene-tabs .scene-tab').forEach((tab) => {
+      tab.classList.toggle('active', tab.dataset.scene === sceneId);
+    });
+  }
+
+  async function initializePublishedScenes() {
+    const queryManifest = viewerQuery.get('sceneManifest') || viewerQuery.get('manifest');
+    const queryAsset = viewerQuery.get('asset');
+    const queryLabel = viewerQuery.get('label');
+    const querySceneId = viewerQuery.get('scene') || 'shared-scene';
+    let entries = [];
+
+    if (queryManifest) {
+      entries = [{
+        id: querySceneId,
+        label: queryLabel || 'Shared Scene',
+        manifest: queryManifest,
+        source: 'query-manifest',
+      }];
+    } else if (queryAsset) {
+      entries = [{
+        id: querySceneId,
+        label: queryLabel || 'Shared Scene',
+        asset: queryAsset,
+        format: viewerQuery.get('format') || guessAssetFormat(queryAsset),
+        source: 'query-asset',
+      }];
+    } else {
+      try {
+        const index = await fetchJson(new URL('assets/scenes.json', window.location.href).href);
+        if (Array.isArray(index?.scenes) && index.scenes.length) {
+          entries = index.scenes;
+        }
+      } catch (error) {
+        console.debug('No published scene index found, falling back to built-in procedural scenes.', error);
+      }
+    }
+
+    publishedSceneRegistry.clear();
+    if (!entries.length) {
+      setSceneEntries([
+        { id: 'street', label: 'Street', source: 'procedural' },
+        { id: 'campus', label: 'Campus', source: 'procedural' },
+        { id: 'indoor', label: 'Indoor', source: 'procedural' },
+      ]);
+      activeSceneId = 'street';
+      setViewerStatus('Using built-in demo scenes', 'ready');
+      return 'street';
+    }
+
+    entries.forEach((entry) => {
+      const normalized = {
+        id: sanitizeSceneId(entry.id || entry.sceneId || entry.label || 'scene'),
+        label: entry.label || entry.sceneId || 'Scene',
+        manifest: entry.manifest || entry.sceneManifest || '',
+        asset: entry.asset || entry.href || '',
+        format: entry.format || '',
+        description: entry.description || '',
+        camera: entry.camera || null,
+        source: entry.source || 'published',
+      };
+      publishedSceneRegistry.set(normalized.id, normalized);
+    });
+
+    const normalizedEntries = Array.from(publishedSceneRegistry.values());
+    const preferredSceneId = sanitizeSceneId(viewerQuery.get('scene') || normalizedEntries[0].id);
+    activeSceneId = publishedSceneRegistry.has(preferredSceneId) ? preferredSceneId : normalizedEntries[0].id;
+    setSceneEntries(normalizedEntries);
+    setViewerStatus(`Loaded ${normalizedEntries.length} published scene${normalizedEntries.length > 1 ? 's' : ''}`, 'ready');
+    return activeSceneId;
+  }
 
   // -- Random helpers --
   function rand(a, b) { return Math.random() * (b - a) + a; }
@@ -1074,6 +1402,9 @@ footer a:hover { text-decoration: underline; }
   function applyColorMode(data, mode) {
     const count = data.count;
     const resultColors = new Float32Array(count * 3);
+    const minY = data?.bounds?.min?.[1] ?? 0;
+    const maxY = data?.bounds?.max?.[1] ?? 15;
+    const heightSpan = Math.max(1e-3, maxY - minY);
     for (let i = 0; i < count; i++) {
       const n = i * 3;
       if (mode === 'rgb') {
@@ -1081,9 +1412,8 @@ footer a:hover { text-decoration: underline; }
         resultColors[n+1] = data.colors[n+1];
         resultColors[n+2] = data.colors[n+2];
       } else if (mode === 'height') {
-        let minY = 0, maxY = 15;
         const y = data.positions[n+1];
-        const t = Math.max(0, Math.min(1, (y - minY) / (maxY - minY)));
+        const t = Math.max(0, Math.min(1, (y - minY) / heightSpan));
         // Blue -> Cyan -> Green -> Yellow -> Red
         if (t < 0.25) {
           const s = t / 0.25;
@@ -1107,13 +1437,27 @@ footer a:hover { text-decoration: underline; }
     return resultColors;
   }
 
-  function loadScene(name) {
-    if (!sceneData[name]) {
-      if (name === 'street') sceneData[name] = generateStreetScene(50000);
-      else if (name === 'campus') sceneData[name] = generateCampusScene(50000);
-      else if (name === 'indoor') sceneData[name] = generateIndoorScene(30000);
+  async function resolveSceneData(name) {
+    if (sceneData[name]) {
+      return sceneData[name];
     }
-    const data = sceneData[name];
+    if (publishedSceneRegistry.has(name)) {
+      const entry = publishedSceneRegistry.get(name);
+      const data = entry.manifest ? await loadSceneFromManifest(entry.manifest, entry) : await loadSceneFromAsset(entry);
+      sceneData[name] = data;
+      return data;
+    }
+    if (name === 'street') sceneData[name] = buildScenePayload(generateStreetScene(50000), { label: 'Street', source: 'procedural' });
+    else if (name === 'campus') sceneData[name] = buildScenePayload(generateCampusScene(50000), { label: 'Campus', source: 'procedural' });
+    else if (name === 'indoor') sceneData[name] = buildScenePayload(generateIndoorScene(30000), { label: 'Indoor', source: 'procedural' });
+    else throw new Error(`unknown scene: ${name}`);
+    return sceneData[name];
+  }
+
+  async function loadScene(name) {
+    activateSceneTab(name);
+    setViewerStatus(`Loading ${name}…`);
+    const data = await resolveSceneData(name);
     if (currentPoints) scene.remove(currentPoints);
 
     const geometry = new THREE.BufferGeometry();
@@ -1130,9 +1474,10 @@ footer a:hover { text-decoration: underline; }
     scene.add(currentPoints);
 
     document.getElementById('point-count').textContent = data.count.toLocaleString() + ' points';
+    setViewerStatus(`Showing ${data.label} from ${data.source}`, 'ready');
 
     // Camera transition
-    const cam = defaultCameras[name];
+    const cam = data.camera || defaultCameras[name] || cameraFromBounds(data.bounds);
     const startPos = camera.position.clone();
     const endPos = new THREE.Vector3(...cam.pos);
     const startTarget = controls.target.clone();
@@ -1151,15 +1496,6 @@ footer a:hover { text-decoration: underline; }
     requestAnimationFrame(animateCam);
   }
 
-  // Controls - only target scene tabs within the viewer toolbar
-  document.querySelectorAll('.scene-tabs .scene-tab').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.scene-tabs .scene-tab').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      loadScene(btn.dataset.scene);
-    });
-  });
-
   document.getElementById('point-size').addEventListener('input', e => {
     if (currentPoints) currentPoints.material.size = parseFloat(e.target.value);
   });
@@ -1169,8 +1505,7 @@ footer a:hover { text-decoration: underline; }
       document.querySelectorAll('[data-color]').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       currentColorMode = btn.dataset.color;
-      const activeScene = document.querySelector('.scene-tabs .scene-tab.active').dataset.scene;
-      const data = sceneData[activeScene];
+      const data = sceneData[activeSceneId];
       if (data && currentPoints) {
         const newColors = applyColorMode(data, currentColorMode);
         currentPoints.geometry.setAttribute('color', new THREE.BufferAttribute(newColors, 3));
@@ -1187,11 +1522,31 @@ footer a:hover { text-decoration: underline; }
   });
 
   document.getElementById('reset-cam').addEventListener('click', () => {
-    const activeScene = document.querySelector('.scene-tabs .scene-tab.active').dataset.scene;
-    const cam = defaultCameras[activeScene];
+    const data = sceneData[activeSceneId];
+    const cam = data?.camera || defaultCameras[activeSceneId] || cameraFromBounds(data?.bounds || inferBounds(new Float32Array([0,0,0])));
     camera.position.set(...cam.pos);
     controls.target.set(...cam.target);
     controls.update();
+  });
+
+  sceneUploadEl.addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const uploadedSceneId = 'uploaded-asset';
+      sceneData[uploadedSceneId] = await loadLocalSceneFile(file);
+      const nextEntries = [
+        { id: uploadedSceneId, label: 'Uploaded', source: 'local-upload' },
+        ...sceneEntries.filter((entry) => entry.id !== uploadedSceneId),
+      ];
+      setSceneEntries(nextEntries);
+      await loadScene(uploadedSceneId);
+    } catch (error) {
+      console.error('Failed to load local scene asset', error);
+      setViewerStatus(`Upload failed: ${error.message || error}`, 'error');
+    } finally {
+      sceneUploadEl.value = '';
+    }
   });
 
   // Render loop
@@ -1211,7 +1566,18 @@ footer a:hover { text-decoration: underline; }
   });
 
   // Initial load
-  loadScene('street');
+  initializePublishedScenes()
+    .then((initialSceneId) => loadScene(initialSceneId))
+    .catch((error) => {
+      console.error('Failed to initialize published scenes', error);
+      setSceneEntries([
+        { id: 'street', label: 'Street', source: 'procedural' },
+        { id: 'campus', label: 'Campus', source: 'procedural' },
+        { id: 'indoor', label: 'Indoor', source: 'procedural' },
+      ]);
+      setViewerStatus(`Published scene load failed: ${error.message || error}`, 'error');
+      return loadScene('street');
+    });
 })();
 
 

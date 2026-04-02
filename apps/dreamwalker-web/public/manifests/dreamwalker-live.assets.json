@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "label": "Local DreamWalker Asset Manifest",
+  "note": "splatUrl と colliderMeshUrl に実ファイルを入れると、fragment ごとに Marble world を差し替えられる。",
+  "fragments": {
+    "residency": {
+      "label": "Residency Marble",
+      "splatUrl": "",
+      "colliderMeshUrl": "",
+      "expectedSplatUrl": "/splats/residency-main.sog",
+      "expectedColliderMeshUrl": "/colliders/residency-main-collider.glb",
+      "worldNote": "Residency fragment 用の World Labs Marble export をここへ割り当てる。"
+    },
+    "echo-chamber": {
+      "label": "Echo Chamber Marble",
+      "splatUrl": "",
+      "colliderMeshUrl": "",
+      "expectedSplatUrl": "/splats/echo-chamber-main.sog",
+      "expectedColliderMeshUrl": "/colliders/echo-chamber-main-collider.glb",
+      "worldNote": "Echo Chamber fragment 用の Marble export をここへ割り当てる。"
+    }
+  }
+}

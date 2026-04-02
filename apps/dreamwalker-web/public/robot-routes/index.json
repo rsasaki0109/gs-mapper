@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "label": "DreamWalker Public Robot Route Catalog",
+  "note": "repo 同梱の robot route preset 一覧。robot sandbox の導線や demo route をここへ足す。",
+  "routes": [
+    {
+      "id": "residency-window-loop",
+      "label": "Residency Window Loop",
+      "url": "/robot-routes/residency-window-loop.json",
+      "description": "window talk 側へ寄って gate lane へ返す sample loop",
+      "fragmentId": "residency",
+      "accent": "#85e3e1"
+    }
+  ]
+}

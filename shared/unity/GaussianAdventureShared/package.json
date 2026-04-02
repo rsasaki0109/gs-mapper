@@ -1,0 +1,16 @@
+{
+  "name": "com.rsasaki.gaussian-adventure-shared",
+  "displayName": "Gaussian Adventure Shared",
+  "version": "0.1.0",
+  "unity": "6000.0",
+  "description": "Shared DreamWalker-style controllers and hybrid splat traversal utilities.",
+  "keywords": [
+    "unity",
+    "gaussian-splatting",
+    "first-person",
+    "dreamwalker"
+  ],
+  "author": {
+    "name": "Ryo Sasaki"
+  }
+}

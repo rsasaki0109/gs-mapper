@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from nerf_gs_playground.benchmark import Benchmark, BenchmarkResult
+from gs_sim2real.benchmark import Benchmark, BenchmarkResult
 
 
 class TestBenchmarkResult:

@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "protocol": "dreamwalker-robot-route/v1",
+  "label": "Residency Window Loop",
+  "fragmentId": "residency",
+  "fragmentLabel": "Residency",
+  "frameId": "dreamwalker_map",
+  "world": {
+    "fragmentId": "residency",
+    "fragmentLabel": "Residency",
+    "assetLabel": "Residency Marble",
+    "splatUrl": "https://developer.playcanvas.com/assets/toy-cat.sog",
+    "colliderMeshUrl": "",
+    "frameId": "dreamwalker_map",
+    "zoneMapUrl": "/manifests/robotics-residency.zones.json",
+    "usesDemoFallback": true
+  },
+  "pose": {
+    "position": [
+      2.4,
+      0.0,
+      8.2
+    ],
+    "yawDegrees": 24
+  },
+  "waypoint": {
+    "position": [
+      2.4,
+      0.0,
+      11.0
+    ]
+  },
+  "route": [
+    [
+      0.0,
+      0.0,
+      5.8
+    ],
+    [
+      0.8,
+      0.0,
+      6.6
+    ],
+    [
+      1.6,
+      0.0,
+      7.4
+    ],
+    [
+      2.4,
+      0.0,
+      8.2
+    ]
+  ]
+}

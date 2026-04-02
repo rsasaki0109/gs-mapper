@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "label": "DreamWalker Live Sample Studio Bundle",
+  "note": "URL query から直接読み込める sample studio bundle。asset / scene / semantic zone / robot route の session draft をまとめて適用する。",
+  "assetWorkspace": {
+    "version": 1,
+    "label": "Sample Asset Workspace",
+    "fragments": {
+      "residency": {
+        "label": "Sample Residency Bundle"
+      },
+      "echo-chamber": {
+        "label": "Sample Echo Chamber Bundle"
+      }
+    }
+  },
+  "sceneWorkspace": {
+    "version": 1,
+    "label": "Sample Scene Workspace",
+    "fragments": {
+      "residency": {
+        "streamScenes": [
+          {
+            "id": "window-talk",
+            "title": "Sample Window Talk",
+            "topic": "sample studio bundle / long-use browser stage",
+            "overlayMemo": {
+              "title": "Sample Bundle Memo",
+              "items": [
+                "sample beat one",
+                "sample beat two"
+              ],
+              "footer": "sample url launch"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "semanticZoneWorkspace": {
+    "residency": {
+      "frameId": "dreamwalker_map",
+      "resolution": 0.5,
+      "defaultCost": 0,
+      "bounds": {
+        "minX": -6.0,
+        "maxX": 6.0,
+        "minZ": 0.0,
+        "maxZ": 14.0
+      },
+      "zones": [
+        {
+          "id": "residency-stage",
+          "label": "Sample Stage Zone",
+          "shape": "rect",
+          "center": [0.0, 0.0, 5.8],
+          "size": [4.6, 3.2],
+          "cost": 22,
+          "tags": ["stream", "sample"]
+        },
+        {
+          "id": "gate-lane",
+          "label": "Sample Gate Lane",
+          "shape": "rect",
+          "center": [0.0, 0.0, 10.6],
+          "size": [3.0, 2.6],
+          "cost": 48,
+          "tags": ["gate", "sample"]
+        }
+      ]
+    }
+  },
+  "robotRoute": {
+    "version": 1,
+    "protocol": "dreamwalker-robot-route/v1",
+    "label": "Sample Bundle Route",
+    "fragmentId": "residency",
+    "fragmentLabel": "Residency",
+    "frameId": "dreamwalker_map",
+    "world": {
+      "fragmentId": "residency",
+      "fragmentLabel": "Residency",
+      "assetLabel": "Residency Marble",
+      "splatUrl": "https://developer.playcanvas.com/assets/toy-cat.sog",
+      "colliderMeshUrl": "",
+      "frameId": "dreamwalker_map",
+      "zoneMapUrl": "/manifests/robotics-residency.zones.json",
+      "usesDemoFallback": true
+    },
+    "pose": {
+      "position": [1.0, 0.0, 6.8],
+      "yawDegrees": 18
+    },
+    "waypoint": {
+      "position": [1.0, 0.0, 9.6]
+    },
+    "route": [
+      [0.0, 0.0, 5.8],
+      [0.6, 0.0, 6.2],
+      [1.0, 0.0, 6.8]
+    ]
+  },
+  "state": {
+    "fragmentId": "residency",
+    "streamSceneId": "window-talk",
+    "overlayPresetId": "side-stack",
+    "filterId": "soft-dream",
+    "ratioId": "free",
+    "cameraPresetId": "window"
+  }
+}

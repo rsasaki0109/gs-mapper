@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "label": "DreamWalker Public Robot Mission Catalog",
+  "note": "route + zone + launch URL を束ねた robotics mission manifest 一覧。実運用では配信回や patrol ごとの mission file をここへ足す。",
+  "missions": [
+    {
+      "id": "residency-window-loop",
+      "label": "Residency Window Loop Mission",
+      "url": "/robot-missions/residency-window-loop.mission.json",
+      "description": "sample mission / residency window loop / base route + zone manifest",
+      "fragmentId": "residency",
+      "accent": "#85e3e1"
+    }
+  ]
+}

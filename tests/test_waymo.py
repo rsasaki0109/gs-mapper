@@ -7,7 +7,7 @@ import json
 import numpy as np
 import pytest
 
-from nerf_gs_playground.datasets.waymo import WaymoLoader
+from gs_sim2real.datasets.waymo import WaymoLoader
 
 
 class TestRotationToQuaternion:

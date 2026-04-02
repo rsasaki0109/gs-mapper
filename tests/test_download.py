@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from nerf_gs_playground.common.download import download_dataset
+from gs_sim2real.common.download import download_dataset
 
 
 class TestDownloadDataset:

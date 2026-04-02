@@ -1,0 +1,48 @@
+{
+  "name": "dreamwalker-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "relay": "node ./tools/overlay-relay.mjs",
+    "robotics:bridge": "node ./tools/robotics-bridge.mjs",
+    "robotics:client": "node ./tools/robotics-bridge-client.mjs",
+    "robotics:rosbridge": "node ./tools/robotics-rosbridge-relay.mjs",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test:browser": "playwright test",
+    "test:docs-viewer": "node --test tests/docs-viewer.test.mjs",
+    "test:stream-import": "node --test tests/live-localization-stream-import.test.mjs",
+    "test:review-bundle-import": "node --test tests/localization-review-bundle-import.test.mjs",
+    "test:sim2real-ws-protocol": "node --test tests/sim2real-websocket-protocol.test.mjs",
+    "experiment:live-stream-import": "node ./tools/live-localization-stream-import-lab.mjs",
+    "experiment:review-bundle-import": "node ./tools/localization-review-bundle-import-lab.mjs",
+    "experiment:sim2real-ws-protocol": "node ./tools/sim2real-websocket-protocol-lab.mjs",
+    "validate:studio": "node ./tools/validate-studio-assets.mjs",
+    "validate:robot-bundle": "node ./tools/validate-robot-bundle.mjs",
+    "bundle:robot-mission": "node ./tools/bundle-robot-mission.mjs",
+    "release:robot-mission": "node ./tools/release-robot-mission.mjs",
+    "discover:robot-bundles": "node ./tools/discover-robot-bundles.mjs",
+    "stage:fragment": "node ./tools/stage-marble-fragment.mjs",
+    "stage:robot-route": "node ./tools/stage-robot-route.mjs",
+    "stage:robot-zones": "node ./tools/stage-robot-zones.mjs",
+    "analyze:robot-route": "node ./tools/analyze-robot-route.mjs",
+    "suggest:robot-zones": "node ./tools/suggest-robot-zones.mjs",
+    "tune:robot-zones": "node ./tools/tune-robot-zones.mjs",
+    "publish:robot-mission": "node ./tools/publish-robot-mission.mjs"
+  },
+  "dependencies": {
+    "@playcanvas/react": "0.11.3",
+    "playcanvas": "2.17.2",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "sync-ammo": "0.1.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "@vitejs/plugin-react": "4.7.0",
+    "vite": "5.4.21",
+    "ws": "^8.18.3"
+  }
+}

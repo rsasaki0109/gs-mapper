@@ -1,0 +1,40 @@
+{
+  "frameId": "dreamwalker_map",
+  "resolution": 0.5,
+  "defaultCost": 0,
+  "bounds": {
+    "minX": -6.0,
+    "maxX": 6.0,
+    "minZ": 0.0,
+    "maxZ": 12.0
+  },
+  "zones": [
+    {
+      "id": "echo-threshold",
+      "label": "Echo Threshold",
+      "shape": "rect",
+      "center": [0.0, 0.0, 4.8],
+      "size": [4.2, 2.8],
+      "cost": 20,
+      "tags": ["safe", "threshold"]
+    },
+    {
+      "id": "chorus-pocket",
+      "label": "Chorus Pocket",
+      "shape": "rect",
+      "center": [-2.8, 0.0, 3.7],
+      "size": [2.8, 2.2],
+      "cost": 35,
+      "tags": ["chorus", "photo"]
+    },
+    {
+      "id": "return-vector",
+      "label": "Return Vector",
+      "shape": "circle",
+      "center": [0.0, 0.0, 8.4],
+      "radius": 1.35,
+      "cost": 60,
+      "tags": ["gate", "return"]
+    }
+  ]
+}

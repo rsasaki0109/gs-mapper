@@ -1,4 +1,4 @@
-"""Streamlit demo app for the nerf-gs-playground 3DGS pipeline.
+"""Streamlit demo app for the gs-sim2real 3DGS pipeline.
 
 Provides a browser-based interface for uploading images, running COLMAP
 preprocessing, training 3D Gaussian Splatting models, viewing 3D point
@@ -94,7 +94,7 @@ def _generate_demo_point_cloud(n: int = 2000) -> tuple[np.ndarray, np.ndarray]:
 def _load_ply_for_plotly(ply_path: Path) -> tuple[np.ndarray, np.ndarray] | None:
     """Try to load positions and colours from a PLY file."""
     try:
-        from nerf_gs_playground.viewer.web_viewer import load_ply
+        from gs_sim2real.viewer.web_viewer import load_ply
 
         data = load_ply(ply_path)
         return data.positions, data.colors
@@ -158,7 +158,7 @@ if uploaded_files:
 if sample_download_clicked:
     with st.spinner("Downloading sample images..."):
         try:
-            from nerf_gs_playground.common.download import download_sample_images
+            from gs_sim2real.common.download import download_sample_images
 
             tmp = Path(tempfile.mkdtemp(prefix="gs_app_sample_"))
             img_dir = download_sample_images(tmp, num_images=10)
@@ -191,7 +191,7 @@ if run_pipeline and work_dir is not None:
     if run_colmap:
         st.session_state["colmap_status"] = "running"
         try:
-            from nerf_gs_playground.preprocess.colmap import run_colmap as _run_colmap
+            from gs_sim2real.preprocess.colmap import run_colmap as _run_colmap
 
             sparse_dir = _run_colmap(
                 image_dir=work_dir,
@@ -208,7 +208,7 @@ if run_pipeline and work_dir is not None:
     data_for_train = colmap_dir if run_colmap else work_dir
     try:
         if training_method == "gsplat":
-            from nerf_gs_playground.train.gsplat_trainer import train_gsplat
+            from gs_sim2real.train.gsplat_trainer import train_gsplat
 
             ply = train_gsplat(
                 data_dir=data_for_train,
@@ -217,7 +217,7 @@ if run_pipeline and work_dir is not None:
             )
             st.session_state["ply_path"] = str(ply)
         else:
-            from nerf_gs_playground.train.nerfstudio_trainer import train_nerfstudio
+            from gs_sim2real.train.nerfstudio_trainer import train_nerfstudio
 
             train_nerfstudio(
                 data_dir=data_for_train,
@@ -233,8 +233,8 @@ elif run_pipeline and work_dir is None:
 # ---------------------------------------------------------------------------
 # Tabs
 # ---------------------------------------------------------------------------
-tab_input, tab_preprocess, tab_train, tab_viewer, tab_export = st.tabs(
-    ["Input Images", "Preprocessing", "Training Progress", "3D Viewer", "Export"]
+tab_input, tab_preprocess, tab_train, tab_viewer, tab_export, tab_teleop = st.tabs(
+    ["Input Images", "Preprocessing", "Training Progress", "3D Viewer", "Export", "Robot Teleop"]
 )
 
 # ---- Tab 1: Input Images ----
@@ -424,7 +424,7 @@ with tab_viewer:
         )
         st.plotly_chart(fig, use_container_width=True)
 
-    st.info("For the full interactive viewer, use the CLI command: `gs-playground view --model <path.ply>`")
+    st.info("For the full interactive viewer, use the CLI command: `gs-sim2real view --model <path.ply>`")
 
 # ---- Tab 5: Export ----
 with tab_export:
@@ -462,13 +462,66 @@ with tab_export:
     st.code(
         f"""\
 # Preprocess with COLMAP
-gs-playground preprocess --images {img_dir_display} --output outputs/colmap{gpu_flag}
+gs-sim2real preprocess --images {img_dir_display} --output outputs/colmap{gpu_flag}
 
 # Train 3DGS
-gs-playground train --data outputs/colmap --method {training_method} --iterations {num_iterations}
+gs-sim2real train --data outputs/colmap --method {training_method} --iterations {num_iterations}
 
 # View the result
-gs-playground view --model outputs/train/point_cloud.ply
+gs-sim2real view --model outputs/train/point_cloud.ply
 """,
         language="bash",
+    )
+
+# ---- Tab 6: Robot Teleop ----
+with tab_teleop:
+    st.header("Robot Teleop in DreamWalker")
+
+    ply_path_str = st.session_state.get("ply_path")
+    has_ply = ply_path_str and Path(ply_path_str).exists()
+
+    if has_ply:
+        st.success(f"Trained model ready: `{ply_path_str}`")
+        fragment = st.text_input("Fragment name", value="residency")
+
+        if st.button("Stage for DreamWalker", type="primary"):
+            try:
+                from gs_sim2real.demo.stage_for_dreamwalker import stage_ply
+
+                result = stage_ply(ply_path_str, fragment=fragment)
+                st.session_state["dreamwalker_staged"] = result
+                st.success(f"Staged: {result['splat_dest']}")
+            except Exception as exc:
+                st.error(f"Staging failed: {exc}")
+
+        staged = st.session_state.get("dreamwalker_staged")
+        if staged:
+            st.markdown(f"**Launch URL**: [{staged['launch_url']}]({staged['launch_url']})")
+            st.info("Run `cd apps/dreamwalker-web && npm run dev` in another terminal, then open the URL above.")
+    else:
+        st.info("No trained model available. Run the pipeline first, or use the CLI:")
+
+    st.subheader("CLI One-Command Demo")
+    st.code(
+        """\
+# From images (full pipeline)
+gs-sim2real demo --images <IMAGE_DIR> --iterations 1000
+
+# From an existing PLY
+gs-sim2real demo --ply outputs/train/point_cloud.ply
+""",
+        language="bash",
+    )
+
+    st.subheader("Controls")
+    st.markdown(
+        """\
+| Key | Action |
+|-----|--------|
+| WASD | Move robot |
+| Mouse | Look around |
+| R | Toggle robot mode |
+| 1/2/3 | Front / Chase / Top camera |
+| Space | Place waypoint |
+"""
     )

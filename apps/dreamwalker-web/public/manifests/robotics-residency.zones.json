@@ -1,0 +1,40 @@
+{
+  "frameId": "dreamwalker_map",
+  "resolution": 0.5,
+  "defaultCost": 0,
+  "bounds": {
+    "minX": -6.0,
+    "maxX": 6.0,
+    "minZ": 0.0,
+    "maxZ": 14.0
+  },
+  "zones": [
+    {
+      "id": "residency-stage",
+      "label": "Residency Stage",
+      "shape": "rect",
+      "center": [0.0, 0.0, 5.8],
+      "size": [4.6, 3.2],
+      "cost": 15,
+      "tags": ["stream", "safe"]
+    },
+    {
+      "id": "gate-lane",
+      "label": "Gate Lane",
+      "shape": "rect",
+      "center": [0.0, 0.0, 10.6],
+      "size": [3.0, 2.6],
+      "cost": 45,
+      "tags": ["gate", "transition"]
+    },
+    {
+      "id": "dream-void",
+      "label": "Dream Void",
+      "shape": "circle",
+      "center": [2.1, 0.0, 11.4],
+      "radius": 1.25,
+      "cost": 90,
+      "tags": ["hazard", "void"]
+    }
+  ]
+}

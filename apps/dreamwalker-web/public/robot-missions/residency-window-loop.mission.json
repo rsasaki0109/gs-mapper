@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "protocol": "dreamwalker-robot-mission/v1",
+  "id": "residency-window-loop",
+  "label": "Residency Window Loop Mission",
+  "description": "sample mission / residency window loop / base route + zone manifest",
+  "fragmentId": "residency",
+  "fragmentLabel": "Residency",
+  "accent": "#85e3e1",
+  "routeUrl": "/robot-routes/residency-window-loop.json",
+  "zoneMapUrl": "/manifests/robotics-residency.zones.json",
+  "launchUrl": "/?robotMission=%2Frobot-missions%2Fresidency-window-loop.mission.json",
+  "cameraPresetId": "window",
+  "robotCameraId": "chase",
+  "streamSceneId": "window-talk",
+  "startupMode": "robot",
+  "world": {
+    "assetLabel": "Residency Marble",
+    "frameId": "dreamwalker_map"
+  }
+}

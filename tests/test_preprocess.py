@@ -39,7 +39,7 @@ class TestExtractFrames:
 
     def test_extract_frames_creates_files(self, tmp_path: Path) -> None:
         """Extract frames from a tiny video and verify output files are created."""
-        from nerf_gs_playground.preprocess.extract_frames import extract_frames
+        from gs_sim2real.preprocess.extract_frames import extract_frames
 
         video_path = _create_test_video(tmp_path / "video.mp4", num_frames=5)
         output_dir = tmp_path / "frames"
@@ -52,7 +52,7 @@ class TestExtractFrames:
 
     def test_extract_frames_max_frames(self, tmp_path: Path) -> None:
         """Setting max_frames=2 extracts exactly 2 frames."""
-        from nerf_gs_playground.preprocess.extract_frames import extract_frames
+        from gs_sim2real.preprocess.extract_frames import extract_frames
 
         video_path = _create_test_video(tmp_path / "video.mp4", num_frames=10)
         output_dir = tmp_path / "frames"
@@ -63,14 +63,14 @@ class TestExtractFrames:
 
     def test_extract_frames_nonexistent_video(self) -> None:
         """extract_frames raises FileNotFoundError for a missing video."""
-        from nerf_gs_playground.preprocess.extract_frames import extract_frames
+        from gs_sim2real.preprocess.extract_frames import extract_frames
 
         with pytest.raises(FileNotFoundError):
             extract_frames(Path("/nonexistent/video.mp4"), Path("/tmp/out"))
 
     def test_extract_frames_both_fps_and_every_n_raises(self, tmp_path: Path) -> None:
         """Specifying both fps and every_n raises ValueError."""
-        from nerf_gs_playground.preprocess.extract_frames import extract_frames
+        from gs_sim2real.preprocess.extract_frames import extract_frames
 
         video_path = _create_test_video(tmp_path / "video.mp4", num_frames=3)
 
@@ -81,7 +81,7 @@ class TestExtractFrames:
         """Extracted frames can be read back as valid images."""
         import cv2
 
-        from nerf_gs_playground.preprocess.extract_frames import extract_frames
+        from gs_sim2real.preprocess.extract_frames import extract_frames
 
         video_path = _create_test_video(tmp_path / "video.mp4", num_frames=3)
         output_dir = tmp_path / "frames"

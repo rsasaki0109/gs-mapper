@@ -3,14 +3,14 @@ requires = ["setuptools>=68.0", "setuptools-scm>=8.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "nerf-gs-playground"
+name = "gs-sim2real"
 version = "0.1.0"
-description = "Multi-dataset 3D Gaussian Splatting reconstruction playground"
+description = "Multi-dataset 3D Gaussian Splatting sim2real reconstruction toolkit"
 authors = [{ name = "rsasaki0109" }]
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
-keywords = ["3d-gaussian-splatting", "nerf", "3d-reconstruction", "point-cloud", "robotics"]
+keywords = ["3d-gaussian-splatting", "nerf", "3d-reconstruction", "point-cloud", "robotics", "sim2real"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "License :: OSI Approved :: MIT License",
@@ -32,18 +32,20 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/rsasaki0109/nerf-gs-playground"
-Documentation = "https://rsasaki0109.github.io/nerf-gs-playground/"
-Repository = "https://github.com/rsasaki0109/nerf-gs-playground"
+Homepage = "https://github.com/rsasaki0109/gs-sim2real"
+Documentation = "https://rsasaki0109.github.io/gs-sim2real/"
+Repository = "https://github.com/rsasaki0109/gs-sim2real"
 
 [project.optional-dependencies]
 nerfstudio = ["nerfstudio"]
 gsplat = ["gsplat"]
 app = ["streamlit>=1.30", "plotly>=5.0"]
+metrics = ["lpips"]
 dev = ["pytest", "ruff", "mypy"]
 
 [project.scripts]
-gs-playground = "nerf_gs_playground.cli:main"
+gs-sim2real = "gs_sim2real.cli:main"
+gs-sim2real-robotics-node = "gs_sim2real.robotics.ros2_bridge_node:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

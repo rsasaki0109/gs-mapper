@@ -1,51 +1,98 @@
-# Python
+# Python / general tooling
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 *.egg-info/
 *.egg
+.eggs/
 dist/
 build/
+site/
 *.whl
-.eggs/
 
 # Virtual environments
 .venv/
 venv/
 env/
 
-# IDE
+# IDE / editor
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# Data and model artifacts
-data/
-outputs/
-*.ply
-*.pt
-*.pth
-*.onnx
+node_modules/
 
 # Environment
 .env
 
-# Jupyter
+# Jupyter / test / lint caches
 .ipynb_checkpoints/
+.coverage
+htmlcov/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Python data / model artifacts
+data/
+outputs/
+checkpoints/
+wandb/
+*.pt
+*.pth
+*.onnx
+
+# Unity generated folders
+projects/**/[Ll]ibrary/
+projects/**/[Tt]emp/
+projects/**/[Oo]bj/
+projects/**/[Bb]uild/
+projects/**/[Bb]uilds/
+projects/**/[Ll]ogs/
+projects/**/[Uu]ser[Ss]ettings/
+projects/**/[Mm]emoryCaptures/
+projects/**/[Rr]ecordings/
+projects/**/[Aa]rtifacts/
+
+# Unity auto-generated solution / IDE files
+projects/**/*.csproj
+projects/**/*.unityproj
+projects/**/*.sln
+projects/**/*.suo
+projects/**/*.tmp
+projects/**/*.user
+projects/**/*.userprefs
+projects/**/*.pidb
+projects/**/*.booproj
+projects/**/*.svd
+projects/**/*.pdb
+projects/**/*.mdb
+projects/**/*.opendb
+projects/**/*.VC.db
+projects/**/sysinfo.txt
+
+# Unity package caches
+projects/**/Assets/AssetStoreTools*
+
+# Large raw captures / Gaussian Splat source assets
+raw_assets/
+captures/
+cache/
+*.splat
+*.spz
+*.ksplat
+*.ply
+*.pcd
+*.las
+*.laz
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Coverage
-.coverage
-htmlcov/
-
-# mypy
-.mypy_cache/
-
-# ruff
-.ruff_cache/
+# Web app outputs
+apps/**/dist/
+apps/**/.vite/
+apps/**/coverage/

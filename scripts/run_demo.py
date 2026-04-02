@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a demo of the full nerf-gs-playground pipeline.
+"""Run a demo of the full gs-sim2real pipeline.
 
 Usage:
     python scripts/run_demo.py
@@ -28,7 +28,7 @@ sys.path.insert(0, str(project_root / "src"))
 
 def main() -> None:
     """Run the full demo pipeline."""
-    parser = argparse.ArgumentParser(description="Run nerf-gs-playground demo pipeline")
+    parser = argparse.ArgumentParser(description="Run gs-sim2real demo pipeline")
     parser.add_argument("--images", default=None, help="Path to input images directory")
     parser.add_argument("--output", default=None, help="Output directory (default: outputs/demo)")
     parser.add_argument(
@@ -53,7 +53,7 @@ def main() -> None:
     train_dir = output_dir / "train"
 
     print("=" * 60)
-    print("  nerf-gs-playground Demo Pipeline")
+    print("  gs-sim2real Demo Pipeline")
     print("=" * 60)
     print(f"  Output directory: {output_dir}")
     print(f"  Training method: {args.method}")
@@ -69,7 +69,7 @@ def main() -> None:
         print(f"Using provided images from: {images_dir}")
     elif args.sample_images:
         print("Step 1: Downloading sample images...")
-        from nerf_gs_playground.common.download import download_sample_images
+        from gs_sim2real.common.download import download_sample_images
 
         images_dir = download_sample_images(
             output_dir / "sample_data",
@@ -96,7 +96,7 @@ def main() -> None:
         print("  Step 2: COLMAP Preprocessing")
         print("=" * 60)
         try:
-            from nerf_gs_playground.preprocess.colmap import run_colmap
+            from gs_sim2real.preprocess.colmap import run_colmap
 
             sparse_dir = run_colmap(
                 image_dir=images_dir,
@@ -121,7 +121,7 @@ def main() -> None:
 
         if args.method == "gsplat":
             try:
-                from nerf_gs_playground.train.gsplat_trainer import train_gsplat
+                from gs_sim2real.train.gsplat_trainer import train_gsplat
 
                 ply_path = train_gsplat(
                     data_dir=colmap_dir,
@@ -138,7 +138,7 @@ def main() -> None:
                 sys.exit(1)
         else:
             try:
-                from nerf_gs_playground.train.nerfstudio_trainer import train_nerfstudio
+                from gs_sim2real.train.nerfstudio_trainer import train_nerfstudio
 
                 train_nerfstudio(
                     data_dir=colmap_dir,
@@ -160,7 +160,7 @@ def main() -> None:
         print("=" * 60)
         print("  Step 4: Launching Viewer")
         print("=" * 60)
-        from nerf_gs_playground.viewer.web_viewer import launch_viewer
+        from gs_sim2real.viewer.web_viewer import launch_viewer
 
         launch_viewer(ply_path, port=args.port)
     elif ply_path is None:

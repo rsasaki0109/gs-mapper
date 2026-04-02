@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 
-from nerf_gs_playground.viewer.web_export import ply_to_binary, ply_to_json
+from gs_sim2real.viewer.web_export import ply_to_binary, ply_to_json, ply_to_scene_bundle
 
 
 def _write_ascii_ply(path: Path, positions: list[list[float]], colors: list[list[int]]) -> Path:
@@ -161,3 +161,49 @@ class TestPlyToBinary:
 
         expected_size = 4 + 24 + 5 * 24
         assert Path(result).stat().st_size == expected_size
+
+
+class TestPlyToSceneBundle:
+    """Tests for GitHub Pages scene bundle export."""
+
+    def test_creates_scene_manifest_and_binary_asset(self, tmp_path: Path) -> None:
+        positions = [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 2.5, 1.0]]
+        colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255]]
+        ply_path = _write_ascii_ply(tmp_path / "bundle.ply", positions, colors)
+        output_dir = tmp_path / "bundle"
+
+        manifest_path = ply_to_scene_bundle(
+            str(ply_path),
+            str(output_dir),
+            asset_format="binary",
+            scene_id="demo-room",
+            label="Demo Room",
+            description="Tiny binary demo scene",
+        )
+
+        manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+        assert manifest["type"] == "web-scene-manifest"
+        assert manifest["sceneId"] == "demo-room"
+        assert manifest["label"] == "Demo Room"
+        assert manifest["asset"]["format"] == "binary"
+        assert manifest["asset"]["href"] == "demo-room.points.bin"
+        assert (output_dir / "demo-room.points.bin").exists()
+        assert manifest["camera"]["target"] == [4.0, 3.5, 3.5]
+
+    def test_creates_scene_manifest_and_json_asset(self, tmp_path: Path) -> None:
+        positions = [[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]]
+        colors = [[255, 255, 255], [0, 0, 0]]
+        ply_path = _write_ascii_ply(tmp_path / "bundle-json.ply", positions, colors)
+        output_dir = tmp_path / "bundle-json"
+
+        manifest_path = ply_to_scene_bundle(
+            str(ply_path),
+            str(output_dir),
+            asset_format="json",
+            scene_id="json-scene",
+        )
+
+        manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+        asset = json.loads((output_dir / "json-scene.points.json").read_text(encoding="utf-8"))
+        assert manifest["asset"]["format"] == "json"
+        assert asset["count"] == 2

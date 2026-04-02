@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 import pytest
 
-from nerf_gs_playground.common.config import (
+from gs_sim2real.common.config import (
     get_dataset_config,
     get_project_root,
     load_config,
@@ -133,7 +133,7 @@ class TestFrameExtraction:
             pytest.skip("OpenCV not available")
 
         import numpy as np
-        from nerf_gs_playground.preprocess.extract_frames import extract_frames
+        from gs_sim2real.preprocess.extract_frames import extract_frames
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
@@ -164,7 +164,7 @@ class TestFrameExtraction:
             pytest.skip("OpenCV not available")
 
         import numpy as np
-        from nerf_gs_playground.preprocess.extract_frames import extract_frames
+        from gs_sim2real.preprocess.extract_frames import extract_frames
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
@@ -183,7 +183,7 @@ class TestFrameExtraction:
 
     def test_extract_frames_missing_video(self) -> None:
         """Test that missing video raises FileNotFoundError."""
-        from nerf_gs_playground.preprocess.extract_frames import extract_frames
+        from gs_sim2real.preprocess.extract_frames import extract_frames
 
         with pytest.raises(FileNotFoundError):
             extract_frames(Path("/nonexistent/video.mp4"), Path("/tmp/out"))
@@ -196,7 +196,7 @@ class TestFrameExtraction:
             pytest.skip("OpenCV not available")
 
         import numpy as np
-        from nerf_gs_playground.preprocess.extract_frames import extract_frames
+        from gs_sim2real.preprocess.extract_frames import extract_frames
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
@@ -215,7 +215,7 @@ class TestCLIParsing:
 
     def test_parse_download(self) -> None:
         """Test parsing download subcommand."""
-        from nerf_gs_playground.cli import build_parser
+        from gs_sim2real.cli import build_parser
 
         parser = build_parser()
         args = parser.parse_args(["download", "--dataset", "ggrt"])
@@ -224,7 +224,7 @@ class TestCLIParsing:
 
     def test_parse_preprocess(self) -> None:
         """Test parsing preprocess subcommand."""
-        from nerf_gs_playground.cli import build_parser
+        from gs_sim2real.cli import build_parser
 
         parser = build_parser()
         args = parser.parse_args(["preprocess", "--images", "/data/images", "--method", "colmap"])
@@ -234,7 +234,7 @@ class TestCLIParsing:
 
     def test_parse_train(self) -> None:
         """Test parsing train subcommand."""
-        from nerf_gs_playground.cli import build_parser
+        from gs_sim2real.cli import build_parser
 
         parser = build_parser()
         args = parser.parse_args(["train", "--data", "/data/colmap", "--iterations", "5000"])
@@ -244,7 +244,7 @@ class TestCLIParsing:
 
     def test_parse_view(self) -> None:
         """Test parsing view subcommand."""
-        from nerf_gs_playground.cli import build_parser
+        from gs_sim2real.cli import build_parser
 
         parser = build_parser()
         args = parser.parse_args(["view", "--model", "model.ply", "--port", "9090"])
@@ -254,7 +254,7 @@ class TestCLIParsing:
 
     def test_parse_run(self) -> None:
         """Test parsing run subcommand."""
-        from nerf_gs_playground.cli import build_parser
+        from gs_sim2real.cli import build_parser
 
         parser = build_parser()
         args = parser.parse_args(["run", "--images", "/data/imgs", "--no-viewer"])
@@ -264,7 +264,7 @@ class TestCLIParsing:
 
     def test_no_command_prints_help(self) -> None:
         """Test that no subcommand exits with code 0."""
-        from nerf_gs_playground.cli import main
+        from gs_sim2real.cli import main
 
         with pytest.raises(SystemExit) as exc_info:
             main([])

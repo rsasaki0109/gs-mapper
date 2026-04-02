@@ -1,0 +1,41 @@
+{
+  "version": "gs-sim2real-web-scene/v1",
+  "type": "web-scene-manifest",
+  "sceneId": "demo-room",
+  "label": "Demo Room",
+  "description": "Small exported room scene for GitHub Pages",
+  "asset": {
+    "href": "demo-room.points.bin",
+    "format": "binary"
+  },
+  "count": 6460,
+  "bounds": {
+    "min": [
+      -4.029839992523193,
+      -0.029990000650286674,
+      -3.029939889907837
+    ],
+    "max": [
+      4.0297698974609375,
+      2.829900026321411,
+      3.0099198818206787
+    ]
+  },
+  "camera": {
+    "position": [
+      13.19188117980957,
+      8.467052459716797,
+      13.181906700134277
+    ],
+    "target": [
+      -3.504753112792969e-05,
+      1.3999550342559814,
+      -0.010010004043579102
+    ],
+    "up": [
+      0.0,
+      1.0,
+      0.0
+    ]
+  }
+}

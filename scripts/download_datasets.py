@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Download datasets for nerf-gs-playground.
+"""Download datasets for gs-sim2real.
 
 Usage:
     python scripts/download_datasets.py --dataset ggrt --dest data/
@@ -25,7 +25,7 @@ sys.path.insert(0, str(project_root / "src"))
 
 def main() -> None:
     """Download a dataset based on CLI arguments."""
-    parser = argparse.ArgumentParser(description="Download datasets for nerf-gs-playground")
+    parser = argparse.ArgumentParser(description="Download datasets for gs-sim2real")
     parser.add_argument("--dataset", help="Dataset to download (e.g. ggrt, covla, mcd)")
     parser.add_argument("--dest", default=None, help="Destination directory (default: data/)")
     parser.add_argument("--max-samples", type=int, default=None, help="Max samples to download")
@@ -35,7 +35,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.list:
-        from nerf_gs_playground.common.config import load_datasets_config
+        from gs_sim2real.common.config import load_datasets_config
 
         datasets = load_datasets_config()
         print("Available datasets:")
@@ -46,7 +46,7 @@ def main() -> None:
         return
 
     if args.sample_images:
-        from nerf_gs_playground.common.download import download_sample_images
+        from gs_sim2real.common.download import download_sample_images
 
         dest = Path(args.dest) if args.dest else project_root / "data" / "sample"
         download_sample_images(dest, num_images=args.num_images)
@@ -57,7 +57,7 @@ def main() -> None:
         print("\nError: --dataset is required (or use --list to see available datasets)")
         sys.exit(1)
 
-    from nerf_gs_playground.common.download import download_dataset
+    from gs_sim2real.common.download import download_dataset
 
     dest = Path(args.dest) if args.dest else None
 
