@@ -744,7 +744,7 @@ async function main() {
         carousel = false;
     } catch (err) {}
     const url = new URL(
-        params.get("url") || "../assets/outdoor-demo/outdoor-demo.splat",
+        params.get("url") || "assets/outdoor-demo/outdoor-demo.splat",
         location.href,
     );
     const req = await fetch(url, {
