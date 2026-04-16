@@ -757,7 +757,16 @@ async function main() {
 
     const rowLength = 3 * 4 + 3 * 4 + 4 + 4;
     const reader = req.body.getReader();
-    let splatData = new Uint8Array(req.headers.get("content-length"));
+    const contentLengthHeader = parseInt(req.headers.get("content-length") || "0", 10);
+    const contentEncoding = (req.headers.get("content-encoding") || "").toLowerCase();
+    // GitHub Pages (and other hosts) may gzip the response, in which case the
+    // Content-Length header reports compressed bytes but fetch delivers the
+    // decompressed stream. Fall back to a dynamic buffer when the header is
+    // missing or known to be unreliable.
+    const hasReliableLength = contentLengthHeader > 0 && contentEncoding === "";
+    let splatData = hasReliableLength
+        ? new Uint8Array(contentLengthHeader)
+        : new Uint8Array(64 * 1024 * 1024);
 
     const downsample =
         splatData.length / rowLength > 500000 ? 1 : 1 / devicePixelRatio;
@@ -1450,6 +1459,13 @@ async function main() {
         const { done, value } = await reader.read();
         if (done || stopLoading) break;
 
+        if (bytesRead + value.length > splatData.length) {
+            const grown = new Uint8Array(
+                Math.max(splatData.length * 2, bytesRead + value.length),
+            );
+            grown.set(splatData.subarray(0, bytesRead));
+            splatData = grown;
+        }
         splatData.set(value, bytesRead);
         bytesRead += value.length;
 
