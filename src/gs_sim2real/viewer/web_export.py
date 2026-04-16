@@ -233,3 +233,76 @@ def ply_to_scene_bundle(
         label=label or Path(ply_path).stem.replace("_", " ").replace("-", " "),
         description=description,
     )
+
+
+SH_C0 = 0.28209479177387814
+
+
+def ply_to_splat(ply_path: str | Path, output_path: str | Path, max_points: int | None = None) -> str:
+    """Convert a gsplat PLY to the antimatter15/splat 32-byte-per-gaussian binary.
+
+    Per-gaussian layout (little-endian native float32 / uint8, matching the
+    upstream WebGL viewer):
+      - position   : float32 x 3  (bytes  0..11)
+      - scale      : float32 x 3 as exp(log_scale)  (bytes 12..23)
+      - color RGBA : uint8   x 4, RGB = (0.5 + SH_C0 * f_dc).clip, A = sigmoid(opacity)  (24..27)
+      - rotation   : uint8   x 4, normalized quat * 128 + 128  (28..31)
+
+    Gaussians are sorted by ``exp(sum(scale_logs)) * sigmoid(opacity)`` descending
+    before writing so the viewer renders larger, more opaque splats first.
+    """
+    from gs_sim2real.viewer.web_viewer import load_ply
+
+    src = Path(ply_path)
+    dst = Path(output_path)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+
+    data = load_ply(str(src))
+    positions = np.asarray(data.positions, dtype=np.float32)
+    scales_log = np.asarray(data.scales, dtype=np.float32) if data.scales is not None else None
+    rotations = np.asarray(data.rotations, dtype=np.float32) if data.rotations is not None else None
+    opacities = np.asarray(data.opacities, dtype=np.float32) if data.opacities is not None else None
+    colors = np.asarray(data.colors, dtype=np.float32) if data.colors is not None else None
+    if any(x is None for x in (scales_log, rotations, opacities, colors)):
+        raise ValueError(
+            "PLY is missing gaussian parameters required for .splat (need scales, rotations, opacities, f_dc)"
+        )
+
+    n = len(positions)
+    sigmoid_opacity = 1.0 / (1.0 + np.exp(-opacities))
+    score = np.exp(scales_log.sum(axis=1)) * sigmoid_opacity
+    order = np.argsort(-score)
+    if max_points is not None and max_points > 0 and n > max_points:
+        order = order[:max_points]
+    n_out = int(order.shape[0])
+
+    rot_raw = rotations[order].astype(np.float64)
+    rot_norm = np.linalg.norm(rot_raw, axis=1, keepdims=True)
+    rot_norm = np.where(rot_norm == 0.0, 1.0, rot_norm)
+    rot_u8 = np.clip(rot_raw / rot_norm * 128.0 + 128.0, 0, 255).astype(np.uint8)
+
+    rgba = np.empty((n_out, 4), dtype=np.float32)
+    rgba[:, :3] = np.clip(colors[order], 0.0, 1.0)
+    rgba[:, 3] = np.clip(sigmoid_opacity[order], 0.0, 1.0)
+    rgba_u8 = np.clip(rgba * 255.0, 0, 255).astype(np.uint8)
+
+    pos = positions[order].astype(np.float32)
+    scale = np.exp(scales_log[order]).astype(np.float32)
+
+    dtype = np.dtype(
+        [
+            ("pos", "<f4", 3),
+            ("scale", "<f4", 3),
+            ("rgba", "u1", 4),
+            ("rot", "u1", 4),
+        ]
+    )
+    packed = np.empty(n_out, dtype=dtype)
+    packed["pos"] = pos
+    packed["scale"] = scale
+    packed["rgba"] = rgba_u8
+    packed["rot"] = rot_u8
+    with open(dst, "wb") as f:
+        f.write(packed.tobytes())
+    logger.info("Exported %d gaussians to %s (%.1f KB)", n_out, dst, dst.stat().st_size / 1024)
+    return str(dst)

@@ -87,6 +87,7 @@ cache/
 *.pcd
 *.las
 *.laz
+!docs/assets/**/*.splat
 
 # OS
 .DS_Store
