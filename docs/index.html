@@ -569,7 +569,7 @@ footer a:hover { text-decoration: underline; }
       <div class="toolbar-sep"></div>
       <div class="toolbar-group">
         <span class="toolbar-label">Size</span>
-        <input type="range" id="point-size" min="0.5" max="6" step="0.1" value="2.0">
+        <input type="range" id="point-size" min="0.05" max="1.5" step="0.05" value="0.25">
       </div>
       <div class="toolbar-sep"></div>
       <div class="toolbar-group">
@@ -796,6 +796,21 @@ footer a:hover { text-decoration: underline; }
   scene.add(axesHelper);
   const gridHelper = new THREE.GridHelper(40, 40, 0x30363d, 0x21262d);
   scene.add(gridHelper);
+
+  const softDiscSprite = (() => {
+    const cnv = document.createElement('canvas');
+    cnv.width = 64; cnv.height = 64;
+    const ctx = cnv.getContext('2d');
+    const grd = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grd.addColorStop(0.0, 'rgba(255,255,255,1.0)');
+    grd.addColorStop(0.4, 'rgba(255,255,255,0.7)');
+    grd.addColorStop(1.0, 'rgba(255,255,255,0.0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, 64, 64);
+    const tex = new THREE.CanvasTexture(cnv);
+    tex.minFilter = THREE.LinearFilter;
+    return tex;
+  })();
 
   let currentPoints = null;
   let sceneData = {};
@@ -1468,6 +1483,11 @@ footer a:hover { text-decoration: underline; }
     const material = new THREE.PointsMaterial({
       size: parseFloat(document.getElementById('point-size').value),
       vertexColors: true,
+      sizeAttenuation: true,
+      transparent: true,
+      depthWrite: false,
+      alphaTest: 0.02,
+      map: softDiscSprite,
     });
 
     currentPoints = new THREE.Points(geometry, material);
