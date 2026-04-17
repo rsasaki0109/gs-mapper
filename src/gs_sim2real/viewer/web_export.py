@@ -238,7 +238,12 @@ def ply_to_scene_bundle(
 SH_C0 = 0.28209479177387814
 
 
-def ply_to_splat(ply_path: str | Path, output_path: str | Path, max_points: int | None = None) -> str:
+def ply_to_splat(
+    ply_path: str | Path,
+    output_path: str | Path,
+    max_points: int | None = None,
+    normalize_target_extent: float | None = None,
+) -> str:
     """Convert a gsplat PLY to the antimatter15/splat 32-byte-per-gaussian binary.
 
     Per-gaussian layout (little-endian native float32 / uint8, matching the
@@ -250,6 +255,12 @@ def ply_to_splat(ply_path: str | Path, output_path: str | Path, max_points: int 
 
     Gaussians are sorted by ``exp(sum(scale_logs)) * sigmoid(opacity)`` descending
     before writing so the viewer renders larger, more opaque splats first.
+
+    If ``normalize_target_extent`` is set, positions are centered at the
+    scene centroid and rescaled so that the largest XYZ extent equals the
+    target (gaussian scales are divided by the same factor to preserve
+    visual shape). This lets world-metric scenes render inside viewers that
+    assume unit-ish scale.
     """
     from gs_sim2real.viewer.web_viewer import load_ply
 
@@ -287,7 +298,22 @@ def ply_to_splat(ply_path: str | Path, output_path: str | Path, max_points: int 
     rgba_u8 = np.clip(rgba * 255.0, 0, 255).astype(np.uint8)
 
     pos = positions[order].astype(np.float32)
-    scale = np.exp(scales_log[order]).astype(np.float32)
+    scale_shift = 0.0
+    if normalize_target_extent is not None and normalize_target_extent > 0:
+        centroid = pos.mean(axis=0)
+        centered = pos - centroid
+        extent = float(np.max(centered.max(axis=0) - centered.min(axis=0)))
+        if extent > 0:
+            factor = extent / float(normalize_target_extent)
+            pos = (centered / factor).astype(np.float32)
+            scale_shift = float(-np.log(factor))
+            logger.info(
+                "ply_to_splat: normalized scene extent %.2f -> %.2f (factor %.3f)",
+                extent,
+                float(normalize_target_extent),
+                factor,
+            )
+    scale = np.exp(scales_log[order] + scale_shift).astype(np.float32)
 
     dtype = np.dtype(
         [
