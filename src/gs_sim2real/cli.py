@@ -166,6 +166,16 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Project the world LiDAR cloud into each training image as sparse depth .npy (for depth_loss_weight > 0)",
     )
+    pp.add_argument(
+        "--mcd-reference-origin",
+        default="",
+        help="Share the ENU origin across bags. 'lat,lon,alt' in WGS84 degrees/metres.",
+    )
+    pp.add_argument(
+        "--mcd-reference-bag",
+        default="",
+        help="Use the ENU origin recorded under <path>/pose/origin_wgs84.json from a previously preprocessed bag.",
+    )
     pp.add_argument("--trajectory", default=None, help="SLAM trajectory file (for lidar-slam method)")
     pp.add_argument(
         "--trajectory-format",
@@ -374,6 +384,16 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Project the world LiDAR cloud into each training image as sparse depth .npy",
     )
+    rn.add_argument(
+        "--mcd-reference-origin",
+        default="",
+        help="Share the ENU origin across bags. 'lat,lon,alt' in WGS84 degrees/metres.",
+    )
+    rn.add_argument(
+        "--mcd-reference-bag",
+        default="",
+        help="Use the ENU origin recorded under <path>/pose/origin_wgs84.json from a previously preprocessed bag.",
+    )
     rn.add_argument("--trajectory", default=None, help="Trajectory file for --preprocess-method lidar-slam")
     rn.add_argument(
         "--trajectory-format",
@@ -526,6 +546,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--mcd-export-depth",
         action="store_true",
         help="Project the world LiDAR cloud into each training image as sparse depth .npy",
+    )
+    dm.add_argument(
+        "--mcd-reference-origin",
+        default="",
+        help="Share the ENU origin across bags. 'lat,lon,alt' in WGS84 degrees/metres.",
+    )
+    dm.add_argument(
+        "--mcd-reference-bag",
+        default="",
+        help="Use the ENU origin recorded under <path>/pose/origin_wgs84.json from a previously preprocessed bag.",
     )
     dm.add_argument("--trajectory", default=None, help="Trajectory file for --preprocess-method lidar-slam")
     dm.add_argument(
@@ -1572,6 +1602,31 @@ def _mcd_antenna_offset_base(args: argparse.Namespace) -> tuple[float, float, fl
     return (float(v[0]), float(v[1]), float(v[2]))
 
 
+def _resolve_mcd_reference_origin(args) -> tuple[float, float, float] | None:
+    """Return (lat, lon, alt) for ENU origin sharing across bags, or None."""
+    explicit = getattr(args, "mcd_reference_origin", None)
+    if explicit:
+        parts = [p.strip() for p in str(explicit).split(",") if p.strip()]
+        if len(parts) != 3:
+            raise ValueError(f"--mcd-reference-origin must be 'lat,lon,alt', got {explicit!r}")
+        return float(parts[0]), float(parts[1]), float(parts[2])
+
+    ref_bag = getattr(args, "mcd_reference_bag", None)
+    if ref_bag:
+        from gs_sim2real.datasets.mcd import MCDLoader
+
+        pose_dir = Path(ref_bag) / "pose"
+        if not (pose_dir / "origin_wgs84.json").is_file():
+            raise FileNotFoundError(
+                f"--mcd-reference-bag={ref_bag!r} has no pose/origin_wgs84.json; "
+                "preprocess that bag first (so it writes its GNSS origin)."
+            )
+        origin = MCDLoader.load_navsat_origin(pose_dir)
+        assert origin is not None
+        return origin
+    return None
+
+
 def _mcd_export_depth_maps(
     loader,
     xyz_npy: Path,
@@ -1762,6 +1817,7 @@ def _mcd_gnss_sparse_import(
             f"(tf_edges={len(tf_map)}, dynamic_tf={include_tf_dynamic})"
         )
 
+        ref_origin = _resolve_mcd_reference_origin(args)
         tum_path = loader.extract_navsat_trajectory(
             colmap_dir,
             gnss_topic=getattr(args, "gnss_topic", None),
@@ -1770,8 +1826,12 @@ def _mcd_gnss_sparse_import(
             vehicle_frame_only=True,
             antenna_offset_enu=_mcd_antenna_offset_enu(args),
             antenna_offset_base=_mcd_antenna_offset_base(args),
+            reference_origin=ref_origin,
         )
-        print(f"MCD vehicle GNSS trajectory (TUM): {tum_path}")
+        if ref_origin is not None:
+            print(f"MCD vehicle GNSS trajectory (TUM, shared origin {ref_origin}): {tum_path}")
+        else:
+            print(f"MCD vehicle GNSS trajectory (TUM): {tum_path}")
 
         pointcloud_path: str | Path | None = getattr(args, "pointcloud", None)
         if not pointcloud_path:
@@ -1852,6 +1912,7 @@ def _mcd_gnss_sparse_import(
                 file=sys.stderr,
             )
 
+    ref_origin_single = _resolve_mcd_reference_origin(args)
     pointcloud_path: str | Path | None = getattr(args, "pointcloud", None)
     lidar_tum_path: str | None = None
     if not pointcloud_path and not getattr(args, "mcd_skip_lidar_seed", False):
@@ -1864,6 +1925,7 @@ def _mcd_gnss_sparse_import(
                 vehicle_frame_only=True,
                 antenna_offset_enu=_mcd_antenna_offset_enu(args),
                 antenna_offset_base=_mcd_antenna_offset_base(args),
+                reference_origin=ref_origin_single,
             )
             vehicle_path = Path(vehicle_tum)
             lidar_side = vehicle_path.with_name("gnss_trajectory_vehicle.tum")
@@ -1884,6 +1946,7 @@ def _mcd_gnss_sparse_import(
         vehicle_frame_only=False,
         antenna_offset_enu=_mcd_antenna_offset_enu(args),
         antenna_offset_base=_mcd_antenna_offset_base(args),
+        reference_origin=ref_origin_single,
     )
     print(f"MCD GNSS trajectory (TUM): {tum_path}")
 

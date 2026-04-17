@@ -195,13 +195,14 @@
 			<h3 class="nohf">GS Mapper — Real WebGL Gaussian Splat</h3>
 			<p>
 			<small class="nohf">
-				Default scene: Autoware Leo Drive ISUZU <strong>bag2</strong> (public).
-				3 cameras × ~400 frames with GNSS + /tf_static pose-import,
-				LiDAR-seeded COLMAP sparse initialized with image-projected RGB,
-				gsplat 50k iter under LiDAR depth supervision (densify until
-				20k), 1.41M gaussians filtered to 80k (opacity ≥ 0.6,
-				scale ≤ 2 m). Positions centered and rescaled so the default
-				camera fits. Override with <code>?url=&lt;splat-path&gt;</code>.
+				Default scene: Autoware Leo Drive ISUZU <strong>bag2 + bag4</strong>
+				fused in a shared ENU frame (<code>--mcd-reference-bag</code>).
+				6 cameras × 1920 registered frames total (1200 + 720), GNSS +
+				/tf_static pose-import with image-projected RGB init, gsplat
+				30k iter under LiDAR depth supervision, 1.23M gaussians
+				filtered to 80k (opacity ≥ 0.5, scale ≤ 2 m). Positions
+				centered and rescaled so the default camera fits. Override with
+				<code>?url=&lt;splat-path&gt;</code>.
 				Viewer: <a href="https://github.com/antimatter15/splat">antimatter15/splat</a> (MIT) by Kevin Kwok.
 				<a href="./">← back to Three.js point viewer</a>.
 			</small>

@@ -807,6 +807,7 @@ class MCDLoader:
         vehicle_frame_only: bool = False,
         antenna_offset_enu: tuple[float, float, float] | None = None,
         antenna_offset_base: tuple[float, float, float] | None = None,
+        reference_origin: tuple[float, float, float] | None = None,
     ) -> str:
         """Write ``sensor_msgs/NavSatFix`` samples to a TUM trajectory file (local ENU).
 
@@ -819,6 +820,10 @@ class MCDLoader:
         ``antenna_offset_base`` is the vector from ``base_link`` origin to the GNSS antenna in **base_link**
         (x forward, y left, z up). It is rotated into ENU using a per-sample heading from successive ENU
         positions, then subtracted. Do not combine with ``antenna_offset_enu``.
+
+        ``reference_origin = (lat, lon, alt)`` overrides the automatic "first fix" origin so multiple
+        bags can be expressed in the same ENU frame. Also writes ``pose/origin_wgs84.json`` with the
+        resolved origin for downstream consumers.
         """
         from gs_sim2real.preprocess.lidar_slam import LiDARSLAMProcessor
 
@@ -854,6 +859,8 @@ class MCDLoader:
             ref_lat: float | None = None
             ref_lon: float | None = None
             ref_alt: float | None = None
+            if reference_origin is not None:
+                ref_lat, ref_lon, ref_alt = (float(x) for x in reference_origin)
             count = 0
             for _, timestamp_ns, rawdata in reader.messages(connections=[connection]):
                 if max_poses is not None and count >= max_poses:
@@ -920,7 +927,35 @@ class MCDLoader:
                     f.write(f"{ts} {twc[0]} {twc[1]} {twc[2]} {qx} {qy} {qz} {qw}\n")
 
         logger.info("Wrote %d GNSS poses to %s", count, tum_path)
+
+        origin_path = pose_dir / "origin_wgs84.json"
+        import json as _json
+
+        origin_path.write_text(
+            _json.dumps(
+                {
+                    "ref_lat": float(ref_lat),
+                    "ref_lon": float(ref_lon),
+                    "ref_alt": float(ref_alt),
+                    "source": "reference_origin" if reference_origin is not None else "first_fix",
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         return str(tum_path)
+
+    @staticmethod
+    def load_navsat_origin(pose_dir: str | Path) -> tuple[float, float, float] | None:
+        """Load ``origin_wgs84.json`` written by :meth:`extract_navsat_trajectory` (returns None if missing)."""
+        import json as _json
+
+        p = Path(pose_dir) / "origin_wgs84.json"
+        if not p.is_file():
+            return None
+        data = _json.loads(p.read_text(encoding="utf-8"))
+        return float(data["ref_lat"]), float(data["ref_lon"]), float(data["ref_alt"])
 
     def build_tf_map(self, include_dynamic_tf: bool = False):
         """Load ``TFMessage`` transforms into a :class:`~gs_sim2real.datasets.ros_tf.StaticTfMap`.
