@@ -143,10 +143,26 @@
 
 ### Waymo E2E をやるなら
 
+**前提条件**:
+
+- Python 3.10 or 3.11（`waymo-open-dataset-tf-2-12-0` は Python 3.12 で `pkgutil.ImpImporter` 削除により build 失敗）
+- `pip install "waymo-open-dataset-tf-2-12-0"` (TensorFlow 2.12 依存)
+- Waymo Open Dataset の利用同意 + `*.tfrecord` ダウンロード（<https://waymo.com/open/download/>）
+
+**セットアップ確認**:
+
+```bash
+bash scripts/check_waymo_e2e_prereqs.sh
+```
+
+[OK] / [WARN] / [MISS] で Python バージョン、SDK、入力データの状態を表示。
+
+**触るファイル**:
+
 - `src/gs_sim2real/datasets/waymo.py`
 - `src/gs_sim2real/cli.py`
 - `scripts/outdoor_smoke.sh`
-- `tests/test_waymo.py`, `tests/test_cli.py`
+- `tests/test_waymo.py`, `tests/test_cli.py`, `tests/test_waymo_prereqs_script.py`
 
 ### bag6 の色改善をやるなら
 
