@@ -49,12 +49,18 @@
 |------|---------|------|
 | MCD `/tf`, `/tf_static`, `/camera_info`, `/gnss/fix` 抽出 | `src/gs_sim2real/datasets/mcd.py`, `ros_tf.py` | |
 | `MCDLoader.merge_lidar_frames_to_world()` | `mcd.py` | per-frame NPY + TUM ENU + `T_base_lidar` で world 点群を合成。identity quaternion の場合は ENU 動きから yaw 推定 |
-| LiDAR-seeded COLMAP sparse | `cli.py` `_mcd_gnss_sparse_import` | `points3D.txt` を random ではなく実 LiDAR 点で seed |
-| `--mcd-lidar-frame` / `--mcd-skip-lidar-seed` CLI フラグ | `cli.py` | |
-| PLY→.splat 変換 (`ply_to_splat`) | `src/gs_sim2real/viewer/web_export.py` | antimatter15/splat 形式（32 B/gauss）。`normalize_target_extent` で世界スケール→viewer 適合サイズに縮小 |
-| WebGL Gaussian Splat viewer | `docs/splat.html`, `docs/splat-viewer/main.js` | antimatter15/splat (MIT) を vendor。デフォ `assets/outdoor-demo/outdoor-demo.splat` を表示 |
+| `MCDLoader.colorize_lidar_world_from_images()` | `mcd.py` | 各カメラ画像に world LiDAR 点を投影 → bilinearly サンプリングした RGB を累積平均。points3D.txt が grey(128) ではなく実色で seed される（**もや晴らしの本丸**） |
+| `MCDLoader.export_lidar_depth_per_image()` | `mcd.py` | 各学習画像に world LiDAR を投影、closest z を per-pixel 保持した float32 (H, W) depth map を `depth/<subdir>/<stem>.npy` に保存 |
+| LiDAR-seeded COLMAP sparse (色付き) | `cli.py` `_mcd_gnss_sparse_import` + `_mcd_colorize_seed` | `points3D.txt` を実 LiDAR 点 + 画像由来 RGB で seed。`--mcd-skip-lidar-colorize` で opt-out |
+| Nx6 点群の `points3D.txt` 書き出し | `preprocess/lidar_slam.py`, `preprocess/depth_from_lidar.py` | `_write_colmap` / `_write_colmap_multiview` が Nx6（xyz + RGB）を受けて色を書く |
+| 新 CLI フラグ | `cli.py` | `--mcd-lidar-frame` / `--mcd-skip-lidar-seed` / `--mcd-skip-lidar-colorize` / `--mcd-export-depth`（preprocess/run/demo すべて） |
+| gsplat depth supervision (`render_mode=RGB+D`) | `train/gsplat_trainer.py` | `_render_gsplat(want_depth=True)` で depth を返し、`depth_loss_weight * L1(rendered_depth, gt_depth)` を valid pixel でトレーニングに加算 |
+| PLY→.splat 変換 (`ply_to_splat`) | `src/gs_sim2real/viewer/web_export.py` | antimatter15/splat 形式（32 B/gauss）。`normalize_target_extent` で世界スケール→viewer 適合サイズに縮小、`min_opacity` / `max_scale` フィルタで霧除去 |
+| WebGL Gaussian Splat viewer | `docs/splat.html`, `docs/splat-viewer/main.js` | antimatter15/splat (MIT) を vendor。gzip 対応 dynamic buffer、`defaultViewMatrix` は outdoor scale、downsample しきい値は 30k |
 | `_densify_and_prune` の mask off-by-one 修正 | `src/gs_sim2real/train/gsplat_trainer.py` | clone → split の順で tensor 拡張する際に旧サイズ mask で indexing する IndexError を解消 |
 | Three.js viewer のソフトスプライト化 / helper スケール | `docs/index.html` | `PointsMaterial` を radial-alpha disc + sizeAttenuation。grid/axes は scene bounds に合わせて動的に再構築 |
+| `configs/training_depth.yaml` | `configs/` | `depth_loss_weight: 0.1` の outdoor + depth 学習プリセット |
+| `configs/datasets.yaml` に bag4 / bag6 | `configs/datasets.yaml` | S3 公開バケットの `autoware_leo_drive_bag4` / `bag6` を `scripts/download_datasets.py` から取得可 |
 
 ## 3. Public data で「実際に verified された」もの
 
@@ -63,12 +69,12 @@
 公開元: <https://autowarefoundation.github.io/autoware-documentation/main/datasets/#leo-drive---isuzu-sensor-data>
 
 - **bag1**: `MCD → COLMAP → gsplat` E2E 成功（`outputs/outdoor_smoke_autoware_seq/`、プラン §6.1 の known-good 条件）。
-- **bag6**: プラン初版では **image-only COLMAP で 2 registered images** 止まり（§3 参照）。本セッションで **GNSS + /tf_static + LiDAR seed により 180 registered images (3 カメラ × 60 frames) / 100,000 world points** 達成。`outputs/bag6_multicam/`, `outputs/bag6_multicam_train/`。
+- **bag6**: プラン初版では **image-only COLMAP で 2 registered images** 止まり（§4.1）。pose-import セッションで **GNSS + /tf_static + LiDAR seed により 180 registered images (3 カメラ × 60 frames) / 100,000 world points** 達成。さらに **250 frames × 3 cam × colorize + 30k iter depth supervision** で 1,024,794 Gaussians まで拡張済み（`outputs/bag6_depth_train/`）。
+- **bag4**: 別ルート。**240 frames × 3 cam = 720 registered images + colorize (196k/200k) + per-image depth (720 maps) + 30k iter depth-supervised training** で 932,243 Gaussians を生成し、現在 `/splat.html` のライブ配信に採用中（`outputs/bag4_full_train/`）。
 
 ### 3.2 Verified だが品質面は弱いもの
 
-- bag1 の再学習（7k–30k iter）は completed だが loss ~0.3、ビューアで道路/建物は判別しづらい。
-- bag6 multi-camera は loss ~0.3、色分布はあるが依然として抽象的（詳細は §10）。
+- bag6 / bag4 ともに colorize + depth で Gaussian 数は百万級に到達。ブラウザで trajectory 沿いの 3D 構造は視認できるが、「街並み」として読めるほどは解像していない。学習量/カメラ数/長時間軌跡が足りていないと見ている。
 
 ### 3.3 実装済みだが public 実データ E2E 未確認のもの
 
@@ -108,22 +114,30 @@
 - **Waymo 実データ E2E**: code path も tests も揃っているが、`tfrecord` を食わせての通し検証が手元で未実施。
 - **NMEA/GNSS/IMU robustness**: GGA / RMC / ENU は入っているが、IMU quaternion / angular velocity 融合や日跨ぎ、logger 時刻ずれが未対応。
 
-### 解決済み（本セッション）
+### 解決済み（2026-04 セッション）
 
-- ~~Blocker 1: MCD calibration / pose import~~ → bag6 で 2→180 registered に突破。`merge_lidar_frames_to_world` + `_mcd_gnss_sparse_import` + 3-camera extrinsics で完結。
-- ~~§16.2 デモが campus 共有バイナリ~~ → bag6 由来の 60k gaussian `.splat` を本物の WebGL GS viewer (`/splat.html`) で配信。
+- ~~Blocker 1: MCD calibration / pose import~~ → bag6 で 2→180 registered、bag4 で 720 registered に到達。`merge_lidar_frames_to_world` + `_mcd_gnss_sparse_import` + 3-camera extrinsics + colorize で完結。
+- ~~§16.2 デモが campus 共有バイナリ~~ → bag4 由来の 80k gaussian `.splat` を本物の WebGL GS viewer (`/splat.html`) で配信中。
+- ~~「画面が灰色のもや」~~ → 画像由来 RGB による LiDAR 点群初期化 + per-image LiDAR depth supervision で color std を 0.06 → 0.16–0.22 に、trajectory 沿いの 3D 構造を可視化。
+- ~~densify bug~~ → `_densify_and_prune` の clone/split 順序を修正、30k iter 学習が安定化。
 
 ## 7. 次の担当者に引き継ぐ順序
 
 ### 優先度 A（残ってる中で最優先）
 
-1. Waymo real-data E2E: `tfrecord` を入手 → `gs-mapper run --preprocess-method waymo` で `images + depth + masks + sparse/0 + train/point_cloud.ply` まで確認。
-2. bag6 の画像由来の initial color（LiDAR 点に image RGB を投影）を実装し、multicam demo を「街っぽく」見せる。
+1. **Waymo real-data E2E**: `tfrecord` を入手 → `gs-mapper run --preprocess-method waymo` で `images + depth + masks + sparse/0 + train/point_cloud.ply` まで確認。
+2. **長時間 bag** 学習 (bag2 (1.2 GB) や複数 bag 連結) で Gaussian あたり viewing constraints を数倍に。
+3. **appearance / sky model の定量評価** (現在は実装あるが未測定)。
 
 ### 優先度 B
 
 1. NMEA / GNSS / IMU robustness（time alignment、IMU 融合、更多 sentence 対応）。
-2. depth / appearance / sky の実地比較評価（bag6 を subject にしてよい）。
+2. Waymo dynamic mask / depth の実使用評価（現在は Autoware bag のみで利用）。
+
+### 既に対応済み（refactor の余地はあるが動く）
+
+- ~~画像由来 initial color~~ → `colorize_lidar_world_from_images` で完了
+- ~~depth supervision~~ → `_render_gsplat(want_depth=True)` + `configs/training_depth.yaml` で完了
 
 ## 8. 具体的に触るファイル
 
@@ -199,8 +213,8 @@ ply_to_splat(
 
 ### 10.2 Outdoor GS Demo の中身（2026-04 セッション後）
 
-- `docs/assets/outdoor-demo/outdoor-demo.splat` は **bag6 multi-camera の実学習結果 60k gaussians**（世界スケール 428 m を 30 単位に正規化）。`campus-gallery` との asset 共有は廃止済み。
-- `docs/assets/outdoor-demo/outdoor-demo.points.bin`（Three.js 用）も bag1 30k iter の密点群。
+- `docs/assets/outdoor-demo/outdoor-demo.splat` は **bag4 multi-camera の実学習結果 80k gaussians**（932k Gaussians をフィルタ: `min_opacity ≥ 0.6`, `max_scale ≤ 2 m`, 世界スケール 500 m を 30 単位に正規化）。image-projected RGB 初期化 + per-image LiDAR depth supervision。
+- `docs/assets/outdoor-demo/outdoor-demo.points.bin`（Three.js 用）は bag1 30k iter の密点群（244k → 60k subsample）。
 - 「campus-gallery は 1 枚の写真から合成した擬似点群」という事実は変わっていないので、**ギャラリー系と outdoor-demo の性質差は大きい**。ユーザに説明する際は注意。
 
 ### 10.3 Splat viewer の限界
