@@ -243,6 +243,8 @@ def ply_to_splat(
     output_path: str | Path,
     max_points: int | None = None,
     normalize_target_extent: float | None = None,
+    min_opacity: float = 0.0,
+    max_scale: float | None = None,
 ) -> str:
     """Convert a gsplat PLY to the antimatter15/splat 32-byte-per-gaussian binary.
 
@@ -281,11 +283,28 @@ def ply_to_splat(
 
     n = len(positions)
     sigmoid_opacity = 1.0 / (1.0 + np.exp(-opacities))
-    score = np.exp(scales_log.sum(axis=1)) * sigmoid_opacity
-    order = np.argsort(-score)
-    if max_points is not None and max_points > 0 and n > max_points:
+    scales_world = np.exp(scales_log)
+    keep = np.ones(n, dtype=bool)
+    if min_opacity > 0.0:
+        keep &= sigmoid_opacity >= float(min_opacity)
+    if max_scale is not None and max_scale > 0.0:
+        keep &= scales_world.max(axis=1) <= float(max_scale)
+    kept_idx = np.nonzero(keep)[0]
+    if kept_idx.size == 0:
+        raise ValueError(f"No gaussians survived filtering (min_opacity={min_opacity}, max_scale={max_scale})")
+    score = np.exp(scales_log[kept_idx].sum(axis=1)) * sigmoid_opacity[kept_idx]
+    order = kept_idx[np.argsort(-score)]
+    if max_points is not None and max_points > 0 and order.size > max_points:
         order = order[:max_points]
     n_out = int(order.shape[0])
+    logger.info(
+        "ply_to_splat: %d/%d gaussians after opacity>=%.2f / scale<=%s (written: %d)",
+        int(kept_idx.size),
+        n,
+        float(min_opacity),
+        max_scale,
+        n_out,
+    )
 
     rot_raw = rotations[order].astype(np.float64)
     rot_norm = np.linalg.norm(rot_raw, axis=1, keepdims=True)
