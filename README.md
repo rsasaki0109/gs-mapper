@@ -1,51 +1,54 @@
-# gs-sim2real
+# GS Mapper
 
-Multi-dataset 3D Gaussian Splatting reconstruction playground.
+Large-scale 3D Gaussian Splatting mapper for robotics, driving, and campus-scale scenes.
 
-One-command pipelines to go from robotics/autonomous driving dataset images to 3DGS training to interactive web viewer.
+One-command pipelines to go from robotics / autonomous-driving dataset images to 3DGS training to an interactive WebGL viewer.
 
 ![Demo](docs/demo.gif)
 
 ---
 
-ロボティクス・自動運転データセットから3D Gaussian Splattingの学習、Webビューアでの可視化までをワンコマンドで実行できるツールです。
+ロボティクス・自動運転データセットから 3D Gaussian Splatting の学習、Web ビューアでの可視化までをワンコマンドで実行できるツールです。Python モジュール名は `gs_sim2real` のまま維持し、旧 CLI の `gs-sim2real` も互換エイリアスとして残します。
 
 ## Live Demo
 
-**https://rsasaki0109.github.io/gs-sim2real/**
+GitHub Pages:
 
-The demo page features an interactive Three.js 3D point cloud viewer and Plotly.js training metrics charts. You can explore reconstructed scenes directly in the browser without any local setup.
+- Three.js point viewer: **<https://rsasaki0109.github.io/gs-mapper/>**
+- Real WebGL Gaussian Splat viewer: **<https://rsasaki0109.github.io/gs-mapper/splat.html>**
 
-GitHub Pages is deployed by [`.github/workflows/pages.yml`](/media/sasaki/aiueo/ai_coding_ws/nerf-gs-playground/.github/workflows/pages.yml) on `push` to `main`, so changes in a feature branch do not appear until they are merged and the Pages workflow finishes.
+The splat page loads an outdoor scene trained with the MCD pose-import pipeline (GNSS + `/tf_static` + LiDAR-seeded COLMAP, image-projected RGB initialization, 50k-iter gsplat with LiDAR depth supervision) and renders real anisotropic 3D Gaussians, not raw splat centers. Override with `?url=<splat-path>`.
 
-The viewer now also accepts exported static scene bundles, so a trained PLY can
-be published on GitHub Pages and opened as a browser-only 3DGS space.
+GitHub Pages is deployed by [`.github/workflows/pages.yml`](.github/workflows/pages.yml) on `push` to `main`.
 
 ## Concept
 
 ```
 Images --> Preprocessing --> 3DGS Training --> Web Viewer
-  |          (COLMAP /        (gsplat /        (viser)
-  |           GGRt)          nerfstudio)
+  |          (COLMAP /        (gsplat /        (Three.js
+  |           GGRt / MCD      nerfstudio)      + antimatter15/splat)
+  |           pose-import)
   |
   +-- GGRt (pose-free)
   +-- CoVLA (driving)
   +-- MCD (campus)
+  +-- Autoware Leo Drive ISUZU bags (outdoor driving)
 ```
 
 ## Supported Datasets
 
-| Dataset | Type | Description | Pose Required |
-|---------|------|-------------|---------------|
-| [GGRt](https://github.com/abdullahamdi/ggrt) | Pose-free 3DGS | Generalizable 3D Gaussian Splatting using Waymo, RealEstate10K, ACID | No |
-| [CoVLA](https://github.com/tier4/CoVLA) | Driving scenes | Large-scale driving dataset with front camera images | Yes (COLMAP) |
-| [MCD](https://mcdviral.github.io/) | Campus scenes | Multi-campus outdoor scenes with stereo, LiDAR, IMU | Yes (COLMAP) |
+| Dataset | Type | Description | Pose |
+|---------|------|-------------|------|
+| [GGRt](https://github.com/abdullahamdi/ggrt) | Pose-free 3DGS | Generalizable Gaussian Splatting over Waymo / RealEstate10K / ACID | Not required |
+| [CoVLA](https://github.com/tier4/CoVLA) | Driving scenes | Large-scale driving dataset with front camera images | COLMAP |
+| [MCD](https://mcdviral.github.io/) | Campus rosbags | Multi-campus outdoor scenes with stereo, LiDAR, IMU | COLMAP / GNSS + `/tf_static` pose-import |
+| Autoware Leo Drive ISUZU | Outdoor driving rosbag | Public multi-camera + LiDAR + GNSS/INS bags from Autoware Foundation | GNSS + `/tf_static` pose-import (see `configs/datasets.yaml`) |
 
 ## Installation
 
 ```bash
-git clone https://github.com/rsasaki0109/gs-sim2real.git
-cd gs-sim2real
+git clone https://github.com/rsasaki0109/gs-mapper.git
+cd gs-mapper
 pip install -e ".[dev]"
 ```
 
@@ -77,7 +80,7 @@ and tabs for each stage of the workflow.
 Export a trained PLY as a static scene bundle:
 
 ```bash
-gs-sim2real export \
+gs-mapper export \
   --model outputs/train/point_cloud.ply \
   --format scene-bundle \
   --output docs/assets/my-scene \
@@ -86,10 +89,56 @@ gs-sim2real export \
   --label "My Scene"
 ```
 
+To publish the same PLY into the real WebGL splat viewer (`docs/splat.html`):
+
+```python
+from gs_sim2real.viewer.web_export import ply_to_splat
+
+ply_to_splat(
+    "outputs/train/point_cloud.ply",
+    "docs/assets/my-scene/my-scene.splat",
+    max_points=60000,
+    normalize_target_extent=30.0,
+    min_opacity=0.5,
+    max_scale=2.0,
+)
+```
+
+Open `https://<pages>/splat.html?url=assets/my-scene/my-scene.splat` after deploy.
+
+## Outdoor pipeline quickstart (Autoware Leo Drive)
+
+Download a public bag, preprocess with pose-import + image-projected RGB + LiDAR depth maps, train with depth supervision:
+
+```bash
+python3 scripts/download_datasets.py --dataset autoware_leo_drive_bag2 --dest data/
+
+gs-mapper preprocess \
+  --images data/autoware_leo_drive_bag2 \
+  --output outputs/bag2 \
+  --method mcd \
+  --image-topic "/lucid_vision/camera_0/raw_image,/lucid_vision/camera_1/raw_image,/lucid_vision/camera_2/raw_image" \
+  --lidar-topic /sensing/lidar/concatenated/pointcloud \
+  --imu-topic /sensing/imu/imu_data \
+  --gnss-topic /gnss/fix \
+  --mcd-seed-poses-from-gnss \
+  --mcd-tf-use-image-stamps \
+  --mcd-export-depth \
+  --extract-lidar \
+  --max-frames 400 --every-n 1 \
+  --matching sequential --no-gpu
+
+gs-mapper train --data outputs/bag2 --output outputs/bag2_train \
+  --method gsplat --iterations 50000 \
+  --config configs/training_depth_long.yaml
+```
+
+See `docs/plan_outdoor_gs.md` for the detailed outdoor pipeline handoff (status, blockers, known-good conditions).
+
 Then either:
 
 - add `docs/assets/my-scene/scene.json` to `docs/assets/scenes.json` so it appears in the default viewer tab list
-- or open it directly with `https://<user>.github.io/gs-sim2real/?sceneManifest=assets/my-scene/scene.json`
+- or open it directly with `https://<user>.github.io/gs-mapper/?sceneManifest=assets/my-scene/scene.json`
 
 The GitHub Pages viewer also accepts direct exported `.json` / `.bin` point
 assets through the `Load Asset` button in `docs/index.html`.
