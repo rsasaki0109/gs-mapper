@@ -469,6 +469,145 @@ class MCDLoader:
                 rotations.append(pose[:3, :3].copy())
         return rotations
 
+    def colorize_lidar_world_from_images(
+        self,
+        lidar_world_xyz: np.ndarray,
+        images_root: str | Path,
+        trajectory_path: str | Path,
+        cameras: list[dict],
+        hybrid_tf: Any | None = None,
+        base_frame: str = "base_link",
+        stamp_tolerance_sec: float = 0.25,
+    ) -> np.ndarray:
+        """Return per-point uint8 RGB sampled from images that see each world point.
+
+        For each camera / each image, projects world points into the camera via
+        the vehicle trajectory (TUM) + per-image TF extrinsics (HybridTfLookup)
+        or a constant ``T_base_cam`` fallback per camera. Accumulates the
+        bilinearly-sampled RGB at valid projections and averages, falling back
+        to 128 grey for points no camera ever saw.
+
+        Args:
+            lidar_world_xyz: (N, 3) ENU world positions.
+            images_root: directory with ``<subdir>/frame_*.jpg`` and
+                ``image_timestamps.csv``.
+            trajectory_path: vehicle-frame TUM file (position + identity or
+                inferred orientation).
+            cameras: list of dicts with ``subdir``, ``camera_frame``,
+                ``pinhole=(fx, fy, cx, cy, w, h)`` and optional ``T_base_cam``.
+            hybrid_tf: optional :class:`HybridTfLookup`; if given, per-image
+                ``base_frame → camera_frame`` is queried at the frame timestamp.
+            base_frame: TF parent (default ``base_link``).
+            stamp_tolerance_sec: skip frames whose trajectory match is farther
+                than this in seconds.
+        """
+        from gs_sim2real.preprocess.lidar_slam import LiDARSLAMProcessor
+
+        xyz = np.asarray(lidar_world_xyz, dtype=np.float64)
+        n_pts = xyz.shape[0]
+        if n_pts == 0:
+            return np.full((0, 3), 128, dtype=np.uint8)
+
+        images_root_p = Path(images_root)
+        ts_csv = images_root_p / "image_timestamps.csv"
+        if not ts_csv.is_file():
+            logger.warning("No image_timestamps.csv in %s; returning grey colors", images_root_p)
+            return np.full((n_pts, 3), 128, dtype=np.uint8)
+        stamp_map: dict[str, float] = {}
+        with open(ts_csv, newline="") as f:
+            for row in csv.DictReader(f):
+                stamp_map[row["filename"].strip()] = float(row["timestamp_ns"]) * 1e-9
+
+        proc = LiDARSLAMProcessor()
+        timestamps, poses = proc._load_tum_trajectory(Path(trajectory_path))
+        if len(timestamps) < 1:
+            logger.warning("Empty trajectory %s; returning grey colors", trajectory_path)
+            return np.full((n_pts, 3), 128, dtype=np.uint8)
+        rotations = self._infer_trajectory_rotations(np.asarray(timestamps), poses)
+        ts_array = np.asarray(timestamps, dtype=np.float64)
+        poses_arr = [np.asarray(p, dtype=np.float64) for p in poses]
+
+        xyz_hom = np.concatenate([xyz, np.ones((n_pts, 1), dtype=np.float64)], axis=1)
+
+        color_sum = np.zeros((n_pts, 3), dtype=np.float64)
+        color_count = np.zeros((n_pts,), dtype=np.int32)
+
+        exts = {".jpg", ".jpeg", ".png", ".bmp", ".tiff"}
+        total_visits = 0
+        for cam in cameras:
+            subdir = str(cam.get("subdir") or "")
+            pinhole = cam.get("pinhole")
+            if not pinhole:
+                continue
+            fx, fy, cx, cy, w_img, h_img = pinhole
+            camera_frame = str(cam.get("camera_frame") or "").strip()
+            T_base_cam_const = cam.get("T_base_cam")
+            if T_base_cam_const is not None:
+                T_base_cam_const = np.asarray(T_base_cam_const, dtype=np.float64)
+
+            folder = images_root_p / subdir if subdir else images_root_p
+            if not folder.is_dir():
+                continue
+            cam_images = sorted(p for p in folder.iterdir() if p.is_file() and p.suffix.lower() in exts)
+            for img_path in cam_images:
+                rel = img_path.relative_to(images_root_p).as_posix()
+                if rel not in stamp_map:
+                    continue
+                img_ts = stamp_map[rel]
+                match_idx = int(np.argmin(np.abs(ts_array - img_ts)))
+                if abs(ts_array[match_idx] - img_ts) > stamp_tolerance_sec:
+                    continue
+                T_world_base = np.eye(4, dtype=np.float64)
+                T_world_base[:3, :3] = rotations[match_idx]
+                T_world_base[:3, 3] = poses_arr[match_idx][:3, 3]
+                T_base_cam = None
+                if hybrid_tf is not None and camera_frame:
+                    T_base_cam = hybrid_tf.lookup(base_frame, camera_frame, int(round(img_ts * 1e9)))
+                if T_base_cam is None:
+                    T_base_cam = T_base_cam_const
+                if T_base_cam is None:
+                    continue
+                T_world_cam = T_world_base @ np.asarray(T_base_cam, dtype=np.float64)
+                T_cam_world = np.linalg.inv(T_world_cam)
+                cam_pts = xyz_hom @ T_cam_world.T  # (N, 4)
+                x = cam_pts[:, 0]
+                y = cam_pts[:, 1]
+                z = cam_pts[:, 2]
+                valid_z = z > 1e-3
+                if not np.any(valid_z):
+                    continue
+                u = fx * x / np.where(valid_z, z, 1.0) + cx
+                v = fy * y / np.where(valid_z, z, 1.0) + cy
+                in_bounds = valid_z & (u >= 0) & (u < w_img - 1) & (v >= 0) & (v < h_img - 1)
+                if not np.any(in_bounds):
+                    continue
+                img_bgr = cv2.imread(str(img_path))
+                if img_bgr is None:
+                    continue
+                if img_bgr.shape[0] != int(h_img) or img_bgr.shape[1] != int(w_img):
+                    img_bgr = cv2.resize(img_bgr, (int(w_img), int(h_img)))
+                idx = np.nonzero(in_bounds)[0]
+                ui = u[idx].astype(np.int32)
+                vi = v[idx].astype(np.int32)
+                rgb = img_bgr[vi, ui][:, ::-1]  # BGR -> RGB
+                color_sum[idx] += rgb.astype(np.float64)
+                color_count[idx] += 1
+                total_visits += int(idx.size)
+
+        logger.info(
+            "colorize_lidar_world: %d points, %d projections, %d covered",
+            n_pts,
+            total_visits,
+            int((color_count > 0).sum()),
+        )
+
+        rgb_out = np.full((n_pts, 3), 128, dtype=np.uint8)
+        covered = color_count > 0
+        if np.any(covered):
+            avg = (color_sum[covered] / color_count[covered, None]).clip(0, 255).astype(np.uint8)
+            rgb_out[covered] = avg
+        return rgb_out
+
     def extract_imu(
         self,
         output_dir: str | Path,

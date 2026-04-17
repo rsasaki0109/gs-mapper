@@ -1542,6 +1542,45 @@ def _mcd_antenna_offset_base(args: argparse.Namespace) -> tuple[float, float, fl
     return (float(v[0]), float(v[1]), float(v[2]))
 
 
+def _mcd_colorize_seed(
+    loader,
+    xyz_npy: Path,
+    images_root: str,
+    trajectory_path: str,
+    cameras: list[dict],
+    hybrid_tf,
+    base_frame: str,
+) -> Path:
+    """Project images onto a world-frame LiDAR cloud and save an Nx6 .npy."""
+    import numpy as np
+
+    try:
+        pts = np.load(xyz_npy)
+    except Exception as exc:
+        print(f"Warning: colorize_seed could not load {xyz_npy} ({exc})", file=sys.stderr)
+        return xyz_npy
+    xyz = pts[:, :3].astype(np.float32)
+    try:
+        rgb = loader.colorize_lidar_world_from_images(
+            lidar_world_xyz=xyz,
+            images_root=images_root,
+            trajectory_path=trajectory_path,
+            cameras=cameras,
+            hybrid_tf=hybrid_tf,
+            base_frame=base_frame,
+        )
+    except Exception as exc:
+        print(f"Warning: LiDAR colorize failed ({exc}); keeping grey seed", file=sys.stderr)
+        return xyz_npy
+
+    colored = np.hstack([xyz.astype(np.float32), rgb.astype(np.float32)])
+    out_npy = xyz_npy.with_name("lidar_world_rgb.npy")
+    np.save(out_npy, colored)
+    covered = int((rgb.sum(axis=1) != 128 * 3).sum())
+    print(f"MCD LiDAR colorized seed: {covered}/{len(xyz)} points with image RGB -> {out_npy}")
+    return out_npy
+
+
 def _mcd_lidar_world_seed(
     loader,
     colmap_dir: Path,
@@ -1682,6 +1721,17 @@ def _mcd_gnss_sparse_import(
             dyn = loader.collect_tf_dynamic_edges()
             hybrid_tf = HybridTfLookup(static_topo, dyn if len(dyn) > 0 else None)
             print("MCD: per-image TF extrinsics (HybridTfLookup: /tf_static topology + /tf samples)")
+
+        if pointcloud_path and not getattr(args, "mcd_skip_lidar_colorize", False):
+            pointcloud_path = _mcd_colorize_seed(
+                loader,
+                Path(pointcloud_path),
+                images_out,
+                tum_path,
+                cameras,
+                hybrid_tf,
+                base_frame,
+            )
 
         sparse_dir = import_multicam_vehicle_trajectory(
             trajectory_path=tum_path,

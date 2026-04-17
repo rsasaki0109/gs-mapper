@@ -117,6 +117,11 @@ def load_pointcloud(path: Path | str) -> np.ndarray:
     if path.suffix == ".npy":
         data = np.load(path)
         if data.ndim == 2 and data.shape[1] >= 3:
+            if data.shape[1] >= 6:
+                out = np.empty((data.shape[0], 6), dtype=np.float64)
+                out[:, :3] = data[:, :3].astype(np.float64)
+                out[:, 3:6] = data[:, 3:6].astype(np.float64)
+                return out
             return data[:, :3].astype(np.float64)
         raise ValueError(f"Expected (N, 3+) array, got shape {data.shape}")
 

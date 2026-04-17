@@ -124,16 +124,20 @@ class LiDARSLAMProcessor:
             pointcloud_path = Path(pointcloud_path)
             if pointcloud_path.exists():
                 pts = load_pointcloud(pointcloud_path)
+                xyz = pts[:, :3]
+                rgb = pts[:, 3:6] if pts.shape[1] >= 6 else None
                 if lidar_to_camera is not None:
-                    ones = np.ones((len(pts), 1))
-                    pts_hom = np.hstack([pts, ones])
-                    pts = (lidar_to_camera @ pts_hom.T).T[:, :3]
+                    ones = np.ones((len(xyz), 1))
+                    pts_hom = np.hstack([xyz, ones])
+                    xyz = (lidar_to_camera @ pts_hom.T).T[:, :3]
                 # Subsample
-                if len(pts) > max_points:
+                if len(xyz) > max_points:
                     rng = np.random.default_rng(seed=42)
-                    indices = rng.choice(len(pts), max_points, replace=False)
-                    pts = pts[indices]
-                points3d = pts
+                    indices = rng.choice(len(xyz), max_points, replace=False)
+                    xyz = xyz[indices]
+                    if rgb is not None:
+                        rgb = rgb[indices]
+                points3d = np.hstack([xyz, rgb]) if rgb is not None else xyz
                 logger.info("Loaded %d points from point cloud", len(points3d))
 
         # Write COLMAP format
@@ -659,8 +663,13 @@ class LiDARSLAMProcessor:
         with open(sparse_dir / "points3D.txt", "w") as f:
             f.write("# 3D point list\n")
             if points3d is not None:
+                has_color = points3d.ndim == 2 and points3d.shape[1] >= 6
                 for i, pt in enumerate(points3d):
-                    f.write(f"{i + 1} {pt[0]} {pt[1]} {pt[2]} 128 128 128 0.0\n")
+                    if has_color:
+                        r, g, b = int(pt[3]), int(pt[4]), int(pt[5])
+                    else:
+                        r = g = b = 128
+                    f.write(f"{i + 1} {pt[0]} {pt[1]} {pt[2]} {r} {g} {b} 0.0\n")
             else:
                 # Generate sparse random points as fallback
                 rng = np.random.default_rng(seed=42)
@@ -730,8 +739,13 @@ class LiDARSLAMProcessor:
         with open(sparse_dir / "points3D.txt", "w") as f:
             f.write("# 3D point list\n")
             if points3d is not None:
+                has_color = points3d.ndim == 2 and points3d.shape[1] >= 6
                 for i, pt in enumerate(points3d):
-                    f.write(f"{i + 1} {pt[0]} {pt[1]} {pt[2]} 128 128 128 0.0\n")
+                    if has_color:
+                        r, g, b = int(pt[3]), int(pt[4]), int(pt[5])
+                    else:
+                        r = g = b = 128
+                    f.write(f"{i + 1} {pt[0]} {pt[1]} {pt[2]} {r} {g} {b} 0.0\n")
             else:
                 rng = np.random.default_rng(seed=42)
                 centers = np.array([e["pose"][:3, 3] for e in aligned])
