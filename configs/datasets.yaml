@@ -114,3 +114,16 @@ autoware_leo_drive_bag6:
   type: driving
   aws_s3_sync:
     uri: "s3://autoware-files/collected_data/2022-08-22_leo_drive_isuzu_bags/all-sensors-bag6_compressed/"
+
+autoware_leo_drive_bag4:
+  name: Autoware Leo Drive ISUZU — all-sensors-bag4_compressed
+  description: >
+    Public ROS 2 bag from Autoware Foundation (Bus ODD, multi-camera + LiDAR + GNSS/INS).
+    Different route than bag6; used as alternate outdoor demo source.
+  paper_url: "https://autowarefoundation.github.io/autoware-documentation/main/datasets/#leo-drive---isuzu-sensor-data"
+  source_url: "https://autowarefoundation.github.io/autoware-documentation/main/datasets/#leo-drive---isuzu-sensor-data"
+  download_method: aws_s3_sync
+  data_format: rosbag2
+  type: driving
+  aws_s3_sync:
+    uri: "s3://autoware-files/collected_data/2022-08-22_leo_drive_isuzu_bags/all-sensors-bag4_compressed/"
