@@ -821,27 +821,32 @@ class GsplatTrainer:
         split_mask = selected & (scale_norm >= percent_dense * scene_extent)
         num_split = split_mask.sum().item()
 
+        clone_payload = None
         if num_clone > 0:
-            new_means = gaussians.means[clone_mask].detach().clone()
-            new_scales = gaussians.scales[clone_mask].detach().clone()
-            new_rotations = gaussians.rotations[clone_mask].detach().clone()
-            new_opacities = gaussians.opacities[clone_mask].detach().clone()
-            new_sh = gaussians.sh_coeffs[clone_mask].detach().clone()
+            clone_payload = (
+                gaussians.means[clone_mask].detach().clone(),
+                gaussians.scales[clone_mask].detach().clone(),
+                gaussians.rotations[clone_mask].detach().clone(),
+                gaussians.opacities[clone_mask].detach().clone(),
+                gaussians.sh_coeffs[clone_mask].detach().clone(),
+            )
 
-            self._extend_gaussians(gaussians, new_means, new_scales, new_rotations, new_opacities, new_sh, device)
-
+        split_payload = None
         if num_split > 0:
-            # Split by replacing with two smaller Gaussians
             split_means = gaussians.means[split_mask].detach()
             offset = torch.randn_like(split_means) * torch.exp(gaussians.scales[split_mask]).detach()
-            new_means = split_means + offset
-            # Reduce scale
-            new_scales = gaussians.scales[split_mask].detach().clone() - np.log(1.6)
-            new_rotations = gaussians.rotations[split_mask].detach().clone()
-            new_opacities = gaussians.opacities[split_mask].detach().clone()
-            new_sh = gaussians.sh_coeffs[split_mask].detach().clone()
+            split_payload = (
+                split_means + offset,
+                gaussians.scales[split_mask].detach().clone() - np.log(1.6),
+                gaussians.rotations[split_mask].detach().clone(),
+                gaussians.opacities[split_mask].detach().clone(),
+                gaussians.sh_coeffs[split_mask].detach().clone(),
+            )
 
-            self._extend_gaussians(gaussians, new_means, new_scales, new_rotations, new_opacities, new_sh, device)
+        if clone_payload is not None:
+            self._extend_gaussians(gaussians, *clone_payload, device)
+        if split_payload is not None:
+            self._extend_gaussians(gaussians, *split_payload, device)
 
         # Prune low-opacity Gaussians
         opacity_vals = torch.sigmoid(gaussians.opacities).squeeze(-1)
