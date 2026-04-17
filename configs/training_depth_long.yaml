@@ -1,0 +1,49 @@
+# Longer training preset for outdoor gsplat with LiDAR depth supervision.
+#
+# Extends the default depth-supervised config so we get more refinement
+# iterations after densification (more "viewing constraints per gaussian"):
+#   - 50k total iterations (vs 30k)
+#   - densify up to iter 20k (vs 15k) so large scenes keep growing before
+#     pure refinement kicks in
+#   - opacity reset less often, so converged opacities don't get knocked
+#     back late in training
+
+num_iterations: 50000
+batch_size: 1
+seed: 42
+
+learning_rate:
+  position: 0.00016
+  feature: 0.0025
+  opacity: 0.05
+  scaling: 0.005
+  rotation: 0.001
+
+lr_schedule:
+  position_lr_init: 0.00016
+  position_lr_final: 0.00000016
+  position_lr_delay_mult: 0.01
+  position_lr_max_steps: 50000
+
+sh_degree: 3
+
+densify_from_iter: 500
+densify_until_iter: 20000
+densify_interval: 100
+densify_grad_threshold: 0.0002
+
+opacity_reset_interval: 5000
+min_opacity: 0.005
+
+percent_dense: 0.01
+max_screen_size: 40
+
+lambda_dssim: 0.2
+
+depth_loss_weight: 0.1
+
+save_iterations: [20000, 35000, 50000]
+test_iterations: [20000, 35000, 50000]
+
+resolution: -1
+white_background: false
