@@ -111,44 +111,41 @@
 
 ### Blocker（残っているもの）
 
-- **Waymo 実データ E2E**: code path も tests も揃っているが、`tfrecord` を食わせての通し検証が手元で未実施。
 - **NMEA/GNSS/IMU robustness**: GGA / RMC / ENU は入っているが、IMU quaternion / angular velocity 融合や日跨ぎ、logger 時刻ずれが未対応。
+- **性能面**: splat viewer のライブ fps が 5–7 程度。100k 超 gaussian + HiDPI で shader 負荷がボトルネック。将来は WebGPU (mkkellogg/Spark 等) or sort/rasterize の optimise を検討。
+
+### 非対象（意図的に scope 外）
+
+- **Waymo real-data E2E**: code path / tests / `scripts/check_waymo_e2e_prereqs.sh` は揃っているが、Python 3.12 環境での SDK build 失敗 + Waymo Open Dataset の利用規約同意 + 手動 tfrecord ダウンロードが必要。プロジェクト方針として公開同意不要データ（Autoware Leo Drive）を優先するため、本セッションで意図的に非対象とした。必要になったら Python 3.10 venv を別途立てて `WAYMO_DATA_DIR` を指定すれば即動く状態。
 
 ### 解決済み（2026-04 セッション）
 
-- ~~Blocker 1: MCD calibration / pose import~~ → bag6 で 2→180 registered、bag4 で 720 registered に到達。`merge_lidar_frames_to_world` + `_mcd_gnss_sparse_import` + 3-camera extrinsics + colorize で完結。
-- ~~§16.2 デモが campus 共有バイナリ~~ → bag4 由来の 80k gaussian `.splat` を本物の WebGL GS viewer (`/splat.html`) で配信中。
-- ~~「画面が灰色のもや」~~ → 画像由来 RGB による LiDAR 点群初期化 + per-image LiDAR depth supervision で color std を 0.06 → 0.16–0.22 に、trajectory 沿いの 3D 構造を可視化。
-- ~~densify bug~~ → `_densify_and_prune` の clone/split 順序を修正、30k iter 学習が安定化。
+- ~~Blocker 1: MCD calibration / pose import~~ → bag6 で 2→180 registered、bag4 で 720 registered、**triple fusion (bag2 + bag4 + bag6) で 2760 registered**。`merge_lidar_frames_to_world` + `_mcd_gnss_sparse_import` + 3-camera extrinsics + colorize で完結。
+- ~~§16.2 デモが campus 共有バイナリ~~ → **triple-bag fusion** 由来の 80k gaussian `.splat` を本物の WebGL GS viewer (`/splat.html`) で配信中（9 cameras × 2760 frames, 1.34M Gaussians）。
+- ~~「画面が灰色のもや」~~ → 画像由来 RGB による LiDAR 点群初期化 + per-image LiDAR depth supervision + per-image appearance embedding (scale, bias) で color std を 0.06 → 0.15–0.22 に、trajectory 沿いの 3D 構造を可視化。L1 loss も 0.32 → 0.20 と 38% 改善。
+- ~~densify bug~~ → `_densify_and_prune` の clone/split 順序を修正、30k–50k iter 学習が安定化。
+- ~~Multi-bag fusion~~ → `reference_origin` 共有 + `scripts/merge_mcd_sparse.py` で任意の N bag を 1 つの sparse に結合可能。
+- ~~appearance embedding~~ → per-image (scale, bias) RGB affine を trainer に追加、`configs/training_appearance.yaml` で有効化。
 
 ## 7. 次の担当者に引き継ぐ順序
 
-### 優先度 A（残ってる中で最優先）
+### 優先度 A（残り）
 
-1. **Waymo real-data E2E**: `tfrecord` を入手 → `gs-mapper run --preprocess-method waymo` で `images + depth + masks + sparse/0 + train/point_cloud.ply` まで確認。`scripts/check_waymo_e2e_prereqs.sh` で事前確認。
-2. **Multi-bag fusion**（下記 §7.5 参照）で viewing constraints を更に増強。bag2 + bag4 を共通 ENU 座標で結合し、同じ `sparse/0` で学習する。
-3. **appearance embedding の実装**（plan 旧版に記載されていたが main には未実装）。per-image (scale, bias) を SH DC に掛ける形の最小実装で exposure 差を吸収させる。
-
-### 7.5 Multi-bag fusion（次セッション候補）
-
-現在の pipeline は 1 bag 単位で ENU 座標を立てている（最初の NavSatFix が原点）。bag2 と bag4 を同時学習するには:
-
-1. `MCDLoader.extract_navsat_trajectory()` が ENU 原点の **lat/lon/alt を返す** よう拡張
-2. 複数 bag を preprocess するときは `ref_lat/lon/alt` を共通で渡す（最初の bag の原点を再利用）
-3. `_mcd_gnss_sparse_import` が merged sparse を書き出す。2 bag 分の images が `images/<bag_tag>/<cam>/frame_*.jpg` と副ディレクトリ化
-4. 学習時は COLMAP 形式のまま 1 つの sparse を読ませるだけで済む
-
-難しいのは **lat/lon を preprocess 引数で渡す UX** の設計。`--reference-origin <lat,lon,alt>` or `--reference-bag <path>` など。
+1. **性能最適化**: splat viewer を WebGPU 実装（例: `@sparkjsdev/spark`）に載せ替え、100k gauss 超でも 60 fps を狙う。
+2. **4+ bag fusion**: bag1 / bag3 / bag5 を追加ダウンロードして bag2+bag4+bag6+… の 5-6 bag fusion。視点数がさらに倍増する。
+3. **NMEA/GNSS/IMU robustness**: IMU quaternion 融合、logger 時刻ずれ、日跨ぎ RMC を堅牢化。
 
 ### 優先度 B
 
-1. NMEA / GNSS / IMU robustness（time alignment、IMU 融合、更多 sentence 対応）。
-2. Waymo dynamic mask / depth の実使用評価（現在は Autoware bag のみで利用）。
+1. Waymo real-data E2E（ユーザが Waymo Open Dataset の Terms of Use に同意し、Python 3.10/3.11 環境を立てられる場合のみ）。プロジェクト方針として Autoware 系が主軸のため後回し。
+2. Waymo dynamic mask / depth の実使用評価。
 
 ### 既に対応済み（refactor の余地はあるが動く）
 
 - ~~画像由来 initial color~~ → `colorize_lidar_world_from_images` で完了
 - ~~depth supervision~~ → `_render_gsplat(want_depth=True)` + `configs/training_depth.yaml` で完了
+- ~~Multi-bag fusion~~ → `--mcd-reference-origin` / `--mcd-reference-bag` CLI + `scripts/merge_mcd_sparse.py` で実装完了。bag2+bag4+bag6 の triple fusion をライブデモに採用
+- ~~appearance embedding~~ → per-image (scale, bias) の trainer 実装 + `configs/training_appearance.yaml` で完了
 
 ## 8. 具体的に触るファイル
 
