@@ -808,6 +808,7 @@ class MCDLoader:
         antenna_offset_enu: tuple[float, float, float] | None = None,
         antenna_offset_base: tuple[float, float, float] | None = None,
         reference_origin: tuple[float, float, float] | None = None,
+        imu_csv_path: str | Path | None = None,
     ) -> str:
         """Write ``sensor_msgs/NavSatFix`` samples to a TUM trajectory file (local ENU).
 
@@ -824,6 +825,12 @@ class MCDLoader:
         ``reference_origin = (lat, lon, alt)`` overrides the automatic "first fix" origin so multiple
         bags can be expressed in the same ENU frame. Also writes ``pose/origin_wgs84.json`` with the
         resolved origin for downstream consumers.
+
+        ``imu_csv_path`` points at the CSV written by :meth:`extract_imu`. When
+        provided, the orientation column is used as each TUM entry's quaternion
+        (linearly interpolated to the GNSS timestamp) instead of the default
+        identity + motion-inferred yaw. This improves robustness for stationary
+        segments and sharp turns.
         """
         from gs_sim2real.preprocess.lidar_slam import LiDARSLAMProcessor
 
@@ -906,17 +913,32 @@ class MCDLoader:
         if antenna_offset_base is not None:
             east_a, north_a, up_a = _apply_antenna_offset_base_link(east_a, north_a, up_a, antenna_offset_base)
 
+        imu_samples = _load_imu_orientation_csv(imu_csv_path) if imu_csv_path else None
+        if imu_samples is not None:
+            logger.info("extract_navsat_trajectory: interpolating %d IMU orientations", imu_samples.shape[0])
+
         with open(tum_path, "w") as f:
             for i, ts in enumerate(rows_ts):
                 east = float(east_a[i])
                 north = float(north_a[i])
                 up = float(up_a[i])
+                imu_quat = _interp_imu_quaternion(imu_samples, ts) if imu_samples is not None else None
                 if vehicle_frame_only:
-                    f.write(f"{ts} {east} {north} {up} 0 0 0 1\n")
+                    if imu_quat is not None:
+                        qx, qy, qz, qw = imu_quat
+                        f.write(f"{ts} {east} {north} {up} {qx} {qy} {qz} {qw}\n")
+                    else:
+                        f.write(f"{ts} {east} {north} {up} 0 0 0 1\n")
                 elif T_base_cam is None:
-                    f.write(f"{ts} {east} {north} {up} 0 0 0 1\n")
+                    if imu_quat is not None:
+                        qx, qy, qz, qw = imu_quat
+                        f.write(f"{ts} {east} {north} {up} {qx} {qy} {qz} {qw}\n")
+                    else:
+                        f.write(f"{ts} {east} {north} {up} 0 0 0 1\n")
                 else:
                     T_world_base = np.eye(4, dtype=np.float64)
+                    if imu_quat is not None:
+                        T_world_base[:3, :3] = _quat_to_rotmat(imu_quat)
                     T_world_base[0, 3] = east
                     T_world_base[1, 3] = north
                     T_world_base[2, 3] = up
@@ -1424,3 +1446,82 @@ class MCDLoader:
 
         mask = np.isfinite(x) & np.isfinite(y) & np.isfinite(z)
         return np.stack([x[mask], y[mask], z[mask], intensity[mask]], axis=-1)
+
+
+def _load_imu_orientation_csv(path: str | Path) -> np.ndarray | None:
+    """Load (timestamp_sec, qx, qy, qz, qw) rows from the CSV :meth:`MCDLoader.extract_imu` writes.
+
+    Returns a (N, 5) ``float64`` array sorted by timestamp or ``None`` if
+    the file is missing / empty / has only identity quaternions (useful when
+    an IMU topic actually carries no orientation).
+    """
+    p = Path(path)
+    if not p.is_file():
+        return None
+    rows: list[tuple[float, float, float, float, float]] = []
+    with open(p, newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            try:
+                ts = float(row["timestamp_sec"])
+                qx = float(row["orientation_x"])
+                qy = float(row["orientation_y"])
+                qz = float(row["orientation_z"])
+                qw = float(row["orientation_w"])
+            except (KeyError, ValueError):
+                continue
+            rows.append((ts, qx, qy, qz, qw))
+    if not rows:
+        return None
+    arr = np.asarray(sorted(rows, key=lambda r: r[0]), dtype=np.float64)
+    # Reject bags whose IMU topic reports identity all the way through.
+    quat_std = arr[:, 1:].std(axis=0).sum()
+    if quat_std < 1e-6:
+        return None
+    return arr
+
+
+def _interp_imu_quaternion(imu_samples: np.ndarray, ts: float) -> tuple[float, float, float, float] | None:
+    """Nearest-neighbour interpolation of a (qx, qy, qz, qw) quaternion at ``ts``."""
+    if imu_samples is None or imu_samples.shape[0] == 0:
+        return None
+    times = imu_samples[:, 0]
+    if ts <= times[0]:
+        quat = imu_samples[0, 1:]
+    elif ts >= times[-1]:
+        quat = imu_samples[-1, 1:]
+    else:
+        idx = int(np.searchsorted(times, ts))
+        lo = imu_samples[idx - 1]
+        hi = imu_samples[idx]
+        dt = hi[0] - lo[0]
+        if dt <= 0:
+            quat = lo[1:]
+        else:
+            alpha = (ts - lo[0]) / dt
+            q_lo = lo[1:]
+            q_hi = hi[1:]
+            if float(np.dot(q_lo, q_hi)) < 0.0:
+                q_hi = -q_hi
+            quat = (1.0 - alpha) * q_lo + alpha * q_hi
+    norm = float(np.linalg.norm(quat))
+    if norm < 1e-9:
+        return None
+    quat = quat / norm
+    return float(quat[0]), float(quat[1]), float(quat[2]), float(quat[3])
+
+
+def _quat_to_rotmat(quat: tuple[float, float, float, float]) -> np.ndarray:
+    """Convert a (qx, qy, qz, qw) quaternion into a 3x3 rotation matrix."""
+    qx, qy, qz, qw = quat
+    xx, yy, zz = qx * qx, qy * qy, qz * qz
+    xy, xz, yz = qx * qy, qx * qz, qy * qz
+    wx, wy, wz = qw * qx, qw * qy, qw * qz
+    return np.array(
+        [
+            [1 - 2 * (yy + zz), 2 * (xy - wz), 2 * (xz + wy)],
+            [2 * (xy + wz), 1 - 2 * (xx + zz), 2 * (yz - wx)],
+            [2 * (xz - wy), 2 * (yz + wx), 1 - 2 * (xx + yy)],
+        ],
+        dtype=np.float64,
+    )
