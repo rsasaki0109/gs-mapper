@@ -12,12 +12,18 @@ One-command pipelines to go from robotics / autonomous-driving dataset images to
 
 ## Live Demo
 
-GitHub Pages:
+GitHub Pages hosts four views of the same 6-bag Autoware Leo Drive ISUZU bundle:
 
-- Three.js point viewer: **<https://rsasaki0109.github.io/gs-mapper/>**
-- Real WebGL Gaussian Splat viewer: **<https://rsasaki0109.github.io/gs-mapper/splat.html>**
+| URL | Renderer | Notes |
+|-----|----------|-------|
+| [`/`](https://rsasaki0109.github.io/gs-mapper/) | `THREE.PointsMaterial` (WebGL) | Three.js point viewer, draws gaussian centres as soft-disc sprites. Widest browser support. |
+| [`/splat.html`](https://rsasaki0109.github.io/gs-mapper/splat.html) | `antimatter15/splat` (WebGL2, CPU sort) | Lightest real splat renderer, vendored as a single JS file. |
+| [`/splat_spark.html`](https://rsasaki0109.github.io/gs-mapper/splat_spark.html) | `sparkjsdev/spark` 2.0 (WebGL2, ESM) | Advanced Three.js-based renderer loaded via importmap + CDN. Experimental: may appear blank under headless browsers without a real GPU. |
+| [`/splat_webgpu.html`](https://rsasaki0109.github.io/gs-mapper/splat_webgpu.html) | `shrekshao/webgpu-3d-gaussian-splat-viewer` (WebGPU, GPU radix sort) | True WebGPU: compute-shader preprocess + radix sort per frame. Requires Chrome 113+, Edge 113+, or Safari TP with WebGPU enabled. |
 
-The splat page loads an outdoor scene trained with the MCD pose-import pipeline (GNSS + `/tf_static` + LiDAR-seeded COLMAP, image-projected RGB initialization, 50k-iter gsplat with LiDAR depth supervision) and renders real anisotropic 3D Gaussians, not raw splat centers. Override with `?url=<splat-path>`.
+Every viewer defaults to `assets/outdoor-demo/outdoor-demo.splat` (5-bag or 6-bag fused reconstruction, 80k filtered gaussians). Override with `?url=<splat-path>`.
+
+The bundle was trained with the full MCD pose-import stack: GNSS + `/tf_static` + LiDAR-seeded COLMAP sparse, image-projected RGB init, gsplat 30k-50k iter with LiDAR depth supervision, per-image appearance embedding (scale + bias), and per-view 6-DOF joint pose refinement (BA).
 
 GitHub Pages is deployed by [`.github/workflows/pages.yml`](.github/workflows/pages.yml) on `push` to `main`.
 

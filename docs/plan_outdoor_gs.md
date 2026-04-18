@@ -94,7 +94,11 @@
 
 `/tf_static` の `base_link → camera_top/camera_link` 変換 + GNSS 軌跡 + LiDAR 点群 world merge（200k 点）で COLMAP text model を直接書き出し → 3 カメラで 180 frames 全部 registered、100k 点 seed。これが本セッションの突破口。
 
-### 4.3 densification は 100k 級初期点でも Stable に走るよう修正済み
+### 4.3 MCD (mcdviral.github.io) NTU session17 も image-only COLMAP は 2 registered 止まり
+
+`scripts/download_mcd_session.sh` で 633 MB rosbag1 (NTU #17) を取得できるようになった（Drive 確認フォーム自動突破）。ただしこのセッションは handheld D455 ステレオ + IMU のみで **GNSS / /tf_static は含まれない**。150 frame サブサンプルで image-only COLMAP を走らせても Autoware bag6 と同じ「2 registered images / 36 points」症状で詰まる。gsplat 側は 5295 gauss まで学習するが点群が貧弱で demo 品質に達しない。MCD を本格的に使うなら: (a) SLAM 済みポーズを外部で流し込む、(b) もっと画像間重複が多いセッションを選ぶ、(c) DUSt3R pose-free 経路に切り替える、のいずれか。
+
+### 4.4 densification は 100k 級初期点でも Stable に走るよう修正済み
 
 以前は iter 500 以降の densify で `IndexError: mask [N] != tensor [N+num_clone]` が即発生していた。本セッションの修正で bag1 30k iter → 244k Gaussians まで完走。
 
