@@ -38,3 +38,21 @@ def test_outdoor_demo_manifest_and_referenced_binary_exist(assets_dir: Path) -> 
     href = man["asset"]["href"]
     bin_path = (manifest_path.parent / href).resolve()
     assert bin_path.is_file(), f"missing binary referenced by outdoor-demo: {href}"
+
+
+def test_webgpu_viewer_bundle_present() -> None:
+    """shrekshao WebGPU viewer bundle must be present alongside the wrapper page."""
+    docs_dir = REPO_ROOT / "docs"
+    wrapper = docs_dir / "splat_webgpu.html"
+    inner = docs_dir / "splat-webgpu" / "index.html"
+    js = docs_dir / "splat-webgpu" / "assets" / "index.js"
+    css = docs_dir / "splat-webgpu" / "assets" / "index.css"
+    license_file = docs_dir / "splat-webgpu" / "LICENSE"
+    for p in (wrapper, inner, js, css, license_file):
+        assert p.is_file(), f"missing WebGPU viewer asset: {p}"
+    # Inner html should reference the relative bundle assets.
+    inner_text = inner.read_text(encoding="utf-8")
+    assert "./assets/index.js" in inner_text
+    assert "./assets/index.css" in inner_text
+    # Bundle should not be empty.
+    assert js.stat().st_size > 10_000

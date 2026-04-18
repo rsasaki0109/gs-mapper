@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <title>GS Mapper &mdash; WebGPU Gaussian Splat Viewer</title>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no"
+    />
+    <style>
+      html, body { margin: 0; padding: 0; height: 100vh; width: 100vw; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; }
+      #info {
+        position: absolute;
+        z-index: 100;
+        top: 10px;
+        left: 15px;
+        max-width: 520px;
+        text-shadow: 0 0 3px black;
+      }
+      #info h3 { margin: 5px 0; }
+      #info p { margin: 5px 0; font-size: small; }
+      #info a { color: #6cf; }
+      #info code { background: rgba(255, 255, 255, 0.1); padding: 1px 4px; border-radius: 3px; }
+      #fallback {
+        display: none;
+        position: absolute;
+        z-index: 200;
+        top: 45%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        padding: 24px 32px;
+        background: rgba(0, 0, 0, 0.8);
+        border: 1px solid #444;
+        max-width: 560px;
+        text-align: center;
+      }
+      iframe {
+        border: 0;
+        width: 100vw;
+        height: 100vh;
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="info">
+      <h3>GS Mapper &mdash; Real WebGPU Gaussian Splatting</h3>
+      <p>
+        Rendered entirely via WebGPU compute + render pipelines
+        (radix-sort on GPU, 2D-covariance projection, alpha blending).
+        Default scene: <code>outdoor-demo.splat</code> (antimatter15 format,
+        DC-only colour since the higher-order SH coefs are stripped in this
+        compact format). Override with
+        <code>?url=&lt;.ply-or-.splat-path&gt;</code>.
+      </p>
+      <p>
+        Viewer: <a href="https://github.com/shrekshao/webgpu-3d-gaussian-splat-viewer">shrekshao/webgpu-3d-gaussian-splat-viewer</a>
+        (MIT, vanilla TypeScript + Vite, built locally and bundled into
+        <code>docs/splat-webgpu/</code>).
+        Compare with: <a href="./splat.html">WebGL (antimatter15)</a> &middot;
+        <a href="./splat_spark.html">WebGL ES (Spark)</a> &middot;
+        <a href="./">Three.js point viewer</a>.
+      </p>
+      <p>
+        Drag: orbit &middot; right-drag: pan &middot; wheel: dolly.
+        Requires a browser with WebGPU enabled
+        (Chrome 113+, Edge 113+, recent Safari Technology Preview).
+      </p>
+    </div>
+    <div id="fallback">
+      <h3>WebGPU not available</h3>
+      <p>This viewer requires the browser's WebGPU API. Try Chrome/Edge 113+, Safari TP with WebGPU enabled, or Firefox Nightly with <code>dom.webgpu.enabled=true</code>.</p>
+      <p>In the meantime, the <a href="./splat.html">WebGL viewer</a> works in any modern browser.</p>
+    </div>
+    <iframe id="viewer" title="WebGPU Gaussian Splat Viewer" allow="fullscreen"></iframe>
+    <script>
+      (function () {
+        const iframe = document.getElementById('viewer');
+        const fallback = document.getElementById('fallback');
+        if (!('gpu' in navigator)) {
+          iframe.style.display = 'none';
+          fallback.style.display = 'block';
+          return;
+        }
+        // Pass through any ?url= / ?cameras= / ?model= to the inner viewer.
+        const search = window.location.search || '';
+        iframe.src = './splat-webgpu/index.html' + search;
+      })();
+    </script>
+  </body>
+</html>
