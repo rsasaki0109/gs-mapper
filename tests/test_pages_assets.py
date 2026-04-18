@@ -40,6 +40,18 @@ def test_outdoor_demo_manifest_and_referenced_binary_exist(assets_dir: Path) -> 
     assert bin_path.is_file(), f"missing binary referenced by outdoor-demo: {href}"
 
 
+def test_dust3r_demo_splat_present(assets_dir: Path) -> None:
+    """DUSt3R-derived splat must be bundled and match the 32-byte format."""
+    splat = assets_dir / "outdoor-demo" / "outdoor-demo-dust3r.splat"
+    assert splat.is_file(), "missing DUSt3R demo splat"
+    size = splat.stat().st_size
+    assert size > 1_000_000, f"splat looks too small ({size} bytes)"
+    assert size % 32 == 0, f"splat is not 32-byte aligned ({size} bytes)"
+    # splat.html should link to the DUSt3R variant so visitors can toggle it.
+    html = (REPO_ROOT / "docs" / "splat.html").read_text(encoding="utf-8")
+    assert "outdoor-demo-dust3r.splat" in html
+
+
 def test_webgpu_viewer_bundle_present() -> None:
     """shrekshao WebGPU viewer bundle must be present alongside the wrapper page."""
     docs_dir = REPO_ROOT / "docs"

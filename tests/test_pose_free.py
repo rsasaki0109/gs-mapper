@@ -166,15 +166,94 @@ class TestPoseFreeProcessor:
         assert (Path(result) / "cameras.txt").exists()
 
     def test_dust3r_falls_back_to_simple(self, tmp_path: Path) -> None:
-        """DUSt3R method falls back to simple init when dust3r is not installed."""
+        """DUSt3R method falls back to simple init when the clone is missing."""
         from gs_sim2real.preprocess.pose_free import PoseFreeProcessor
 
         image_dir = tmp_path / "images"
         _create_test_images(image_dir, num_images=3)
 
         output_dir = tmp_path / "output"
-        processor = PoseFreeProcessor(method="dust3r")
+        processor = PoseFreeProcessor(
+            method="dust3r",
+            dust3r_root=tmp_path / "no_such_dust3r",
+            checkpoint=tmp_path / "no_such.pth",
+        )
         sparse_path = processor.estimate_poses(str(image_dir), str(output_dir))
 
         # Should still produce valid output via fallback
         assert (Path(sparse_path) / "cameras.txt").exists()
+
+
+def _create_color_images(image_dir: Path, num_images: int, size: tuple[int, int] = (32, 24)) -> list[Path]:
+    image_dir.mkdir(parents=True, exist_ok=True)
+    paths: list[Path] = []
+    for i in range(num_images):
+        img = np.zeros((size[1], size[0], 3), dtype=np.uint8)
+        img[..., 0] = (i * 20) % 256
+        img[..., 1] = 128
+        img[..., 2] = 255 - ((i * 20) % 256)
+        path = image_dir / f"frame_{i:04d}.png"
+        cv2.imwrite(str(path), img)
+        paths.append(path)
+    return paths
+
+
+def test_write_colmap_sparse_round_trip(tmp_path: Path) -> None:
+    """write_colmap_sparse produces files the gsplat trainer can load."""
+    from gs_sim2real.preprocess.pose_free import write_colmap_sparse
+
+    image_dir = tmp_path / "imgs"
+    images = _create_color_images(image_dir, num_images=3, size=(32, 24))
+
+    # Two frames translated along X, unit rotation.
+    poses = np.stack(
+        [
+            np.eye(4),
+            np.array([[1, 0, 0, 0.5], [0, 1, 0, 0.0], [0, 0, 1, 0.0], [0, 0, 0, 1]], dtype=np.float32),
+            np.array([[1, 0, 0, 1.0], [0, 1, 0, 0.0], [0, 0, 1, 0.0], [0, 0, 0, 1]], dtype=np.float32),
+        ],
+        axis=0,
+    ).astype(np.float32)
+    focals = np.array([[28.0], [28.0], [28.0]], dtype=np.float32)
+    # Fake per-view points: 5 random points per view, matching RGB in 0..1.
+    rng = np.random.default_rng(0)
+    pts3d_per_view = [rng.uniform(-1, 1, size=(5, 3)).astype(np.float32) for _ in range(3)]
+    rgb_per_view = [rng.uniform(0, 1, size=(5, 3)).astype(np.float32) for _ in range(3)]
+    # DUSt3R working shapes == original shapes here so focal scaling is identity.
+    dust3r_shapes = [(24, 32)] * 3
+
+    out_dir = tmp_path / "dust3r_out"
+    sparse_dir = write_colmap_sparse(
+        out_dir,
+        image_paths=images,
+        poses=poses,
+        focals=focals,
+        pts3d_per_view=pts3d_per_view,
+        rgb_per_view=rgb_per_view,
+        dust3r_shapes=dust3r_shapes,
+        max_points=0,
+    )
+    sparse_dir = Path(sparse_dir)
+
+    assert (sparse_dir / "cameras.txt").exists()
+    assert (sparse_dir / "images.txt").exists()
+    assert (sparse_dir / "points3D.txt").exists()
+    # Images copied.
+    assert len(list((out_dir / "images").glob("*.png"))) == 3
+
+    # cameras.txt: 3 PINHOLE lines with matching width/height.
+    cam_lines = [
+        line for line in (sparse_dir / "cameras.txt").read_text().splitlines() if line and not line.startswith("#")
+    ]
+    assert len(cam_lines) == 3
+    for line in cam_lines:
+        parts = line.split()
+        assert parts[1] == "PINHOLE"
+        assert parts[2] == "32"
+        assert parts[3] == "24"
+
+    # points3D.txt: 15 points total (3 views x 5 points each).
+    pt_lines = [
+        line for line in (sparse_dir / "points3D.txt").read_text().splitlines() if line and not line.startswith("#")
+    ]
+    assert len(pt_lines) == 15
