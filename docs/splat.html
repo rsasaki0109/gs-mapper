@@ -195,13 +195,13 @@
 			<h3 class="nohf">GS Mapper — Real WebGL Gaussian Splat</h3>
 			<p>
 			<small class="nohf">
-				Default scene: Autoware Leo Drive ISUZU <strong>bag2 + bag4 + bag6</strong>
+				Default scene: Autoware Leo Drive ISUZU <strong>bag1 + bag2 + bag4 + bag6</strong>
 				fused in a shared ENU frame (<code>--mcd-reference-bag</code>).
-				9 cameras × 2760 registered frames total (1200 + 720 + 840), GNSS +
+				12 cameras × 4260 registered frames total (1500 + 1200 + 720 + 840), GNSS +
 				/tf_static pose-import with image-projected RGB init, gsplat
 				30k iter under LiDAR depth supervision <em>plus per-image
 				appearance embedding (scale, bias)</em> to absorb cross-bag
-				exposure differences, 1.34M gaussians filtered to 80k
+				exposure differences, 1.40M gaussians filtered to 80k
 				(opacity ≥ 0.3, scale ≤ 2 m). Positions centered and rescaled so
 				the default camera fits. Override with <code>?url=&lt;splat-path&gt;</code>.
 				Viewer: <a href="https://github.com/antimatter15/splat">antimatter15/splat</a> (MIT) by Kevin Kwok.

@@ -159,11 +159,20 @@ class GsplatTrainer:
         for iteration in range(1, num_iterations + 1):
             # Pick a random training view
             idx = np.random.randint(len(image_data))
-            gt_image = image_data[idx]["image"]  # (H, W, 3)
-            viewmat = image_data[idx]["viewmat"]  # (4, 4)
-            K = image_data[idx]["K"]  # (3, 3)
+            entry_i = image_data[idx]
+            if entry_i.get("_lazy"):
+                gt_image = entry_i["image"].to(device, non_blocking=True)
+            else:
+                gt_image = entry_i["image"]
+            viewmat = entry_i["viewmat"]
+            K = entry_i["K"]
             H, W = gt_image.shape[:2]
-            gt_depth = image_data[idx].get("depth") if use_depth_loss else None
+            gt_depth = None
+            if use_depth_loss and "depth" in entry_i:
+                if entry_i.get("_lazy"):
+                    gt_depth = entry_i["depth"].to(device, non_blocking=True)
+                else:
+                    gt_depth = entry_i["depth"]
 
             # Render
             if use_depth_loss and gt_depth is not None:
@@ -474,6 +483,15 @@ class GsplatTrainer:
         if not cameras_data:
             raise ValueError("No cameras found in COLMAP model")
 
+        # Heuristic: if the dataset is large enough to risk OOM when every
+        # image (+ depth map) is pinned on GPU, keep images / depth on CPU
+        # and transfer per iteration. Threshold ~1000 images or CPU device.
+        image_count = len(images_meta)
+        lazy_threshold = int(self.config.get("lazy_image_threshold", 1000))
+        lazy_images = image_count > lazy_threshold or str(device) == "cpu"
+        if lazy_images:
+            print(f"Lazy image loading enabled ({image_count} > {lazy_threshold}); images stay on CPU")
+
         image_data = []
         for img_id, meta in images_meta.items():
             img_path = img_dir / meta["name"]
@@ -484,7 +502,11 @@ class GsplatTrainer:
             # Load image
             img = Image.open(img_path).convert("RGB")
             img_np = np.array(img, dtype=np.float32) / 255.0
-            img_tensor = torch.from_numpy(img_np).to(device)
+            img_tensor_cpu = torch.from_numpy(img_np)
+            if lazy_images:
+                img_tensor = img_tensor_cpu.pin_memory() if torch.cuda.is_available() else img_tensor_cpu
+            else:
+                img_tensor = img_tensor_cpu.to(device)
 
             H, W = img_tensor.shape[:2]
 
@@ -502,12 +524,17 @@ class GsplatTrainer:
                 "viewmat": viewmat,
                 "K": K,
                 "name": meta["name"],
+                "_lazy": lazy_images,
             }
             depth_path = data_dir / "depth" / (Path(meta["name"]).with_suffix(".npy"))
             if depth_path.exists():
                 depth_np = np.load(depth_path).astype(np.float32)
                 if depth_np.shape[:2] == (H, W):
-                    entry["depth"] = torch.from_numpy(depth_np).to(device)
+                    depth_cpu = torch.from_numpy(depth_np)
+                    if lazy_images:
+                        entry["depth"] = depth_cpu.pin_memory() if torch.cuda.is_available() else depth_cpu
+                    else:
+                        entry["depth"] = depth_cpu.to(device)
             image_data.append(entry)
 
         return image_data
