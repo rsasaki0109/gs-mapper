@@ -176,6 +176,17 @@ def build_parser() -> argparse.ArgumentParser:
         default="",
         help="Use the ENU origin recorded under <path>/pose/origin_wgs84.json from a previously preprocessed bag.",
     )
+    pp.add_argument(
+        "--mcd-imu-csv",
+        default="",
+        help="Path to an imu.csv with orientation_* columns. Interpolated into each TUM row as the base_link quaternion "
+        "(falls back to the motion-inferred yaw if the column is constant).",
+    )
+    pp.add_argument(
+        "--mcd-skip-imu-orientation",
+        action="store_true",
+        help="Ignore any imu.csv and keep the default motion-inferred yaw.",
+    )
     pp.add_argument("--trajectory", default=None, help="SLAM trajectory file (for lidar-slam method)")
     pp.add_argument(
         "--trajectory-format",
@@ -394,6 +405,16 @@ def build_parser() -> argparse.ArgumentParser:
         default="",
         help="Use the ENU origin recorded under <path>/pose/origin_wgs84.json from a previously preprocessed bag.",
     )
+    rn.add_argument(
+        "--mcd-imu-csv",
+        default="",
+        help="Path to an imu.csv with orientation_* columns. Interpolated into each TUM row as the base_link quaternion.",
+    )
+    rn.add_argument(
+        "--mcd-skip-imu-orientation",
+        action="store_true",
+        help="Ignore any imu.csv and keep the default motion-inferred yaw.",
+    )
     rn.add_argument("--trajectory", default=None, help="Trajectory file for --preprocess-method lidar-slam")
     rn.add_argument(
         "--trajectory-format",
@@ -556,6 +577,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--mcd-reference-bag",
         default="",
         help="Use the ENU origin recorded under <path>/pose/origin_wgs84.json from a previously preprocessed bag.",
+    )
+    dm.add_argument(
+        "--mcd-imu-csv",
+        default="",
+        help="Path to an imu.csv with orientation_* columns. Interpolated into each TUM row as the base_link quaternion.",
+    )
+    dm.add_argument(
+        "--mcd-skip-imu-orientation",
+        action="store_true",
+        help="Ignore any imu.csv and keep the default motion-inferred yaw.",
     )
     dm.add_argument("--trajectory", default=None, help="Trajectory file for --preprocess-method lidar-slam")
     dm.add_argument(
@@ -1602,6 +1633,21 @@ def _mcd_antenna_offset_base(args: argparse.Namespace) -> tuple[float, float, fl
     return (float(v[0]), float(v[1]), float(v[2]))
 
 
+def _resolve_mcd_imu_csv(args, colmap_dir: Path) -> str | None:
+    """Return the path to an IMU CSV that extract_navsat_trajectory can interpolate."""
+    if getattr(args, "mcd_skip_imu_orientation", False):
+        return None
+    explicit = getattr(args, "mcd_imu_csv", None)
+    if explicit:
+        p = Path(explicit)
+        return str(p) if p.is_file() else None
+    if getattr(args, "extract_imu", False):
+        default_path = Path(colmap_dir) / "imu.csv"
+        if default_path.is_file():
+            return str(default_path)
+    return None
+
+
 def _resolve_mcd_reference_origin(args) -> tuple[float, float, float] | None:
     """Return (lat, lon, alt) for ENU origin sharing across bags, or None."""
     explicit = getattr(args, "mcd_reference_origin", None)
@@ -1818,6 +1864,7 @@ def _mcd_gnss_sparse_import(
         )
 
         ref_origin = _resolve_mcd_reference_origin(args)
+        imu_csv_for_gnss = _resolve_mcd_imu_csv(args, colmap_dir)
         tum_path = loader.extract_navsat_trajectory(
             colmap_dir,
             gnss_topic=getattr(args, "gnss_topic", None),
@@ -1827,6 +1874,7 @@ def _mcd_gnss_sparse_import(
             antenna_offset_enu=_mcd_antenna_offset_enu(args),
             antenna_offset_base=_mcd_antenna_offset_base(args),
             reference_origin=ref_origin,
+            imu_csv_path=imu_csv_for_gnss,
         )
         if ref_origin is not None:
             print(f"MCD vehicle GNSS trajectory (TUM, shared origin {ref_origin}): {tum_path}")
@@ -1913,6 +1961,7 @@ def _mcd_gnss_sparse_import(
             )
 
     ref_origin_single = _resolve_mcd_reference_origin(args)
+    imu_csv_for_single = _resolve_mcd_imu_csv(args, colmap_dir)
     pointcloud_path: str | Path | None = getattr(args, "pointcloud", None)
     lidar_tum_path: str | None = None
     if not pointcloud_path and not getattr(args, "mcd_skip_lidar_seed", False):
@@ -1926,6 +1975,7 @@ def _mcd_gnss_sparse_import(
                 antenna_offset_enu=_mcd_antenna_offset_enu(args),
                 antenna_offset_base=_mcd_antenna_offset_base(args),
                 reference_origin=ref_origin_single,
+                imu_csv_path=imu_csv_for_single,
             )
             vehicle_path = Path(vehicle_tum)
             lidar_side = vehicle_path.with_name("gnss_trajectory_vehicle.tum")
@@ -1947,6 +1997,7 @@ def _mcd_gnss_sparse_import(
         antenna_offset_enu=_mcd_antenna_offset_enu(args),
         antenna_offset_base=_mcd_antenna_offset_base(args),
         reference_origin=ref_origin_single,
+        imu_csv_path=imu_csv_for_single,
     )
     print(f"MCD GNSS trajectory (TUM): {tum_path}")
 
