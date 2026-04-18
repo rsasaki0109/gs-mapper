@@ -18,13 +18,17 @@
 </head>
 <body>
   <div id="info">
-    <h3>GS Mapper — Spark renderer (advanced WebGL2 Gaussian Splatting)</h3>
+    <h3>GS Mapper — Spark renderer (experimental, advanced WebGL2 Gaussian Splatting)</h3>
     <small>
       Loads the same <code>assets/outdoor-demo/outdoor-demo.splat</code> used by the
       <a href="splat.html">antimatter15/splat viewer</a> but through
       <a href="https://github.com/sparkjsdev/spark">sparkjsdev/spark</a> (MIT, THREE.js-based
-      renderer with GPU-side sort + LoD). Override with <code>?url=&lt;splat-path&gt;</code>.
-      <a href="./">← back to the Three.js point viewer</a>.
+      renderer with GPU-side sort + LoD). <strong>Experimental:</strong> Spark's workers can
+      show a black canvas under headless browsers (Playwright, swiftshader) even though the
+      splat loads; on Chrome/Firefox with a real GPU it should render.
+      Override with <code>?url=&lt;splat-path&gt;</code>.
+      <a href="./">← back to the Three.js point viewer</a> ·
+      <a href="splat.html">use the always-on antimatter15 viewer</a>.
     </small>
   </div>
   <div id="canvas-host"></div>
