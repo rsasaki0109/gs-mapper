@@ -133,6 +133,26 @@ gs-mapper train --data outputs/bag2 --output outputs/bag2_train \
   --config configs/training_depth_long.yaml
 ```
 
+### Multi-bag fusion
+
+Preprocess additional bags with a shared ENU origin (reuse the first bag's `pose/origin_wgs84.json`), then merge the sparse models into one COLMAP input:
+
+```bash
+gs-mapper preprocess \
+  --images data/autoware_leo_drive_bag4 --output outputs/bag4 \
+  --method mcd --mcd-seed-poses-from-gnss --mcd-tf-use-image-stamps \
+  --mcd-export-depth --mcd-reference-bag outputs/bag2 ...
+
+python3 scripts/merge_mcd_sparse.py \
+  --inputs outputs/bag2 outputs/bag4 --tags bag2 bag4 \
+  --output outputs/fused --include-depth
+
+gs-mapper train --data outputs/fused --output outputs/fused_train \
+  --method gsplat --iterations 30000 --config configs/training_appearance.yaml
+```
+
+The live demo is trained on a 5-bag fusion (bag1+2+3+4+6, 15 cameras, 5040 registered frames, 1.43M Gaussians).
+
 See `docs/plan_outdoor_gs.md` for the detailed outdoor pipeline handoff (status, blockers, known-good conditions).
 
 Then either:
