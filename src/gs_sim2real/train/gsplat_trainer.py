@@ -156,6 +156,26 @@ class GsplatTrainer:
                 f"reg_weight={appearance_reg}"
             )
 
+        # Joint pose refinement (BA-style). Each training view learns a 6-DOF
+        # delta in its camera frame: small rotation (so3) + translation applied
+        # to the COLMAP-given viewmat. Helps when GNSS-seeded poses are not
+        # consistent enough for 3DGS to fit.
+        pose_refine_enabled = bool(self.config.get("joint_pose_refinement", False))
+        pose_refine_lr = float(self.config.get("joint_pose_lr", 1e-4))
+        pose_refine_reg = float(self.config.get("joint_pose_reg_weight", 0.1))
+        pose_refine_start = int(self.config.get("joint_pose_start_iter", 1500))
+        pose_so3 = None
+        pose_t = None
+        pose_refine_optimizer = None
+        if pose_refine_enabled:
+            pose_so3 = torch.nn.Parameter(torch.zeros(len(image_data), 3, device=device, dtype=torch.float32))
+            pose_t = torch.nn.Parameter(torch.zeros(len(image_data), 3, device=device, dtype=torch.float32))
+            pose_refine_optimizer = torch.optim.Adam([pose_so3, pose_t], lr=pose_refine_lr)
+            print(
+                f"Joint pose refinement enabled: per-image 6-DOF delta from iter {pose_refine_start}, "
+                f"Adam lr={pose_refine_lr}, reg_weight={pose_refine_reg}"
+            )
+
         for iteration in range(1, num_iterations + 1):
             # Pick a random training view
             idx = np.random.randint(len(image_data))
@@ -173,6 +193,28 @@ class GsplatTrainer:
                     gt_depth = entry_i["depth"].to(device, non_blocking=True)
                 else:
                     gt_depth = entry_i["depth"]
+
+            if pose_refine_enabled and iteration >= pose_refine_start and pose_so3 is not None:
+                # Compose viewmat with a small learned delta: view' = Δ @ view
+                so3 = pose_so3[idx]
+                tvec_delta = pose_t[idx]
+                theta = torch.linalg.norm(so3) + 1e-8
+                axis = so3 / theta
+                cos_t = torch.cos(theta)
+                sin_t = torch.sin(theta)
+                ax, ay, az = axis[0], axis[1], axis[2]
+                K_skew = torch.stack(
+                    [
+                        torch.stack([torch.zeros_like(ax), -az, ay]),
+                        torch.stack([az, torch.zeros_like(ax), -ax]),
+                        torch.stack([-ay, ax, torch.zeros_like(ax)]),
+                    ]
+                )
+                R_delta = torch.eye(3, device=device) + sin_t * K_skew + (1 - cos_t) * (K_skew @ K_skew)
+                T_delta = torch.eye(4, device=device, dtype=viewmat.dtype)
+                T_delta[:3, :3] = R_delta
+                T_delta[:3, 3] = tvec_delta
+                viewmat = T_delta @ viewmat
 
             # Render
             if use_depth_loss and gt_depth is not None:
@@ -202,6 +244,9 @@ class GsplatTrainer:
                 # Regularise (scale, bias) away from drifting: penalise scale != 1, bias != 0.
                 reg = ((appearance_scale[idx] - 1.0) ** 2).mean() + (appearance_bias[idx] ** 2).mean()
                 loss = loss + appearance_reg * reg
+            if pose_refine_enabled and iteration >= pose_refine_start and pose_so3 is not None:
+                pose_reg = (pose_so3[idx] ** 2).sum() + (pose_t[idx] ** 2).sum()
+                loss = loss + pose_refine_reg * pose_reg
 
             # Backprop
             loss.backward()
@@ -232,6 +277,9 @@ class GsplatTrainer:
                 if appearance_optimizer is not None:
                     appearance_optimizer.step()
                     appearance_optimizer.zero_grad()
+                if pose_refine_optimizer is not None and iteration >= pose_refine_start:
+                    pose_refine_optimizer.step()
+                    pose_refine_optimizer.zero_grad()
 
                 # Update learning rate for position
                 self._update_lr(optimizers["position"], iteration, num_iterations)

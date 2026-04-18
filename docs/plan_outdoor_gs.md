@@ -131,8 +131,8 @@
 
 ### 優先度 A（残り）
 
-1. **性能最適化**: splat viewer を WebGPU 実装（例: `@sparkjsdev/spark`）に載せ替え、100k gauss 超でも 60 fps を狙う。
-2. **4+ bag fusion**: bag1 / bag3 / bag5 を追加ダウンロードして bag2+bag4+bag6+… の 5-6 bag fusion。視点数がさらに倍増する。
+1. **WebGPU 版 viewer**: 調査したところ script tag 単体で使える WebGPU GS 実装は現時点で皆無（Spark は ESM import、PlayCanvas Web Components は GS 非対応、cvlab/epfl 版も bundler 必須）。vite 等のビルドステップを導入するか、antimatter15/splat WebGL2 で継続するかの判断が要る。
+2. **MCD (mcdviral.github.io)**: 公開・登録不要だが 1 セッション 3.5〜51 GB と巨大。downloader は `aws s3 sync --no-sign-request` ではなく Google Drive 経由なので `configs/datasets.yaml` に入れられない。rosbag 形式が rosbag1 or 2 不明なので `MCDLoader` の AnyReader 互換を実データで確認する必要あり。
 3. **NMEA/GNSS/IMU robustness**: IMU quaternion 融合、logger 時刻ずれ、日跨ぎ RMC を堅牢化。
 
 ### 優先度 B
@@ -146,6 +146,7 @@
 - ~~depth supervision~~ → `_render_gsplat(want_depth=True)` + `configs/training_depth.yaml` で完了
 - ~~Multi-bag fusion~~ → `--mcd-reference-origin` / `--mcd-reference-bag` CLI + `scripts/merge_mcd_sparse.py` で実装完了。**5-bag fusion (bag1+2+3+4+6) をライブデモに採用**。1000 images 超で自動的に lazy image loading へ切り替わる
 - ~~appearance embedding~~ → per-image (scale, bias) の trainer 実装 + `configs/training_appearance.yaml` で完了
+- ~~joint pose refinement (BA)~~ → 各学習画像に 6-DOF (so3 + translation) delta を学習可能化、`joint_pose_start_iter` から有効化。`configs/training_ba.yaml` で depth + appearance + pose の全部 on
 
 ## 8. 具体的に触るファイル
 

@@ -199,12 +199,13 @@
 				<strong>bag1 + bag2 + bag3 + bag4 + bag5 + bag6</strong>
 				fused in a shared ENU frame (<code>--mcd-reference-bag</code>).
 				18 cameras × 6120 registered frames total (1500 + 1200 + 780 + 720 + 1080 + 840),
-				GNSS + /tf_static pose-import with image-projected RGB init, gsplat
-				30k iter under LiDAR depth supervision <em>plus per-image
-				appearance embedding (scale, bias)</em> to absorb cross-bag
-				exposure differences, 1.60M gaussians filtered to 80k
-				(opacity ≥ 0.3, scale ≤ 2 m). Positions centered and rescaled so
-				the default camera fits. Override with <code>?url=&lt;splat-path&gt;</code>.
+				GNSS + /tf_static pose-import with image-projected RGB init,
+				gsplat 30k iter with the full training stack <em>(LiDAR depth
+				supervision + per-image appearance embedding + joint 6-DOF
+				pose refinement from iter 1500)</em>, 1.48M gaussians filtered
+				to 80k (opacity ≥ 0.3, scale ≤ 2 m). Positions centered and
+				rescaled so the default camera fits. Override with
+				<code>?url=&lt;splat-path&gt;</code>.
 				Viewer: <a href="https://github.com/antimatter15/splat">antimatter15/splat</a> (MIT) by Kevin Kwok.
 				<a href="./">← back to Three.js point viewer</a>.
 			</small>
