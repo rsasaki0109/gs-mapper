@@ -75,12 +75,19 @@ mcd:
   description: >
     Multi-Campus Dataset featuring diverse outdoor campus scenes
     captured with various camera configurations. Suitable for
-    large-scale outdoor 3D reconstruction.
+    large-scale outdoor 3D reconstruction. Hosted on Google Drive.
+    The ``scripts/download_mcd_session.sh`` helper follows the Drive
+    virus-scan confirm form so a session can be fetched without a
+    browser (IDs on https://mcdviral.github.io/Download.html).
   paper_url: "https://arxiv.org/abs/2403.11755"
   source_url: "https://mcdviral.github.io/"
   repository: "https://github.com/mcdviral/mcdviral.github.io"
-  download_method: manual
-  data_format: rosbag
+  download_method: drive_session_script
+  download_script: "scripts/download_mcd_session.sh"
+  example_session:
+    file_id: "1VmHgEj6GI0mPhLOA-gJo1UG8G9FrM26c"
+    label: "NTU session 17 (one of the smallest bags, ~0.6-2.1 GB)"
+  data_format: rosbag1
   sample_url: null
   url: "https://mcdviral.github.io/"
   type: outdoor_campus
