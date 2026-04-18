@@ -120,8 +120,8 @@
 
 ### 解決済み（2026-04 セッション）
 
-- ~~Blocker 1: MCD calibration / pose import~~ → bag6 で 2→180 registered、bag4 で 720 registered、**triple fusion (bag2 + bag4 + bag6) で 2760 registered**。`merge_lidar_frames_to_world` + `_mcd_gnss_sparse_import` + 3-camera extrinsics + colorize で完結。
-- ~~§16.2 デモが campus 共有バイナリ~~ → **triple-bag fusion** 由来の 80k gaussian `.splat` を本物の WebGL GS viewer (`/splat.html`) で配信中（9 cameras × 2760 frames, 1.34M Gaussians）。
+- ~~Blocker 1: MCD calibration / pose import~~ → bag6 で 2→180 registered、bag4 で 720 registered、**5-bag fusion (bag1 + bag2 + bag3 + bag4 + bag6) で 5040 registered**。`merge_lidar_frames_to_world` + `_mcd_gnss_sparse_import` + 3-camera extrinsics + colorize で完結。
+- ~~§16.2 デモが campus 共有バイナリ~~ → **5-bag fusion** 由来の 80k gaussian `.splat` を本物の WebGL GS viewer (`/splat.html`) で配信中（15 cameras × 5040 frames, 1.43M Gaussians）。
 - ~~「画面が灰色のもや」~~ → 画像由来 RGB による LiDAR 点群初期化 + per-image LiDAR depth supervision + per-image appearance embedding (scale, bias) で color std を 0.06 → 0.15–0.22 に、trajectory 沿いの 3D 構造を可視化。L1 loss も 0.32 → 0.20 と 38% 改善。
 - ~~densify bug~~ → `_densify_and_prune` の clone/split 順序を修正、30k–50k iter 学習が安定化。
 - ~~Multi-bag fusion~~ → `reference_origin` 共有 + `scripts/merge_mcd_sparse.py` で任意の N bag を 1 つの sparse に結合可能。
@@ -144,7 +144,7 @@
 
 - ~~画像由来 initial color~~ → `colorize_lidar_world_from_images` で完了
 - ~~depth supervision~~ → `_render_gsplat(want_depth=True)` + `configs/training_depth.yaml` で完了
-- ~~Multi-bag fusion~~ → `--mcd-reference-origin` / `--mcd-reference-bag` CLI + `scripts/merge_mcd_sparse.py` で実装完了。bag2+bag4+bag6 の triple fusion をライブデモに採用
+- ~~Multi-bag fusion~~ → `--mcd-reference-origin` / `--mcd-reference-bag` CLI + `scripts/merge_mcd_sparse.py` で実装完了。**5-bag fusion (bag1+2+3+4+6) をライブデモに採用**。1000 images 超で自動的に lazy image loading へ切り替わる
 - ~~appearance embedding~~ → per-image (scale, bias) の trainer 実装 + `configs/training_appearance.yaml` で完了
 
 ## 8. 具体的に触るファイル
@@ -237,7 +237,7 @@ ply_to_splat(
 
 ### 10.2 Outdoor GS Demo の中身（2026-04 セッション後）
 
-- `docs/assets/outdoor-demo/outdoor-demo.splat` は **bag4 multi-camera の実学習結果 80k gaussians**（932k Gaussians をフィルタ: `min_opacity ≥ 0.6`, `max_scale ≤ 2 m`, 世界スケール 500 m を 30 単位に正規化）。image-projected RGB 初期化 + per-image LiDAR depth supervision。
+- `docs/assets/outdoor-demo/outdoor-demo.splat` は **5-bag fusion (bag1+2+3+4+6) の実学習結果 80k gaussians**（1.43M Gaussians をフィルタ: `min_opacity ≥ 0.3`, `max_scale ≤ 2 m`, 世界スケール 500 m を 30 単位に正規化）。image-projected RGB 初期化 + per-image LiDAR depth supervision + per-image appearance embedding (scale, bias)。
 - `docs/assets/outdoor-demo/outdoor-demo.points.bin`（Three.js 用）は bag1 30k iter の密点群（244k → 60k subsample）。
 - 「campus-gallery は 1 枚の写真から合成した擬似点群」という事実は変わっていないので、**ギャラリー系と outdoor-demo の性質差は大きい**。ユーザに説明する際は注意。
 
