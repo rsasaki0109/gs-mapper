@@ -69,6 +69,9 @@
 
     statusEl.textContent = `loading ${splatUrl}…`;
     const splat = new SplatMesh({ url: splatUrl });
+    // Spark splats are Y-up in storage but THREE.js is Y-up with opposite Z;
+    // the README example uses quat(1, 0, 0, 0) to flip them right-side-up.
+    splat.quaternion.set(1, 0, 0, 0);
     splat.position.set(0, 0, 0);
     scene.add(splat);
 
