@@ -139,6 +139,23 @@ class GsplatTrainer:
         depth_loss_weight = float(self.config.get("depth_loss_weight", 0.0))
         use_depth_loss = depth_loss_weight > 0.0 and self._has_gsplat
 
+        appearance_enabled = bool(self.config.get("appearance_embedding", False))
+        appearance_lr = float(self.config.get("appearance_lr", 0.001))
+        appearance_reg = float(self.config.get("appearance_reg_weight", 0.01))
+        appearance_scale = None
+        appearance_bias = None
+        appearance_optimizer = None
+        if appearance_enabled:
+            # Per-image learnable (scale, bias) RGB affine -- absorbs exposure/white-balance
+            # differences between cameras and frames. Initialised at identity (scale=1, bias=0).
+            appearance_scale = torch.nn.Parameter(torch.ones(len(image_data), 3, device=device, dtype=torch.float32))
+            appearance_bias = torch.nn.Parameter(torch.zeros(len(image_data), 3, device=device, dtype=torch.float32))
+            appearance_optimizer = torch.optim.Adam([appearance_scale, appearance_bias], lr=appearance_lr)
+            print(
+                f"Appearance embedding enabled: per-image (scale, bias) Adam lr={appearance_lr}, "
+                f"reg_weight={appearance_reg}"
+            )
+
         for iteration in range(1, num_iterations + 1):
             # Pick a random training view
             idx = np.random.randint(len(image_data))
@@ -155,15 +172,27 @@ class GsplatTrainer:
                 rendered = self._render(gaussians, viewmat, K, H, W, device)
                 rendered_depth = None
 
+            if appearance_enabled and appearance_scale is not None:
+                # Apply per-image affine: rendered * scale + bias -> compare to gt
+                s = appearance_scale[idx].view(1, 1, 3)
+                b = appearance_bias[idx].view(1, 1, 3)
+                rendered_eff = torch.clamp(rendered * s + b, 0.0, 1.0)
+            else:
+                rendered_eff = rendered
+
             # Compute loss: L1 + lambda * (1 - SSIM) [+ depth L1 where LiDAR sees]
-            l1_loss = torch.abs(rendered - gt_image).mean()
-            ssim_loss = 1.0 - self._simple_ssim(rendered, gt_image)
+            l1_loss = torch.abs(rendered_eff - gt_image).mean()
+            ssim_loss = 1.0 - self._simple_ssim(rendered_eff, gt_image)
             loss = (1.0 - lambda_dssim) * l1_loss + lambda_dssim * ssim_loss
             if rendered_depth is not None:
                 valid = gt_depth > 0
                 if valid.any():
                     depth_l1 = torch.abs(rendered_depth[valid] - gt_depth[valid]).mean()
                     loss = loss + depth_loss_weight * depth_l1
+            if appearance_enabled and appearance_scale is not None:
+                # Regularise (scale, bias) away from drifting: penalise scale != 1, bias != 0.
+                reg = ((appearance_scale[idx] - 1.0) ** 2).mean() + (appearance_bias[idx] ** 2).mean()
+                loss = loss + appearance_reg * reg
 
             # Backprop
             loss.backward()
@@ -191,6 +220,9 @@ class GsplatTrainer:
                 for opt in optimizers.values():
                     opt.step()
                     opt.zero_grad()
+                if appearance_optimizer is not None:
+                    appearance_optimizer.step()
+                    appearance_optimizer.zero_grad()
 
                 # Update learning rate for position
                 self._update_lr(optimizers["position"], iteration, num_iterations)
