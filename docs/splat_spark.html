@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>GS Mapper — Spark (WebGL2) Gaussian Splat Viewer</title>
+<style>
+  body { margin: 0; background: #0d1117; color: #e6edf3; font-family: system-ui, sans-serif; overflow: hidden; }
+  #info {
+    position: absolute; top: 0; left: 0; right: 0; padding: 10px 14px;
+    z-index: 10; background: rgba(13, 17, 23, 0.7); font-size: 13px; line-height: 1.4;
+  }
+  #info h3 { margin: 0 0 6px 0; font-size: 16px; }
+  #info small { color: #8b949e; }
+  #info a { color: #58a6ff; }
+  #canvas-host { position: absolute; inset: 0; }
+  #status { position: absolute; bottom: 10px; right: 14px; font-size: 12px; color: #8b949e; z-index: 10; }
+</style>
+</head>
+<body>
+  <div id="info">
+    <h3>GS Mapper — Spark renderer (advanced WebGL2 Gaussian Splatting)</h3>
+    <small>
+      Loads the same <code>assets/outdoor-demo/outdoor-demo.splat</code> used by the
+      <a href="splat.html">antimatter15/splat viewer</a> but through
+      <a href="https://github.com/sparkjsdev/spark">sparkjsdev/spark</a> (MIT, THREE.js-based
+      renderer with GPU-side sort + LoD). Override with <code>?url=&lt;splat-path&gt;</code>.
+      <a href="./">← back to the Three.js point viewer</a>.
+    </small>
+  </div>
+  <div id="canvas-host"></div>
+  <div id="status">initializing…</div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.178.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.178.0/examples/jsm/",
+      "@sparkjsdev/spark": "https://cdn.jsdelivr.net/npm/@sparkjsdev/spark@2.0.0/dist/spark.module.min.js"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { SplatMesh } from "@sparkjsdev/spark";
+
+    const statusEl = document.getElementById("status");
+    const hostEl = document.getElementById("canvas-host");
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0d1117);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+    camera.position.set(40, 20, 40);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: false });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    hostEl.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.target.set(0, 0, 0);
+    controls.update();
+
+    const params = new URLSearchParams(location.search);
+    const splatUrl = params.get("url") || "assets/outdoor-demo/outdoor-demo.splat";
+
+    statusEl.textContent = `loading ${splatUrl}…`;
+    const splat = new SplatMesh({ url: splatUrl });
+    splat.position.set(0, 0, 0);
+    scene.add(splat);
+
+    if (splat.initialized && typeof splat.initialized.then === "function") {
+      splat.initialized
+        .then(() => {
+          statusEl.textContent = `loaded ${splatUrl}`;
+        })
+        .catch((err) => {
+          statusEl.textContent = `load error: ${err && err.message ? err.message : err}`;
+          console.error(err);
+        });
+    } else {
+      statusEl.textContent = `loaded (no init promise) ${splatUrl}`;
+    }
+
+    window.addEventListener("resize", () => {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+    });
+
+    renderer.setAnimationLoop(function animate() {
+      controls.update();
+      renderer.render(scene, camera);
+    });
+  </script>
+</body>
+</html>
