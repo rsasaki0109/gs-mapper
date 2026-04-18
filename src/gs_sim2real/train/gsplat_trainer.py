@@ -504,7 +504,11 @@ class GsplatTrainer:
             img_np = np.array(img, dtype=np.float32) / 255.0
             img_tensor_cpu = torch.from_numpy(img_np)
             if lazy_images:
-                img_tensor = img_tensor_cpu.pin_memory() if torch.cuda.is_available() else img_tensor_cpu
+                # Skip pin_memory() for very large datasets: it doubles host RAM use
+                # (pinned page-locked pages stay resident) and can cause CUDA OOM
+                # when combined with training tensors. Regular CPU tensor + per-iter
+                # .to(device) is plenty fast for our scale.
+                img_tensor = img_tensor_cpu
             else:
                 img_tensor = img_tensor_cpu.to(device)
 
@@ -532,7 +536,7 @@ class GsplatTrainer:
                 if depth_np.shape[:2] == (H, W):
                     depth_cpu = torch.from_numpy(depth_np)
                     if lazy_images:
-                        entry["depth"] = depth_cpu.pin_memory() if torch.cuda.is_available() else depth_cpu
+                        entry["depth"] = depth_cpu
                     else:
                         entry["depth"] = depth_cpu.to(device)
             image_data.append(entry)
