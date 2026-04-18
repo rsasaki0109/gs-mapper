@@ -98,6 +98,12 @@
 
 `scripts/download_mcd_session.sh` で 633 MB rosbag1 (NTU #17) を取得できるようになった（Drive 確認フォーム自動突破）。ただしこのセッションは handheld D455 ステレオ + IMU のみで **GNSS / /tf_static は含まれない**。150 frame サブサンプルで image-only COLMAP を走らせても Autoware bag6 と同じ「2 registered images / 36 points」症状で詰まる。gsplat 側は 5295 gauss まで学習するが点群が貧弱で demo 品質に達しない。MCD を本格的に使うなら: (a) SLAM 済みポーズを外部で流し込む、(b) もっと画像間重複が多いセッションを選ぶ、(c) DUSt3R pose-free 経路に切り替える、のいずれか。
 
+### 4.3.1 DUSt3R pose-free 経路は本実装済み（PR #55）、ただし NTU #17 では退化
+
+`src/gs_sim2real/preprocess/pose_free.py` の `_run_dust3r` は以前 stub → simple fallback にフォールスルーしていたが、PR #55 で本実装に差し替えた（`run_dust3r_inference` + `write_colmap_sparse`、`scripts/run_dust3r.py` は CLI ラッパ）。DUSt3R の pairwise pointmap + `PointCloudOptimizer` の MST-seeded global align を 300 iter 回し、per-image PINHOLE `cameras.txt` / c2w→w2c の `images.txt` / confidence-filtered `points3D.txt` を gsplat trainer が読める形で吐く。16 GB 級 GPU では inference 後に model weights を GPU から解放しないと aligner の stacked-pred tensor で OOM するので `del model` + `empty_cache()` を明示挿入。
+
+NTU #17 にそのまま適用した場合、多くのフレームが translation ≈ 0 に退化する（image-only COLMAP と同じ parallax 不足症状）。代替として Autoware bag6 cam0 の 20 frame で回したところ 19/20 が非退化 trajectory を復元し、gsplat 3000 iter で 5.57M gauss まで収束。そこから antimatter15 splat format に 400k × 32 B = 12.8 MB で焼いた成果物が `docs/assets/outdoor-demo/outdoor-demo-dust3r.splat` で、`splat.html?url=...` 経由で GNSS+LiDAR supervised demo とトグル比較できる。GNSS も LiDAR も無しで image だけから出ている点が売り（L1 ≈ 0.15、supervised 版の 0.06〜0.08 には届かないが、ポーズなし構築の比較基準として bundled）。
+
 ### 4.4 densification は 100k 級初期点でも Stable に走るよう修正済み
 
 以前は iter 500 以降の densify で `IndexError: mask [N] != tensor [N+num_clone]` が即発生していた。本セッションの修正で bag1 30k iter → 244k Gaussians まで完走。

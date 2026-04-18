@@ -3,7 +3,7 @@
   "type": "web-scene-manifest",
   "sceneId": "outdoor-demo",
   "label": "Outdoor GS Demo",
-  "description": "Autoware Leo Drive ISUZU bag (public real data). COLMAP sparse + gsplat 30k iter with densification. 244k Gaussians (subsampled to 60k for Pages). Renders as splat centers in a point viewer \u2014 higher density makes driving geometry more recognizable.",
+  "description": "Autoware Leo Drive ISUZU bag1+bag2+bag3+bag4+bag5+bag6 fused in a shared ENU frame (GNSS + /tf_static pose-import, image-projected RGB init). gsplat 30k iter with LiDAR depth supervision, per-image appearance embedding, and joint 6-DOF pose refinement. 1.48M gaussians filtered to 60k gaussian centres for this Three.js point viewer; see splat.html for the 80k-gaussian splat render and splat.html?url=assets/outdoor-demo/outdoor-demo-dust3r.splat for a pose-free DUSt3R variant.",
   "asset": {
     "href": "outdoor-demo.points.bin",
     "format": "binary"
