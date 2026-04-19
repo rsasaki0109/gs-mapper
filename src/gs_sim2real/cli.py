@@ -232,9 +232,10 @@ def build_parser() -> argparse.ArgumentParser:
     ex.add_argument("--model", required=True, help="Path to the .ply file")
     ex.add_argument(
         "--format",
-        choices=["json", "binary", "scene-bundle"],
+        choices=["json", "binary", "scene-bundle", "splat"],
         default="json",
-        help="Output format (default: json)",
+        help="Output format (default: json). 'splat' writes the antimatter15/splat 32-byte-per-gauss "
+        "binary that docs/splat.html renders directly.",
     )
     ex.add_argument("--output", required=True, help="Output file path")
     ex.add_argument("--max-points", type=int, default=100000, help="Max points to export (default: 100000)")
@@ -247,6 +248,64 @@ def build_parser() -> argparse.ArgumentParser:
     ex.add_argument("--scene-id", default=None, help="Optional scene id for --format scene-bundle")
     ex.add_argument("--label", default=None, help="Optional scene label for --format scene-bundle")
     ex.add_argument("--description", default="", help="Optional scene description for --format scene-bundle")
+    ex.add_argument(
+        "--splat-normalize-extent",
+        type=float,
+        default=None,
+        help="For --format splat: rescale the scene so its max-axis extent equals this value (meters). "
+        "17.0 matches docs/splat.html's default camera. Leave unset to keep original world scale.",
+    )
+    ex.add_argument(
+        "--splat-min-opacity",
+        type=float,
+        default=0.0,
+        help="For --format splat: drop gaussians below this sigmoid(opacity) threshold (default: 0, no filter).",
+    )
+    ex.add_argument(
+        "--splat-max-scale",
+        type=float,
+        default=None,
+        help="For --format splat: drop gaussians whose max exp(log_scale) exceeds this (meters).",
+    )
+
+    # photos-to-splat (one-shot: image dir -> DUSt3R -> gsplat -> .splat)
+    p2s = subparsers.add_parser(
+        "photos-to-splat",
+        help="One-shot: a folder of JPG/PNG -> DUSt3R pose-free -> gsplat train -> .splat file",
+    )
+    p2s.add_argument("--images", required=True, help="Directory of input images (jpg/png)")
+    p2s.add_argument(
+        "--output", default="outputs/photos_splat", help="Root output directory (default: outputs/photos_splat)"
+    )
+    p2s.add_argument(
+        "--preprocess",
+        choices=["dust3r", "simple"],
+        default="dust3r",
+        help="Pose-estimation backend. 'simple' is a non-metric circular fallback for smoke tests.",
+    )
+    p2s.add_argument(
+        "--num-frames", type=int, default=20, help="DUSt3R frame cap (0 = all). Default 20 fits a 16 GB GPU."
+    )
+    p2s.add_argument("--scene-graph", default="complete", help="DUSt3R pair graph (complete / swin-N / oneref-K)")
+    p2s.add_argument("--dust3r-checkpoint", default=None, help="DUSt3R checkpoint .pth path")
+    p2s.add_argument(
+        "--dust3r-root", default=None, help="Local clone of naver/dust3r (default: DUST3R_PATH env or /tmp/dust3r)"
+    )
+    p2s.add_argument("--align-iters", type=int, default=300, help="DUSt3R global alignment iterations")
+    p2s.add_argument("--iterations", type=int, default=3000, help="gsplat training iterations")
+    p2s.add_argument("--config", default=None, help="Training config YAML override")
+    p2s.add_argument(
+        "--splat-max-points", type=int, default=400000, help="Max gaussians in .splat output (default: 400k)"
+    )
+    p2s.add_argument(
+        "--splat-normalize-extent",
+        type=float,
+        default=17.0,
+        help="Rescale so the scene max-axis extent matches this (matches docs/splat.html defaults).",
+    )
+    p2s.add_argument("--splat-min-opacity", type=float, default=0.02, help="Drop gaussians below this opacity")
+    p2s.add_argument("--splat-max-scale", type=float, default=2.0, help="Drop gaussians above this scale (meters)")
+    p2s.add_argument("--skip-data-check", action="store_true", help="Skip COLMAP sparse preflight before training")
 
     # benchmark
     bm = subparsers.add_parser("benchmark", help="Benchmark training backends")
@@ -1500,6 +1559,17 @@ def cmd_export(args: argparse.Namespace) -> None:
         from gs_sim2real.viewer.web_export import ply_to_binary
 
         result = ply_to_binary(args.model, args.output, max_points=args.max_points)
+    elif args.format == "splat":
+        from gs_sim2real.viewer.web_export import ply_to_splat
+
+        result = ply_to_splat(
+            args.model,
+            args.output,
+            max_points=args.max_points,
+            normalize_target_extent=args.splat_normalize_extent,
+            min_opacity=args.splat_min_opacity,
+            max_scale=args.splat_max_scale,
+        )
     else:
         from gs_sim2real.viewer.web_export import ply_to_scene_bundle
 
@@ -1514,6 +1584,76 @@ def cmd_export(args: argparse.Namespace) -> None:
         )
 
     print(f"Exported to: {result}")
+
+
+def cmd_photos_to_splat(args: argparse.Namespace) -> None:
+    """Handle the photos-to-splat subcommand.
+
+    One-shot pipeline: image directory -> pose-free sparse (DUSt3R by default)
+    -> gsplat training -> antimatter15 .splat binary written to ``<output>/<name>.splat``.
+    The .splat can be dropped into ``docs/assets/...`` or served through the
+    Pages ``splat.html?url=...`` URL directly.
+    """
+    from gs_sim2real.preprocess.pose_free import PoseFreeProcessor
+    from gs_sim2real.train.gsplat_trainer import train_gsplat
+    from gs_sim2real.viewer.web_export import ply_to_splat
+
+    images_dir = Path(args.images)
+    if not images_dir.is_dir():
+        print(f"Error: --images must be a directory (got {images_dir})")
+        sys.exit(2)
+
+    output_dir = Path(args.output)
+    sparse_dir = output_dir / "sparse_input"
+    train_dir = output_dir / "train"
+    splat_path = output_dir / f"{images_dir.name}.splat"
+
+    print("=" * 60)
+    print(f"Step 1/3: Pose-free preprocess ({args.preprocess})")
+    print("=" * 60)
+    processor_kwargs: dict = {
+        "method": args.preprocess,
+        "num_frames": args.num_frames,
+        "scene_graph": args.scene_graph,
+        "align_iters": args.align_iters,
+    }
+    if args.dust3r_checkpoint:
+        processor_kwargs["checkpoint"] = Path(args.dust3r_checkpoint)
+    if args.dust3r_root:
+        processor_kwargs["dust3r_root"] = Path(args.dust3r_root)
+    processor = PoseFreeProcessor(**processor_kwargs)
+    processor.estimate_poses(images_dir, sparse_dir)
+
+    print("\n" + "=" * 60)
+    print(f"Step 2/3: gsplat training ({args.iterations} iterations)")
+    print("=" * 60)
+    config = None
+    if args.config:
+        from gs_sim2real.common.config import load_config
+
+        config = load_config(args.config)
+    _preflight_gsplat_train_data(sparse_dir, getattr(args, "skip_data_check", False))
+    ply_path = train_gsplat(
+        data_dir=sparse_dir,
+        output_dir=train_dir,
+        config=config,
+        num_iterations=args.iterations,
+    )
+
+    print("\n" + "=" * 60)
+    print("Step 3/3: Exporting to antimatter15 .splat format")
+    print("=" * 60)
+    splat_path.parent.mkdir(parents=True, exist_ok=True)
+    ply_to_splat(
+        ply_path,
+        splat_path,
+        max_points=args.splat_max_points,
+        normalize_target_extent=args.splat_normalize_extent,
+        min_opacity=args.splat_min_opacity,
+        max_scale=args.splat_max_scale,
+    )
+    print(f"\nDone. Open locally: docs/splat.html?url={splat_path}")
+    print(f"Splat file: {splat_path}")
 
 
 def cmd_benchmark(args: argparse.Namespace) -> None:
@@ -2447,6 +2587,7 @@ def main(argv: list[str] | None = None) -> None:
         "train": cmd_train,
         "view": cmd_view,
         "export": cmd_export,
+        "photos-to-splat": cmd_photos_to_splat,
         "benchmark": cmd_benchmark,
         "run": cmd_run,
         "demo": cmd_demo,

@@ -299,6 +299,82 @@ class TestCLIHelp:
         assert args.pose_source == "query"
         assert args.query_transport == "auto"
 
+    def test_cli_export_splat_flags(self) -> None:
+        """export parser accepts the antimatter15 .splat format flags."""
+        args = build_parser().parse_args(
+            [
+                "export",
+                "--model",
+                "scene.ply",
+                "--format",
+                "splat",
+                "--output",
+                "scene.splat",
+                "--max-points",
+                "400000",
+                "--splat-normalize-extent",
+                "17.0",
+                "--splat-min-opacity",
+                "0.02",
+                "--splat-max-scale",
+                "2.0",
+            ]
+        )
+        assert args.format == "splat"
+        assert args.splat_normalize_extent == 17.0
+        assert args.splat_min_opacity == 0.02
+        assert args.splat_max_scale == 2.0
+
+    def test_cli_photos_to_splat_defaults(self) -> None:
+        """photos-to-splat parser accepts the minimal form and has sane defaults."""
+        args = build_parser().parse_args(["photos-to-splat", "--images", "photos/"])
+        assert args.command == "photos-to-splat"
+        assert args.preprocess == "dust3r"
+        assert args.num_frames == 20
+        assert args.scene_graph == "complete"
+        assert args.iterations == 3000
+        assert args.splat_max_points == 400000
+        assert args.splat_normalize_extent == 17.0
+        assert args.splat_min_opacity == 0.02
+        assert args.splat_max_scale == 2.0
+
+    def test_cli_photos_to_splat_overrides(self) -> None:
+        """photos-to-splat accepts explicit DUSt3R / training overrides."""
+        args = build_parser().parse_args(
+            [
+                "photos-to-splat",
+                "--images",
+                "my_photos/",
+                "--output",
+                "outputs/my_splat",
+                "--preprocess",
+                "simple",
+                "--num-frames",
+                "12",
+                "--scene-graph",
+                "swin-5",
+                "--align-iters",
+                "500",
+                "--iterations",
+                "5000",
+                "--splat-max-points",
+                "200000",
+                "--splat-normalize-extent",
+                "30.0",
+                "--skip-data-check",
+            ]
+        )
+        assert args.images == "my_photos/"
+        assert args.output == "outputs/my_splat"
+        assert args.preprocess == "simple"
+        assert args.num_frames == 12
+        assert args.scene_graph == "swin-5"
+        assert args.align_iters == 500
+        assert args.iterations == 5000
+        assert args.splat_max_points == 200000
+        assert args.splat_normalize_extent == 30.0
+        assert args.skip_data_check is True
+
     def test_cli_export_scene_bundle_flags(self) -> None:
         """export parser accepts GitHub Pages scene bundle settings."""
         args = build_parser().parse_args(

@@ -114,6 +114,47 @@ ply_to_splat(
 
 Open `https://<pages>/splat.html?url=assets/my-scene/my-scene.splat` after deploy.
 
+## Bring Your Own Photos (one-shot, pose-free)
+
+Drop a folder of JPG/PNG frames in, get a `.splat` out. Uses DUSt3R for
+pose estimation (no COLMAP / GNSS / LiDAR required) and gsplat for
+training. The resulting file is the same 32-byte-per-gauss format that
+[`docs/splat.html`](https://rsasaki0109.github.io/gs-mapper/splat.html)
+renders directly, so you can preview it locally or drop it into
+`docs/assets/...` to ship as a Pages demo.
+
+```bash
+# Ensure a local DUSt3R clone is reachable (default /tmp/dust3r)
+git clone --recursive https://github.com/naver/dust3r /tmp/dust3r
+cd /tmp/dust3r && mkdir -p checkpoints && \
+  wget -P checkpoints https://download.europe.naverlabs.com/ComputerVision/DUSt3R/DUSt3R_ViTLarge_BaseDecoder_512_dpt.pth
+cd -
+
+# One-shot: photos -> .splat (DUSt3R + gsplat + export all in one)
+gs-mapper photos-to-splat \
+    --images ./my_photos \
+    --output outputs/my_photos_splat \
+    --num-frames 20 \
+    --iterations 3000
+# writes outputs/my_photos_splat/my_photos.splat
+```
+
+Or if you already have a trained PLY and just need the splat format:
+
+```bash
+gs-mapper export \
+    --model outputs/my_train/point_cloud.ply \
+    --format splat \
+    --output outputs/my_scene.splat \
+    --max-points 400000 \
+    --splat-normalize-extent 17.0 \
+    --splat-min-opacity 0.02 \
+    --splat-max-scale 2.0
+```
+
+Preview locally with `python -m http.server` from the repo root and open
+`http://localhost:8000/docs/splat.html?url=<path-to-splat>`.
+
 ## Outdoor pipeline quickstart (Autoware Leo Drive)
 
 Download a public bag, preprocess with pose-import + image-projected RGB + LiDAR depth maps, train with depth supervision:
