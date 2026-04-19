@@ -25,7 +25,7 @@ Every viewer defaults to `assets/outdoor-demo/outdoor-demo.splat` (5-bag or 6-ba
 
 The bundle was trained with the full MCD pose-import stack: GNSS + `/tf_static` + LiDAR-seeded COLMAP sparse, image-projected RGB init, gsplat 30k-50k iter with LiDAR depth supervision, per-image appearance embedding (scale + bias), and per-view 6-DOF joint pose refinement (BA).
 
-A **pose-free DUSt3R variant** is also bundled at `assets/outdoor-demo/outdoor-demo-dust3r.splat` (400k gaussians, 12.8 MB) — reconstructed from 20 image-only frames of bag6 cam0 with no GNSS/LiDAR/COLMAP (see `scripts/run_dust3r.py`). Toggle it with [`splat.html?url=assets/outdoor-demo/outdoor-demo-dust3r.splat`](https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/outdoor-demo-dust3r.splat).
+A **pose-free DUSt3R variant** is also bundled at `assets/outdoor-demo/outdoor-demo-dust3r.splat` (400k gaussians, 12.8 MB) — reconstructed from 20 image-only frames of bag6 cam0 with no GNSS/LiDAR/COLMAP (see `scripts/run_dust3r.py`). A newer **MAST3R variant** (metric-aware descendant of DUSt3R) sits next to it at `assets/outdoor-demo/bag6-mast3r.splat`. Toggle either from the scene dropdown on [`splat.html`](https://rsasaki0109.github.io/gs-mapper/splat.html), or pass `?url=...splat` directly.
 
 GitHub Pages is deployed by [`.github/workflows/pages.yml`](.github/workflows/pages.yml) on `push` to `main`.
 

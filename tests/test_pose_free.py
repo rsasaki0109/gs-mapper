@@ -183,6 +183,24 @@ class TestPoseFreeProcessor:
         # Should still produce valid output via fallback
         assert (Path(sparse_path) / "cameras.txt").exists()
 
+    def test_mast3r_falls_back_to_simple(self, tmp_path: Path) -> None:
+        """MAST3R method falls back to simple init when the clone is missing."""
+        from gs_sim2real.preprocess.pose_free import PoseFreeProcessor
+
+        image_dir = tmp_path / "images"
+        _create_test_images(image_dir, num_images=3)
+
+        output_dir = tmp_path / "output"
+        processor = PoseFreeProcessor(
+            method="mast3r",
+            mast3r_root=tmp_path / "no_such_mast3r",
+            checkpoint=tmp_path / "no_such.pth",
+        )
+        sparse_path = processor.estimate_poses(str(image_dir), str(output_dir))
+
+        # Should still produce valid output via fallback
+        assert (Path(sparse_path) / "cameras.txt").exists()
+
 
 def _create_color_images(image_dir: Path, num_images: int, size: tuple[int, int] = (32, 24)) -> list[Path]:
     image_dir.mkdir(parents=True, exist_ok=True)

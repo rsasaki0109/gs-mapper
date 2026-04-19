@@ -1,15 +1,21 @@
 """Pose-free preprocessing for 3D Gaussian Splatting.
 
-Currently the real implementation covers DUSt3R (pairwise pointmap prediction +
-global alignment) and writes a COLMAP-text sparse model compatible with the
-gsplat trainer. The "simple" fallback remains for unit tests and as a sanity
-check when DUSt3R is not available — it arranges cameras in a circle so the
-trainer has something to chew on, but the result is not meaningful.
+Two real backends ship here: DUSt3R (pairwise pointmap prediction + global
+alignment) and MAST3R (metric-aware descendant of DUSt3R; sparse global
+alignment). Both write a COLMAP-text sparse model compatible with the gsplat
+trainer. The "simple" fallback remains for unit tests / sanity checks when
+neither clone is available — it arranges cameras in a circle so the trainer
+has something to chew on, but the result is not meaningful.
 
 The DUSt3R path expects a local clone of ``naver/dust3r`` reachable from
 ``DUST3R_PATH`` (default ``/tmp/dust3r``), plus its ``croco`` submodule and a
 checkpoint file (``DUSt3R_ViTLarge_BaseDecoder_512_dpt.pth`` is the official
-recommendation). The pipeline is:
+recommendation). The MAST3R path similarly expects a local clone of
+``naver/mast3r`` reachable from ``MAST3R_PATH`` (default ``/tmp/mast3r``),
+with its ``dust3r`` + ``croco`` submodules and the
+``MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth`` checkpoint.
+
+DUSt3R pipeline:
 
 1. ``load_images`` into DUSt3R's 512-long-side tensors.
 2. ``make_pairs`` with the requested scene-graph (``complete`` for small
@@ -20,6 +26,12 @@ recommendation). The pipeline is:
 5. Write ``cameras.txt`` / ``images.txt`` / ``points3D.txt`` with per-image
    PINHOLE cameras, per-image c2w→w2c conversion, and a confidence-filtered
    subsample of the fused point cloud.
+
+MAST3R pipeline mirrors steps 1–2 then swaps 3–4 for
+``sparse_global_alignment`` which runs feature matching + a two-stage
+optimizer and returns metric-scale poses, focals, and sparse points via the
+``SparseGA`` container. Step 5 reuses the same ``write_colmap_sparse``
+writer so downstream gsplat/exporter code does not care which backend ran.
 """
 
 from __future__ import annotations
@@ -38,6 +50,8 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_DUST3R_ROOT = Path(os.environ.get("DUST3R_PATH", "/tmp/dust3r"))
 _DEFAULT_CHECKPOINT_NAME = "DUSt3R_ViTLarge_BaseDecoder_512_dpt.pth"
+_DEFAULT_MAST3R_ROOT = Path(os.environ.get("MAST3R_PATH", "/tmp/mast3r"))
+_DEFAULT_MAST3R_CHECKPOINT_NAME = "MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth"
 
 
 def _add_dust3r_to_path(dust3r_root: Path) -> None:
@@ -49,6 +63,20 @@ def _add_dust3r_to_path(dust3r_root: Path) -> None:
             "and set DUST3R_PATH to point at it."
         )
     for sub in (dust3r_root, dust3r_root / "croco"):
+        sub_str = str(sub)
+        if sub_str not in sys.path:
+            sys.path.insert(0, sub_str)
+
+
+def _add_mast3r_to_path(mast3r_root: Path) -> None:
+    """Make the local mast3r clone importable (mast3r ships dust3r + croco as submodules)."""
+    if not mast3r_root.exists():
+        raise FileNotFoundError(
+            f"MAST3R clone not found at {mast3r_root}. "
+            "Clone https://github.com/naver/mast3r (with its dust3r + croco submodules) "
+            "and set MAST3R_PATH to point at it."
+        )
+    for sub in (mast3r_root, mast3r_root / "dust3r", mast3r_root / "dust3r" / "croco"):
         sub_str = str(sub)
         if sub_str not in sys.path:
             sys.path.insert(0, sub_str)
@@ -169,6 +197,85 @@ def run_dust3r_inference(
     return poses, focals, filtered_pts, filtered_rgb, imshapes
 
 
+def run_mast3r_inference(
+    image_paths: Sequence[Path],
+    checkpoint: Path,
+    *,
+    image_size: int = 512,
+    device: str = "cuda",
+    cache_dir: Path | None = None,
+    scene_graph: str = "complete",
+    subsample: int = 8,
+    mast3r_root: Path = _DEFAULT_MAST3R_ROOT,
+) -> tuple[np.ndarray, np.ndarray, list[np.ndarray], list[np.ndarray], list[tuple[int, int]]]:
+    """Run MAST3R sparse global alignment.
+
+    Shape matches ``run_dust3r_inference`` so ``write_colmap_sparse`` accepts
+    the output directly. MAST3R returns per-view focal / pts3d / rgb from
+    ``SparseGA``; we rescale focals back to match the DUSt3R working-resolution
+    contract (the caller scales them up to the original image size on disk).
+
+    Returns:
+        poses: (N, 4, 4) camera-to-world matrices.
+        focals: (N, 1) per-image focal lengths at MAST3R's working resolution.
+        pts3d_per_view: list of (Ni, 3) sparse points per view (no confidence filter).
+        rgb_per_view: list of (Ni, 3) 0..1 RGB per view, aligned to pts3d.
+        mast3r_shapes: list of (H, W) MAST3R working resolutions per view.
+    """
+    _add_mast3r_to_path(mast3r_root)
+
+    import torch  # noqa: PLC0415
+    from dust3r.image_pairs import make_pairs  # noqa: PLC0415
+    from dust3r.utils.image import load_images  # noqa: PLC0415
+    from mast3r.cloud_opt.sparse_ga import sparse_global_alignment  # noqa: PLC0415
+    from mast3r.model import AsymmetricMASt3R  # noqa: PLC0415
+
+    try:
+        import argparse as _argparse  # noqa: PLC0415
+
+        torch.serialization.add_safe_globals([_argparse.Namespace])
+    except Exception:  # pragma: no cover - older torch
+        pass
+
+    logger.info("loading MAST3R from %s", checkpoint)
+    model = AsymmetricMASt3R.from_pretrained(str(checkpoint)).to(device)
+    model.eval()
+
+    logger.info("loading %d images at size=%d", len(image_paths), image_size)
+    views = load_images([str(p) for p in image_paths], size=image_size, verbose=False)
+    # Overwrite MAST3R-expected instance string with the actual path (sparse_global_alignment
+    # indexes pairs by `img_path` identity).
+    for view, path in zip(views, image_paths, strict=True):
+        view["instance"] = str(path)
+
+    pairs = make_pairs(views, scene_graph=scene_graph, prefilter=None, symmetrize=True)
+    logger.info("running MAST3R sparse GA on %d pairs (scene_graph=%s)", len(pairs), scene_graph)
+
+    if cache_dir is None:
+        cache_dir = Path(os.environ.get("TMPDIR", "/tmp")) / "mast3r_cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    sga = sparse_global_alignment(
+        [str(p) for p in image_paths],
+        pairs,
+        str(cache_dir),
+        model,
+        device=device,
+        subsample=subsample,
+    )
+
+    poses = sga.get_im_poses().detach().cpu().numpy()
+    # MAST3R's intrinsics are 3x3 matrices at the working resolution.
+    focals = np.array([float(K[0, 0].detach().cpu()) for K in sga.intrinsics], dtype=np.float32).reshape(-1, 1)
+    pts3d = [p.detach().cpu().numpy() for p in sga.get_sparse_pts3d()]
+    colors = []
+    for c in sga.get_pts3d_colors():
+        colors.append(c.detach().cpu().numpy() if hasattr(c, "detach") else np.asarray(c))
+    # MAST3R `imgs` are rendered as HxWx3 ndarrays already.
+    mast3r_shapes = [tuple(im.shape[:2]) for im in sga.imgs]
+    return poses, focals, pts3d, colors, mast3r_shapes
+
+
 def write_colmap_sparse(
     output_dir: Path,
     image_paths: Sequence[Path],
@@ -273,6 +380,8 @@ class PoseFreeProcessor:
         *,
         checkpoint: Path | None = None,
         dust3r_root: Path | None = None,
+        mast3r_root: Path | None = None,
+        mast3r_cache: Path | None = None,
         num_frames: int = 30,
         image_size: int = 512,
         device: str = "cuda",
@@ -280,13 +389,19 @@ class PoseFreeProcessor:
         align_lr: float = 0.01,
         align_schedule: str = "cosine",
         scene_graph: str = "complete",
+        mast3r_subsample: int = 8,
         max_points: int = 100000,
     ):
         self.method = method
         self.dust3r_root = Path(dust3r_root) if dust3r_root else _DEFAULT_DUST3R_ROOT
-        self.checkpoint = (
-            Path(checkpoint) if checkpoint else self.dust3r_root / "checkpoints" / _DEFAULT_CHECKPOINT_NAME
-        )
+        self.mast3r_root = Path(mast3r_root) if mast3r_root else _DEFAULT_MAST3R_ROOT
+        self.mast3r_cache = Path(mast3r_cache) if mast3r_cache else None
+        if checkpoint:
+            self.checkpoint = Path(checkpoint)
+        elif method == "mast3r":
+            self.checkpoint = self.mast3r_root / "checkpoints" / _DEFAULT_MAST3R_CHECKPOINT_NAME
+        else:
+            self.checkpoint = self.dust3r_root / "checkpoints" / _DEFAULT_CHECKPOINT_NAME
         self.num_frames = num_frames
         self.image_size = image_size
         self.device = device
@@ -294,6 +409,7 @@ class PoseFreeProcessor:
         self.align_lr = align_lr
         self.align_schedule = align_schedule
         self.scene_graph = scene_graph
+        self.mast3r_subsample = mast3r_subsample
         self.max_points = max_points
 
     def estimate_poses(self, image_dir: str | Path, output_dir: str | Path) -> str:
@@ -310,9 +426,48 @@ class PoseFreeProcessor:
 
         if self.method in ("dust3r", "pose-free"):
             return self._run_dust3r(images, output_dir)
+        if self.method == "mast3r":
+            return self._run_mast3r(images, output_dir)
         if self.method == "simple":
             return self._run_simple_init(images, output_dir)
         raise ValueError(f"Unknown pose-free method: {self.method}")
+
+    def _run_mast3r(self, images: list[Path], output_dir: Path) -> str:
+        try:
+            selected = _select_frames(images, self.num_frames)
+            logger.info("MAST3R using %d / %d images", len(selected), len(images))
+            cache_dir = self.mast3r_cache or (output_dir / "mast3r_cache")
+            poses, focals, pts3d_per_view, rgb_per_view, imshapes = run_mast3r_inference(
+                selected,
+                checkpoint=self.checkpoint,
+                image_size=self.image_size,
+                device=self.device,
+                cache_dir=cache_dir,
+                scene_graph=self.scene_graph,
+                subsample=self.mast3r_subsample,
+                mast3r_root=self.mast3r_root,
+            )
+            np.save(output_dir / "poses.npy", poses)
+            np.save(output_dir / "focals.npy", focals)
+            flat_pts = np.concatenate([p.reshape(-1, 3) for p in pts3d_per_view], axis=0)
+            np.save(output_dir / "pts3d.npy", flat_pts)
+            sparse_dir = write_colmap_sparse(
+                output_dir,
+                image_paths=selected,
+                poses=poses,
+                focals=focals,
+                pts3d_per_view=pts3d_per_view,
+                rgb_per_view=rgb_per_view,
+                dust3r_shapes=imshapes,
+                max_points=self.max_points,
+            )
+            return str(sparse_dir)
+        except (ImportError, FileNotFoundError) as exc:
+            logger.warning(
+                "MAST3R not available (%s). Falling back to simple circular initialization.",
+                exc,
+            )
+            return self._run_simple_init(images, output_dir)
 
     def _run_dust3r(self, images: list[Path], output_dir: Path) -> str:
         try:

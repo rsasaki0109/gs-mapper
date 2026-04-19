@@ -279,18 +279,26 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p2s.add_argument(
         "--preprocess",
-        choices=["dust3r", "simple"],
+        choices=["dust3r", "mast3r", "simple"],
         default="dust3r",
-        help="Pose-estimation backend. 'simple' is a non-metric circular fallback for smoke tests.",
+        help="Pose-estimation backend. 'mast3r' uses naver/mast3r (newer, metric-aware). "
+        "'simple' is a non-metric circular fallback for smoke tests.",
     )
     p2s.add_argument(
-        "--num-frames", type=int, default=20, help="DUSt3R frame cap (0 = all). Default 20 fits a 16 GB GPU."
+        "--num-frames", type=int, default=20, help="DUSt3R/MAST3R frame cap (0 = all). Default 20 fits a 16 GB GPU."
     )
-    p2s.add_argument("--scene-graph", default="complete", help="DUSt3R pair graph (complete / swin-N / oneref-K)")
+    p2s.add_argument(
+        "--scene-graph", default="complete", help="DUSt3R/MAST3R pair graph (complete / swin-N / oneref-K)"
+    )
     p2s.add_argument("--dust3r-checkpoint", default=None, help="DUSt3R checkpoint .pth path")
     p2s.add_argument(
         "--dust3r-root", default=None, help="Local clone of naver/dust3r (default: DUST3R_PATH env or /tmp/dust3r)"
     )
+    p2s.add_argument("--mast3r-checkpoint", default=None, help="MAST3R checkpoint .pth path")
+    p2s.add_argument(
+        "--mast3r-root", default=None, help="Local clone of naver/mast3r (default: MAST3R_PATH env or /tmp/mast3r)"
+    )
+    p2s.add_argument("--mast3r-subsample", type=int, default=8, help="MAST3R pointcloud subsample stride")
     p2s.add_argument("--align-iters", type=int, default=300, help="DUSt3R global alignment iterations")
     p2s.add_argument("--iterations", type=int, default=3000, help="gsplat training iterations")
     p2s.add_argument("--config", default=None, help="Training config YAML override")
@@ -1616,11 +1624,18 @@ def cmd_photos_to_splat(args: argparse.Namespace) -> None:
         "num_frames": args.num_frames,
         "scene_graph": args.scene_graph,
         "align_iters": args.align_iters,
+        "mast3r_subsample": args.mast3r_subsample,
     }
-    if args.dust3r_checkpoint:
-        processor_kwargs["checkpoint"] = Path(args.dust3r_checkpoint)
-    if args.dust3r_root:
-        processor_kwargs["dust3r_root"] = Path(args.dust3r_root)
+    if args.preprocess == "mast3r":
+        if args.mast3r_checkpoint:
+            processor_kwargs["checkpoint"] = Path(args.mast3r_checkpoint)
+        if args.mast3r_root:
+            processor_kwargs["mast3r_root"] = Path(args.mast3r_root)
+    else:
+        if args.dust3r_checkpoint:
+            processor_kwargs["checkpoint"] = Path(args.dust3r_checkpoint)
+        if args.dust3r_root:
+            processor_kwargs["dust3r_root"] = Path(args.dust3r_root)
     processor = PoseFreeProcessor(**processor_kwargs)
     processor.estimate_poses(images_dir, sparse_dir)
 

@@ -338,6 +338,28 @@ class TestCLIHelp:
         assert args.splat_min_opacity == 0.02
         assert args.splat_max_scale == 2.0
 
+    def test_cli_photos_to_splat_mast3r(self) -> None:
+        """photos-to-splat accepts mast3r as a pose-estimation backend."""
+        args = build_parser().parse_args(
+            [
+                "photos-to-splat",
+                "--images",
+                "photos/",
+                "--preprocess",
+                "mast3r",
+                "--mast3r-root",
+                "/tmp/mast3r",
+                "--mast3r-checkpoint",
+                "/tmp/mast3r/checkpoints/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric.pth",
+                "--mast3r-subsample",
+                "4",
+            ]
+        )
+        assert args.preprocess == "mast3r"
+        assert args.mast3r_root == "/tmp/mast3r"
+        assert args.mast3r_checkpoint.endswith(".pth")
+        assert args.mast3r_subsample == 4
+
     def test_cli_photos_to_splat_overrides(self) -> None:
         """photos-to-splat accepts explicit DUSt3R / training overrides."""
         args = build_parser().parse_args(
