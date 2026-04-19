@@ -27,7 +27,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # download
     dl = subparsers.add_parser("download", help="Download a dataset")
-    dl.add_argument("--dataset", default=None, help="Dataset name (e.g. ggrt, covla, mcd)")
+    dl.add_argument("--dataset", default=None, help="Dataset name (e.g. covla, mcd, autoware_leo_drive_bagN)")
     dl.add_argument("--output", default=None, help="Output directory (default: data/)")
     dl.add_argument("--max-samples", type=int, default=None, help="Max samples to download")
     dl.add_argument("--sample-images", action="store_true", help="Download sample images for quick testing")
