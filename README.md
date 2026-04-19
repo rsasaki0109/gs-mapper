@@ -1,10 +1,15 @@
 # GS Mapper
 
-Large-scale 3D Gaussian Splatting mapper for robotics, driving, and campus-scale scenes.
+**Photos → interactive 3D Gaussian Splat in one command.**
 
-One-command pipelines to go from robotics / autonomous-driving dataset images to 3DGS training to an interactive WebGL viewer.
+```bash
+gs-mapper photos-to-splat --images ./my_photos --output outputs/my_splat
+# -> outputs/my_splat/my_photos.splat  (open in splat.html?url=...)
+```
 
-![Demo](docs/demo.gif)
+[![Scene picker cycling through 5 bundled splats on github.io](docs/images/demo-sweep/hero.gif)](https://rsasaki0109.github.io/gs-mapper/splat.html)
+
+DUSt3R or MAST3R for pose-free preprocessing, gsplat for training, and an antimatter15/splat-compatible `.splat` binary out the other end. Five bundled demo scenes A/B-compare the pose-free output against a supervised (GNSS + LiDAR + appearance + BA) baseline on the same scenes — pick any from the scene dropdown on the [live viewer](https://rsasaki0109.github.io/gs-mapper/splat.html).
 
 ---
 
