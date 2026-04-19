@@ -104,6 +104,22 @@
 
 NTU #17 にそのまま適用した場合、多くのフレームが translation ≈ 0 に退化する（image-only COLMAP と同じ parallax 不足症状）。代替として Autoware bag6 cam0 の 20 frame で回したところ 19/20 が非退化 trajectory を復元し、gsplat 3000 iter で 5.57M gauss まで収束。そこから antimatter15 splat format に 400k × 32 B = 12.8 MB で焼いた成果物が `docs/assets/outdoor-demo/outdoor-demo-dust3r.splat` で、`splat.html?url=...` 経由で GNSS+LiDAR supervised demo とトグル比較できる。GNSS も LiDAR も無しで image だけから出ている点が売り（L1 ≈ 0.15、supervised 版の 0.06〜0.08 には届かないが、ポーズなし構築の比較基準として bundled）。
 
+### 4.3.2 MCD NTU #17 は image-only では詰む（3 通り試して全滅）— 原因は low inter-frame feature match
+
+2026-04-19 に次の 4 経路を全部試した結果、NTU session17 は image-only で成立しない scene だと確定:
+
+| 試行 | Frames | 結果 |
+|------|--------|------|
+| image-only COLMAP (150 frame 連続) | 150 color | 2 registered / 36 points（初回セッションで既知） |
+| DUSt3R mono 30 frame complete | 30 color | 多数が translation=0、scene 非メトリック |
+| DUSt3R stereo pair (infra1+infra2 × 10 pair) | 20 IR | 10/20 nonzero、scene extent ~0.2m（D455 baseline しか拾えず） |
+| DUSt3R mono 18 frame spread (bag 全域) | 18 color | 3/18 nonzero（最悪。時間差が開くほど退化） |
+| ORB-SLAM3 compact (`simple_visual_slam/run_mono --tum`, 600 frame) | 600 color | 初期化不能。`Initializer: Matches found: 2〜13` が全フレームで継続、>100 match に一度も到達せず |
+
+最大要因は ORB の frame-to-frame match が常に <15 個しか取れないこと。原因候補: 歩行による motion blur、NTU キャンパスの繰り返し textures、handheld の揺れによる大きな viewpoint jump。いずれも image-only アプローチを根本的にブロックする。
+
+**結論**: NTU #17 は pose injection 無しでは shippable demo にならない。次に MCD で demo を作るなら `(a)` 別 session 選定（GNSS 付き、重複多い Kirinyaga / Tuas など）、`(b)` MCDVIRAL の GT pose csv をダウンロードして `--trajectory-format tum` で直接食わせる、のどちらか。本セッションではここで撤退し、NTU #17 は "known-failing scene" として scratched。成果物は保持: `outputs/mcd_ntu17_stereo_dust3r/` など（retain しても demo 用途なし）。
+
 ### 4.4 densification は 100k 級初期点でも Stable に走るよう修正済み
 
 以前は iter 500 以降の densify で `IndexError: mask [N] != tensor [N+num_clone]` が即発生していた。本セッションの修正で bag1 30k iter → 244k Gaussians まで完走。
