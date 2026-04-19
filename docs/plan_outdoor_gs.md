@@ -143,6 +143,21 @@ scripts/download_mcd_folder.sh 1nEPiTXkVmLIhmBOVNpwSAEgnAXupnAxx data/mcd/tuhh_n
 
 取得後は既存の `--method mcd` + `--mcd-seed-poses-from-gnss` + `--mcd-tf-use-image-stamps` + `--mcd-export-depth` パイプラインがそのまま通る想定（Autoware bag 系で確認済）。ただし MCD handheld session は /tf_static の親 frame 名が Autoware と異なる可能性があるので、preprocess 実行時に `mcd.py` の TF lookup が拾えるか一度確認する（拾えなかった場合、`--mcd-reference-bag` 相当の frame override を足す）。
 
+#### 4.3.3.a `tuhh_night_09` で分かった落とし穴 (2026-04-19)
+
+実際に download してみて分かった MCD 側の注意点:
+
+1. **handheld night session は GPS fix が取れていない**。`tuhh_night_09_vn200.bag` に NavSatFix は 73957 本入っているが、全部 `latitude=longitude=altitude=0.0`、`status.status=0` (NO_FIX)。夜間 + 屋内を渡り歩く取り方なので当然の挙動。`--mcd-seed-poses-from-gnss` は機能しない。**night session 全般を避け、day session (`tuhh_day_04` / `ntu_day_02` 以降) から選ぶ**。
+2. **MCD の bag には `/tf` も `/tf_static` も入っていない**。sensor 間 extrinsics は session folder 外の calibration YAML（MCDVIRAL の GitHub `mcdviral/mcd_calibration` 等、別リポジトリ想定）で配布されており、bag 内だけで完結しない。`mcd.py` の TF lookup は空振りになるので、`--mcd-seed-poses-from-gnss` が機能する day session を選んだ後も、camera ↔ imu / camera ↔ lidar の extrinsic を override CLI (`--mcd-reference-bag` 相当の機能、または新規 `--mcd-static-calibration calib.yaml`) で食わせる必要がある。
+3. session folder は `lua_bagname/<bagname>_*.bag` という二重ディレクトリ構造で展開される（gdown の挙動）。CLI が `--mcd-session data/mcd/<name>/` を要求するなら `<name>/<name>_*.bag` の shape を受け付けるか、単ファイル列挙にするかを決めておく。
+
+これらを踏まえて、次セッションの着手順序:
+
+1. day session 1 本 DL（`tuhh_day_04` 12.5 GB か `ntu_day_02` 14.8 GB）
+2. `/vn200/GPS` に valid fix があるか事前に spot-check（`status.status >= 0` が 1% 以上）
+3. MCDVIRAL calibration YAML を入手、`--mcd-static-calibration` みたいなフラグを足して `mcd.py` の TF lookup を bypass できるようにする
+4. preprocess → gsplat train → splat export → Pages bundle
+
 ### 4.4 densification は 100k 級初期点でも Stable に走るよう修正済み
 
 以前は iter 500 以降の densify で `IndexError: mask [N] != tensor [N+num_clone]` が即発生していた。本セッションの修正で bag1 30k iter → 244k Gaussians まで完走。
