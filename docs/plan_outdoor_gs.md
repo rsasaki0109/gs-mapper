@@ -158,6 +158,19 @@ scripts/download_mcd_folder.sh 1nEPiTXkVmLIhmBOVNpwSAEgnAXupnAxx data/mcd/tuhh_n
 3. MCDVIRAL calibration YAML を入手、`--mcd-static-calibration` みたいなフラグを足して `mcd.py` の TF lookup を bypass できるようにする
 4. preprocess → gsplat train → splat export → Pages bundle
 
+#### 4.3.3.b `tuhh_day_04` で image-only DUSt3R 経路が通った (2026-04-19)
+
+上の段で "GNSS + calibration YAML を揃えないと詰む" と書いたが、`tuhh_day_04` (12.6 GB 完本 DL) の d455b color を 5558 frame 中から等間隔 20 frame だけ抜いて DUSt3R complete graph で回したら、**20 frame 中 19 frame が非退化 trajectory** を復元した。歩行モーションの norm 列が 0.009 → 0.21 → ... → 1.87 → ... → 0.11 と綺麗なドーム形で、handheld が屋外を往復したと物理的に解釈できる結果。gsplat 3000 iter で 3.23M gauss まで学習収束。
+
+そのまま `ply_to_splat` で 400k / 12.8 MB に焼いて `docs/assets/outdoor-demo/mcd-tuhh-day04.splat` として bundle、`splat.html?url=...mcd-tuhh-day04.splat` でブラウザから toggle できる。
+
+つまり **day session の場合 image-only DUSt3R 一発で MCD demo を作れる**、GNSS seeding も calibration YAML も要らない。NTU #17 (night handheld / GPS denied / motion blur) との差は「昼の屋外 + 歩行速度 + repetitive なし texture」で DUSt3R 前提がそのまま通るかどうか。次 MCD demo を作るときは
+
+1. day session の image bag 1 本だけ DL (5 GB 前後、LiDAR bag は省略可)
+2. `photos-to-splat` 一撃 or `run_dust3r.py` → gsplat train → `export --format splat`
+
+で 30 分以内で回る、という playbook が確立した。LiDAR depth supervision / appearance / BA を足して質を詰めるなら、そのとき初めて GNSS + calibration path に戻る。
+
 ### 4.4 densification は 100k 級初期点でも Stable に走るよう修正済み
 
 以前は iter 500 以降の densify で `IndexError: mask [N] != tensor [N+num_clone]` が即発生していた。本セッションの修正で bag1 30k iter → 244k Gaussians まで完走。
