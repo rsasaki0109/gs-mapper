@@ -69,7 +69,7 @@ def get_dataset_config(name: str) -> dict[str, Any]:
     """Get configuration for a specific dataset by name.
 
     Args:
-        name: Dataset identifier (e.g. "ggrt", "covla", "mcd").
+        name: Dataset identifier (e.g. "covla", "mcd", "autoware_leo_drive_bagN").
 
     Returns:
         Dictionary of dataset configuration.

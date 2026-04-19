@@ -32,7 +32,7 @@ def download_dataset(
     """Download a dataset by name to the destination directory.
 
     Args:
-        name: Dataset identifier (e.g. "ggrt", "covla", "mcd").
+        name: Dataset identifier (e.g. "covla", "mcd", "autoware_leo_drive_bagN").
         output_dir: Root directory where the dataset will be stored.
             Defaults to ``<project_root>/data/<name>``.
         max_samples: Maximum number of samples to download (for partial downloads).

@@ -34,10 +34,10 @@ GitHub Pages is deployed by [`.github/workflows/pages.yml`](.github/workflows/pa
 ```
 Images --> Preprocessing --> 3DGS Training --> Web Viewer
   |          (COLMAP /        (gsplat /        (Three.js
-  |           GGRt / MCD      nerfstudio)      + antimatter15/splat)
+  |           DUSt3R / MCD    nerfstudio)      + antimatter15/splat)
   |           pose-import)
   |
-  +-- GGRt (pose-free)
+  +-- DUSt3R (pose-free, image-only, bundled)
   +-- CoVLA (driving)
   +-- MCD (campus)
   +-- Autoware Leo Drive ISUZU bags (outdoor driving)
@@ -47,7 +47,8 @@ Images --> Preprocessing --> 3DGS Training --> Web Viewer
 
 | Dataset | Type | Description | Pose |
 |---------|------|-------------|------|
-| [GGRt](https://github.com/abdullahamdi/ggrt) | Pose-free 3DGS | Generalizable Gaussian Splatting over Waymo / RealEstate10K / ACID | Not required |
+| [DUSt3R](https://github.com/naver/dust3r) | Pose-free 3DGS (bundled) | Pairwise pointmap network + PointCloudOptimizer global aligner, feeds into our gsplat trainer | Not required |
+| [GGRt](https://github.com/lifuguan/GGRt_official) | Pose-free 3DGS (reference only) | Feed-forward generalizable renderer; upstream needs `diff-gaussian-rasterization-modified` (custom CUDA extension) and outputs gaussians in a non-PLY format. Not integrated in this repo — use `--preprocess dust3r` instead. | Not required |
 | [CoVLA](https://github.com/tier4/CoVLA) | Driving scenes | Large-scale driving dataset with front camera images | COLMAP |
 | [MCD](https://mcdviral.github.io/) | Campus rosbags | Multi-campus outdoor scenes with stereo, LiDAR, IMU | COLMAP / GNSS + `/tf_static` pose-import |
 | Autoware Leo Drive ISUZU | Outdoor driving rosbag | Public multi-camera + LiDAR + GNSS/INS bags from Autoware Foundation | GNSS + `/tf_static` pose-import (see `configs/datasets.yaml`) |
@@ -278,40 +279,44 @@ The Streamlit app will be available at `http://localhost:8501`.
 To run a specific command inside the container instead of the default app:
 
 ```bash
-docker compose run playground gs-sim2real run ggrt --backend gsplat
+docker compose run playground gs-mapper photos-to-splat --images /workspace/my_photos --output /workspace/outputs/my_splat
 ```
 
 Dataset files in `data/` and training outputs in `outputs/` are mounted as volumes, so they persist on the host.
 
 ## Quick Start
 
-### Full pipeline (download + preprocess + train + view)
+### One-shot (pose-free, just photos in -> splat out)
 
 ```bash
-gs-sim2real run ggrt --backend gsplat
+gs-mapper photos-to-splat --images ./my_photos --output outputs/my_splat
 ```
 
 ### Step-by-step
 
 ```bash
-# Download a dataset
-gs-sim2real download covla --dest data/
+# Download a dataset (mcd, covla, autoware_leo_drive_bagN ...)
+gs-mapper download --dataset mcd --dest data/
 
-# Preprocess with COLMAP
-gs-sim2real preprocess --data-dir data/covla --output-dir outputs/colmap
+# Preprocess with COLMAP (classic path, needs well-textured overlapping views)
+gs-mapper preprocess --images data/covla --output outputs/colmap --method colmap
+
+# Or DUSt3R pose-free (bundled, handles sparse views without COLMAP)
+gs-mapper preprocess --images data/covla --output outputs/colmap --method dust3r
 
 # Train 3DGS
-gs-sim2real train --data-dir outputs/colmap --backend gsplat --iterations 30000
+gs-mapper train --data outputs/colmap --output outputs/train --iterations 30000
 
-# View the result
-gs-sim2real view outputs/train/point_cloud.ply --port 8080
+# Export the trained PLY to the antimatter15 .splat format for docs/splat.html
+gs-mapper export --model outputs/train/point_cloud.ply --format splat --output outputs/my_scene.splat
 ```
 
 ### Using scripts
 
 ```bash
 python scripts/download_datasets.py --dataset mcd --dest data/
-python scripts/run_demo.py --dataset ggrt --backend gsplat
+python scripts/run_dust3r.py --image-dir ./my_photos --output outputs/my_dust3r \
+    --checkpoint /tmp/dust3r/checkpoints/DUSt3R_ViTLarge_BaseDecoder_512_dpt.pth
 ```
 
 ## Project Structure
