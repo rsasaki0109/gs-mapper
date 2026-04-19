@@ -21,11 +21,17 @@ GitHub Pages hosts four views of the same 6-bag Autoware Leo Drive ISUZU bundle:
 | [`/splat_spark.html`](https://rsasaki0109.github.io/gs-mapper/splat_spark.html) | `sparkjsdev/spark` 2.0 (WebGL2, ESM) | Advanced Three.js-based renderer loaded via importmap + CDN. Experimental: may appear blank under headless browsers without a real GPU. |
 | [`/splat_webgpu.html`](https://rsasaki0109.github.io/gs-mapper/splat_webgpu.html) | `shrekshao/webgpu-3d-gaussian-splat-viewer` (WebGPU, GPU radix sort) | True WebGPU: compute-shader preprocess + radix sort per frame. Requires Chrome 113+, Edge 113+, or Safari TP with WebGPU enabled. |
 
-Every viewer defaults to `assets/outdoor-demo/outdoor-demo.splat` (5-bag or 6-bag fused reconstruction, 80k filtered gaussians). Override with `?url=<splat-path>`.
+`splat.html` ships a scene picker that toggles between the supervised demo and four pose-free variants. Each splat is a 400k-gauss / 12.8 MB antimatter15 binary trained by the pipeline in this repo.
 
-The bundle was trained with the full MCD pose-import stack: GNSS + `/tf_static` + LiDAR-seeded COLMAP sparse, image-projected RGB init, gsplat 30k-50k iter with LiDAR depth supervision, per-image appearance embedding (scale + bias), and per-view 6-DOF joint pose refinement (BA).
+| Scene | Preview | Pipeline |
+|-------|---------|----------|
+| Autoware 6-bag fused (supervised default) | [![](docs/images/demo-sweep/01_outdoor-demo.png)](https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/outdoor-demo.splat) | GNSS + `/tf_static` + LiDAR-seeded COLMAP, image-projected RGB init, gsplat 30-50k iter, LiDAR depth + appearance + 6-DOF BA |
+| bag6 cam0 — DUSt3R pose-free | [![](docs/images/demo-sweep/02_outdoor-demo-dust3r.png)](https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/outdoor-demo-dust3r.splat) | 20 image-only frames → DUSt3R pointmap + global align → gsplat 3k iter |
+| bag6 cam0 — MAST3R pose-free (metric) | [![](docs/images/demo-sweep/04_bag6-mast3r.png)](https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/bag6-mast3r.splat) | Same 20 frames → MAST3R sparse global alignment → gsplat 3k iter. Metric-scale, 20/20 non-degenerate poses |
+| MCD tuhh_day_04 — DUSt3R pose-free | [![](docs/images/demo-sweep/03_mcd-tuhh-day04.png)](https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/mcd-tuhh-day04.splat) | 20 color frames of a non-Autoware MCD day handheld session → DUSt3R → gsplat 3k iter |
+| MCD tuhh_day_04 — MAST3R pose-free (metric) | [![](docs/images/demo-sweep/05_mcd-tuhh-day04-mast3r.png)](https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/mcd-tuhh-day04-mast3r.splat) | Same frames → MAST3R → gsplat 3k iter. Matrix completes {bag6, MCD} × {DUSt3R, MAST3R} |
 
-A **pose-free DUSt3R variant** is also bundled at `assets/outdoor-demo/outdoor-demo-dust3r.splat` (400k gaussians, 12.8 MB) — reconstructed from 20 image-only frames of bag6 cam0 with no GNSS/LiDAR/COLMAP (see `scripts/run_dust3r.py`). A newer **MAST3R variant** (metric-aware descendant of DUSt3R) sits next to it at `assets/outdoor-demo/bag6-mast3r.splat`. Toggle either from the scene dropdown on [`splat.html`](https://rsasaki0109.github.io/gs-mapper/splat.html), or pass `?url=...splat` directly.
+The supervised default uses the full MCD pose-import stack. Pose-free variants use the pipeline you can invoke yourself with `gs-mapper photos-to-splat --preprocess dust3r` or `--preprocess mast3r`.
 
 GitHub Pages is deployed by [`.github/workflows/pages.yml`](.github/workflows/pages.yml) on `push` to `main`.
 

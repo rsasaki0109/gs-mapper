@@ -63,6 +63,17 @@ def test_bag6_mast3r_splat_present(assets_dir: Path) -> None:
     assert "bag6-mast3r.splat" in html
 
 
+def test_mcd_tuhh_day04_mast3r_splat_present(assets_dir: Path) -> None:
+    """MAST3R-derived MCD splat must be bundled and linked from splat.html."""
+    splat = assets_dir / "outdoor-demo" / "mcd-tuhh-day04-mast3r.splat"
+    assert splat.is_file(), "missing MAST3R MCD demo splat"
+    size = splat.stat().st_size
+    assert size > 1_000_000, f"splat looks too small ({size} bytes)"
+    assert size % 32 == 0, f"splat is not 32-byte aligned ({size} bytes)"
+    html = (REPO_ROOT / "docs" / "splat.html").read_text(encoding="utf-8")
+    assert "mcd-tuhh-day04-mast3r.splat" in html
+
+
 def test_mcd_tuhh_day04_dust3r_splat_present(assets_dir: Path) -> None:
     """MCD tuhh_day_04 DUSt3R splat must be bundled and linked from splat.html."""
     splat = assets_dir / "outdoor-demo" / "mcd-tuhh-day04.splat"
