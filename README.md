@@ -259,22 +259,22 @@ for seams such as localization alignment, render backend selection, localization
 Refresh the comparison and regenerate those docs with either experiment command:
 
 ```bash
-gs-sim2real experiment-localization-alignment --write-docs --output outputs/localization-alignment-experiment-report.json
-gs-sim2real experiment-render-backend-selection --write-docs --output outputs/render-backend-selection-experiment-report.json
-gs-sim2real experiment-localization-import --write-docs --output outputs/localization-estimate-import-experiment-report.json
-gs-sim2real experiment-query-transport-selection --write-docs --output outputs/query-transport-selection-experiment-report.json
-gs-sim2real experiment-query-request-import --write-docs --output outputs/query-request-import-experiment-report.json
-gs-sim2real experiment-query-cancellation-policy --write-docs --output outputs/query-cancellation-policy-experiment-report.json
-gs-sim2real experiment-query-coalescing-policy --write-docs --output outputs/query-coalescing-policy-experiment-report.json
-gs-sim2real experiment-query-error-mapping --write-docs --output outputs/query-error-mapping-experiment-report.json
-gs-sim2real experiment-query-queue-policy --write-docs --output outputs/query-queue-policy-experiment-report.json
-gs-sim2real experiment-query-source-identity --write-docs --output outputs/query-source-identity-experiment-report.json
-gs-sim2real experiment-query-timeout-policy --write-docs --output outputs/query-timeout-policy-experiment-report.json
-gs-sim2real experiment-query-response-build --write-docs --output outputs/query-response-build-experiment-report.json
-gs-sim2real experiment-live-localization-stream-import --write-docs --output outputs/live-localization-stream-import-experiment-report.json
-gs-sim2real experiment-route-capture-import --write-docs --output outputs/route-capture-bundle-import-experiment-report.json
-gs-sim2real experiment-sim2real-websocket-protocol --write-docs --output outputs/sim2real-websocket-protocol-experiment-report.json
-gs-sim2real experiment-localization-review-bundle-import --write-docs --output outputs/localization-review-bundle-import-experiment-report.json
+gs-mapper experiment localization-alignment --write-docs --output outputs/localization-alignment-experiment-report.json
+gs-mapper experiment render-backend-selection --write-docs --output outputs/render-backend-selection-experiment-report.json
+gs-mapper experiment localization-import --write-docs --output outputs/localization-estimate-import-experiment-report.json
+gs-mapper experiment query-transport-selection --write-docs --output outputs/query-transport-selection-experiment-report.json
+gs-mapper experiment query-request-import --write-docs --output outputs/query-request-import-experiment-report.json
+gs-mapper experiment query-cancellation-policy --write-docs --output outputs/query-cancellation-policy-experiment-report.json
+gs-mapper experiment query-coalescing-policy --write-docs --output outputs/query-coalescing-policy-experiment-report.json
+gs-mapper experiment query-error-mapping --write-docs --output outputs/query-error-mapping-experiment-report.json
+gs-mapper experiment query-queue-policy --write-docs --output outputs/query-queue-policy-experiment-report.json
+gs-mapper experiment query-source-identity --write-docs --output outputs/query-source-identity-experiment-report.json
+gs-mapper experiment query-timeout-policy --write-docs --output outputs/query-timeout-policy-experiment-report.json
+gs-mapper experiment query-response-build --write-docs --output outputs/query-response-build-experiment-report.json
+gs-mapper experiment live-localization-stream-import --write-docs --output outputs/live-localization-stream-import-experiment-report.json
+gs-mapper experiment route-capture-import --write-docs --output outputs/route-capture-bundle-import-experiment-report.json
+gs-mapper experiment sim2real-websocket-protocol --write-docs --output outputs/sim2real-websocket-protocol-experiment-report.json
+gs-mapper experiment localization-review-bundle-import --write-docs --output outputs/localization-review-bundle-import-experiment-report.json
 ```
 
 ## Docker

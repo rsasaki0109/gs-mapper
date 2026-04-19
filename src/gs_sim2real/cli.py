@@ -23,7 +23,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--version", action="version", version="%(prog)s 0.1.0")
 
-    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+    subparsers = parser.add_subparsers(dest="command", metavar="<command>", help="Available commands")
 
     # download
     dl = subparsers.add_parser("download", help="Download a dataset")
@@ -897,439 +897,160 @@ def build_parser() -> argparse.ArgumentParser:
     sb.add_argument("--max-frames", type=int, default=None, help="Optional cap on the number of matched frames")
     sb.add_argument("--output", default=None, help="Optional path for the full benchmark report JSON")
 
-    # localization alignment experiment lab
-    el = subparsers.add_parser(
-        "experiment-localization-alignment",
-        help="Compare multiple localization alignment strategies and optionally refresh experiment docs",
-    )
-    el.add_argument(
-        "--repetitions",
-        type=int,
-        default=200,
-        help="Runtime benchmark repetitions per fixture",
-    )
-    el.add_argument(
-        "--write-docs",
-        action="store_true",
-        help="Refresh docs/experiments.md, docs/decisions.md, and docs/interfaces.md",
-    )
-    el.add_argument(
-        "--docs-dir",
-        default="docs",
-        help="Directory where experiment process docs are written when --write-docs is set",
-    )
-    el.add_argument(
-        "--output",
-        default=None,
-        help="Optional path for the full experiment report JSON",
-    )
+    # experiment labs — specs drive a nested `experiment` subparser plus
+    # hidden top-level aliases for back-compat.
+    experiment_specs: list[tuple[str, str, str]] = [
+        (
+            "localization-alignment",
+            "experiment-localization-alignment",
+            "Compare multiple localization alignment strategies and optionally refresh experiment docs",
+        ),
+        (
+            "render-backend-selection",
+            "experiment-render-backend-selection",
+            "Compare render backend-selection policies and optionally refresh experiment docs",
+        ),
+        (
+            "localization-import",
+            "experiment-localization-import",
+            "Compare localization estimate import policies and optionally refresh experiment docs",
+        ),
+        (
+            "query-transport-selection",
+            "experiment-query-transport-selection",
+            "Compare query transport policies and optionally refresh experiment docs",
+        ),
+        (
+            "query-request-import",
+            "experiment-query-request-import",
+            "Compare query request import policies and optionally refresh experiment docs",
+        ),
+        (
+            "live-localization-stream-import",
+            "experiment-live-localization-stream-import",
+            "Compare live localization stream import policies and optionally refresh experiment docs",
+        ),
+        (
+            "route-capture-import",
+            "experiment-route-capture-import",
+            "Compare route capture bundle import policies and optionally refresh experiment docs",
+        ),
+        (
+            "sim2real-websocket-protocol",
+            "experiment-sim2real-websocket-protocol",
+            "Compare sim2real websocket message protocol policies and optionally refresh experiment docs",
+        ),
+        (
+            "localization-review-bundle-import",
+            "experiment-localization-review-bundle-import",
+            "Compare localization review bundle import policies and optionally refresh experiment docs",
+        ),
+        (
+            "query-cancellation-policy",
+            "experiment-query-cancellation-policy",
+            "Compare query cancellation policies and optionally refresh experiment docs",
+        ),
+        (
+            "query-coalescing-policy",
+            "experiment-query-coalescing-policy",
+            "Compare query dedupe/coalescing policies and optionally refresh experiment docs",
+        ),
+        (
+            "query-error-mapping",
+            "experiment-query-error-mapping",
+            "Compare query error mapping policies and optionally refresh experiment docs",
+        ),
+        (
+            "query-queue-policy",
+            "experiment-query-queue-policy",
+            "Compare query queue policies and optionally refresh experiment docs",
+        ),
+        (
+            "query-source-identity",
+            "experiment-query-source-identity",
+            "Compare query source identity policies and optionally refresh experiment docs",
+        ),
+        (
+            "query-timeout-policy",
+            "experiment-query-timeout-policy",
+            "Compare query timeout policies and optionally refresh experiment docs",
+        ),
+        (
+            "query-response-build",
+            "experiment-query-response-build",
+            "Compare query response build policies and optionally refresh experiment docs",
+        ),
+    ]
 
-    # render backend selection experiment lab
-    er = subparsers.add_parser(
-        "experiment-render-backend-selection",
-        help="Compare render backend-selection policies and optionally refresh experiment docs",
-    )
-    er.add_argument(
-        "--repetitions",
-        type=int,
-        default=200,
-        help="Runtime benchmark repetitions per fixture",
-    )
-    er.add_argument(
-        "--write-docs",
-        action="store_true",
-        help="Refresh docs/experiments.md, docs/decisions.md, and docs/interfaces.md",
-    )
-    er.add_argument(
-        "--docs-dir",
-        default="docs",
-        help="Directory where experiment process docs are written when --write-docs is set",
-    )
-    er.add_argument(
-        "--output",
-        default=None,
-        help="Optional path for the full experiment report JSON",
-    )
+    def _add_experiment_flags(p: argparse.ArgumentParser) -> None:
+        p.add_argument("--repetitions", type=int, default=200, help="Runtime benchmark repetitions per fixture")
+        p.add_argument(
+            "--write-docs",
+            action="store_true",
+            help="Refresh docs/experiments.md, docs/decisions.md, and docs/interfaces.md",
+        )
+        p.add_argument(
+            "--docs-dir",
+            default="docs",
+            help="Directory where experiment process docs are written when --write-docs is set",
+        )
+        p.add_argument("--output", default=None, help="Optional path for the full experiment report JSON")
 
-    # localization estimate import experiment lab
-    ei = subparsers.add_parser(
-        "experiment-localization-import",
-        help="Compare localization estimate import policies and optionally refresh experiment docs",
+    exp_parent = subparsers.add_parser(
+        "experiment",
+        help="Experiment labs: A/B strategies and refresh docs/experiments.md",
     )
-    ei.add_argument(
-        "--repetitions",
-        type=int,
-        default=200,
-        help="Runtime benchmark repetitions per fixture",
-    )
-    ei.add_argument(
-        "--write-docs",
-        action="store_true",
-        help="Refresh docs/experiments.md, docs/decisions.md, and docs/interfaces.md",
-    )
-    ei.add_argument(
-        "--docs-dir",
-        default="docs",
-        help="Directory where experiment process docs are written when --write-docs is set",
-    )
-    ei.add_argument(
-        "--output",
-        default=None,
-        help="Optional path for the full experiment report JSON",
-    )
+    exp_sub = exp_parent.add_subparsers(dest="experiment_command", metavar="<lab>", help="Available experiment labs")
 
-    # query transport selection experiment lab
-    eq = subparsers.add_parser(
-        "experiment-query-transport-selection",
-        help="Compare query transport policies and optionally refresh experiment docs",
-    )
-    eq.add_argument(
-        "--repetitions",
-        type=int,
-        default=200,
-        help="Runtime benchmark repetitions per fixture",
-    )
-    eq.add_argument(
-        "--write-docs",
-        action="store_true",
-        help="Refresh docs/experiments.md, docs/decisions.md, and docs/interfaces.md",
-    )
-    eq.add_argument(
-        "--docs-dir",
-        default="docs",
-        help="Directory where experiment process docs are written when --write-docs is set",
-    )
-    eq.add_argument(
-        "--output",
-        default=None,
-        help="Optional path for the full experiment report JSON",
-    )
-
-    # query request import experiment lab
-    eqr = subparsers.add_parser(
-        "experiment-query-request-import",
-        help="Compare query request import policies and optionally refresh experiment docs",
-    )
-    eqr.add_argument(
-        "--repetitions",
-        type=int,
-        default=200,
-        help="Runtime benchmark repetitions per fixture",
-    )
-    eqr.add_argument(
-        "--write-docs",
-        action="store_true",
-        help="Refresh docs/experiments.md, docs/decisions.md, and docs/interfaces.md",
-    )
-    eqr.add_argument(
-        "--docs-dir",
-        default="docs",
-        help="Directory where experiment process docs are written when --write-docs is set",
-    )
-    eqr.add_argument(
-        "--output",
-        default=None,
-        help="Optional path for the full experiment report JSON",
-    )
-
-    # live localization stream import experiment lab
-    els = subparsers.add_parser(
-        "experiment-live-localization-stream-import",
-        help="Compare live localization stream import policies and optionally refresh experiment docs",
-    )
-    els.add_argument(
-        "--repetitions",
-        type=int,
-        default=200,
-        help="Runtime benchmark repetitions per fixture",
-    )
-    els.add_argument(
-        "--write-docs",
-        action="store_true",
-        help="Refresh docs/experiments.md, docs/decisions.md, and docs/interfaces.md",
-    )
-    els.add_argument(
-        "--docs-dir",
-        default="docs",
-        help="Directory where experiment process docs are written when --write-docs is set",
-    )
-    els.add_argument(
-        "--output",
-        default=None,
-        help="Optional path for the full experiment report JSON",
-    )
-
-    # route capture bundle import experiment lab
-    erc = subparsers.add_parser(
-        "experiment-route-capture-import",
-        help="Compare route capture bundle import policies and optionally refresh experiment docs",
-    )
-    erc.add_argument(
-        "--repetitions",
-        type=int,
-        default=200,
-        help="Runtime benchmark repetitions per fixture",
-    )
-    erc.add_argument(
-        "--write-docs",
-        action="store_true",
-        help="Refresh docs/experiments.md, docs/decisions.md, and docs/interfaces.md",
-    )
-    erc.add_argument(
-        "--docs-dir",
-        default="docs",
-        help="Directory where experiment process docs are written when --write-docs is set",
-    )
-    erc.add_argument(
-        "--output",
-        default=None,
-        help="Optional path for the full experiment report JSON",
-    )
-
-    # sim2real websocket protocol experiment lab
-    esp = subparsers.add_parser(
-        "experiment-sim2real-websocket-protocol",
-        help="Compare sim2real websocket message protocol policies and optionally refresh experiment docs",
-    )
-    esp.add_argument(
-        "--repetitions",
-        type=int,
-        default=200,
-        help="Runtime benchmark repetitions per fixture",
-    )
-    esp.add_argument(
-        "--write-docs",
-        action="store_true",
-        help="Refresh docs/experiments.md, docs/decisions.md, and docs/interfaces.md",
-    )
-    esp.add_argument(
-        "--docs-dir",
-        default="docs",
-        help="Directory where experiment process docs are written when --write-docs is set",
-    )
-    esp.add_argument(
-        "--output",
-        default=None,
-        help="Optional path for the full experiment report JSON",
-    )
-
-    # localization review bundle import experiment lab
-    erl = subparsers.add_parser(
-        "experiment-localization-review-bundle-import",
-        help="Compare localization review bundle import policies and optionally refresh experiment docs",
-    )
-    erl.add_argument(
-        "--repetitions",
-        type=int,
-        default=200,
-        help="Runtime benchmark repetitions per fixture",
-    )
-    erl.add_argument(
-        "--write-docs",
-        action="store_true",
-        help="Refresh docs/experiments.md, docs/decisions.md, and docs/interfaces.md",
-    )
-    erl.add_argument(
-        "--docs-dir",
-        default="docs",
-        help="Directory where experiment process docs are written when --write-docs is set",
-    )
-    erl.add_argument(
-        "--output",
-        default=None,
-        help="Optional path for the full experiment report JSON",
-    )
-
-    # query cancellation policy experiment lab
-    eqc = subparsers.add_parser(
-        "experiment-query-cancellation-policy",
-        help="Compare query cancellation policies and optionally refresh experiment docs",
-    )
-    eqc.add_argument(
-        "--repetitions",
-        type=int,
-        default=200,
-        help="Runtime benchmark repetitions per fixture",
-    )
-    eqc.add_argument(
-        "--write-docs",
-        action="store_true",
-        help="Refresh docs/experiments.md, docs/decisions.md, and docs/interfaces.md",
-    )
-    eqc.add_argument(
-        "--docs-dir",
-        default="docs",
-        help="Directory where experiment process docs are written when --write-docs is set",
-    )
-    eqc.add_argument(
-        "--output",
-        default=None,
-        help="Optional path for the full experiment report JSON",
-    )
-
-    # query coalescing policy experiment lab
-    eqco = subparsers.add_parser(
-        "experiment-query-coalescing-policy",
-        help="Compare query dedupe/coalescing policies and optionally refresh experiment docs",
-    )
-    eqco.add_argument(
-        "--repetitions",
-        type=int,
-        default=200,
-        help="Runtime benchmark repetitions per fixture",
-    )
-    eqco.add_argument(
-        "--write-docs",
-        action="store_true",
-        help="Refresh docs/experiments.md, docs/decisions.md, and docs/interfaces.md",
-    )
-    eqco.add_argument(
-        "--docs-dir",
-        default="docs",
-        help="Directory where experiment process docs are written when --write-docs is set",
-    )
-    eqco.add_argument(
-        "--output",
-        default=None,
-        help="Optional path for the full experiment report JSON",
-    )
-
-    # query error mapping experiment lab
-    eqem = subparsers.add_parser(
-        "experiment-query-error-mapping",
-        help="Compare query error mapping policies and optionally refresh experiment docs",
-    )
-    eqem.add_argument(
-        "--repetitions",
-        type=int,
-        default=200,
-        help="Runtime benchmark repetitions per fixture",
-    )
-    eqem.add_argument(
-        "--write-docs",
-        action="store_true",
-        help="Refresh docs/experiments.md, docs/decisions.md, and docs/interfaces.md",
-    )
-    eqem.add_argument(
-        "--docs-dir",
-        default="docs",
-        help="Directory where experiment process docs are written when --write-docs is set",
-    )
-    eqem.add_argument(
-        "--output",
-        default=None,
-        help="Optional path for the full experiment report JSON",
-    )
-
-    # query queue policy experiment lab
-    eqq = subparsers.add_parser(
-        "experiment-query-queue-policy",
-        help="Compare query queue policies and optionally refresh experiment docs",
-    )
-    eqq.add_argument(
-        "--repetitions",
-        type=int,
-        default=200,
-        help="Runtime benchmark repetitions per fixture",
-    )
-    eqq.add_argument(
-        "--write-docs",
-        action="store_true",
-        help="Refresh docs/experiments.md, docs/decisions.md, and docs/interfaces.md",
-    )
-    eqq.add_argument(
-        "--docs-dir",
-        default="docs",
-        help="Directory where experiment process docs are written when --write-docs is set",
-    )
-    eqq.add_argument(
-        "--output",
-        default=None,
-        help="Optional path for the full experiment report JSON",
-    )
-
-    # query source identity experiment lab
-    eqsi = subparsers.add_parser(
-        "experiment-query-source-identity",
-        help="Compare query source identity policies and optionally refresh experiment docs",
-    )
-    eqsi.add_argument(
-        "--repetitions",
-        type=int,
-        default=200,
-        help="Runtime benchmark repetitions per fixture",
-    )
-    eqsi.add_argument(
-        "--write-docs",
-        action="store_true",
-        help="Refresh docs/experiments.md, docs/decisions.md, and docs/interfaces.md",
-    )
-    eqsi.add_argument(
-        "--docs-dir",
-        default="docs",
-        help="Directory where experiment process docs are written when --write-docs is set",
-    )
-    eqsi.add_argument(
-        "--output",
-        default=None,
-        help="Optional path for the full experiment report JSON",
-    )
-
-    # query timeout policy experiment lab
-    eqt = subparsers.add_parser(
-        "experiment-query-timeout-policy",
-        help="Compare query timeout policies and optionally refresh experiment docs",
-    )
-    eqt.add_argument(
-        "--repetitions",
-        type=int,
-        default=200,
-        help="Runtime benchmark repetitions per fixture",
-    )
-    eqt.add_argument(
-        "--write-docs",
-        action="store_true",
-        help="Refresh docs/experiments.md, docs/decisions.md, and docs/interfaces.md",
-    )
-    eqt.add_argument(
-        "--docs-dir",
-        default="docs",
-        help="Directory where experiment process docs are written when --write-docs is set",
-    )
-    eqt.add_argument(
-        "--output",
-        default=None,
-        help="Optional path for the full experiment report JSON",
-    )
-
-    # query response build experiment lab
-    eqb = subparsers.add_parser(
-        "experiment-query-response-build",
-        help="Compare query response build policies and optionally refresh experiment docs",
-    )
-    eqb.add_argument(
-        "--repetitions",
-        type=int,
-        default=200,
-        help="Runtime benchmark repetitions per fixture",
-    )
-    eqb.add_argument(
-        "--write-docs",
-        action="store_true",
-        help="Refresh docs/experiments.md, docs/decisions.md, and docs/interfaces.md",
-    )
-    eqb.add_argument(
-        "--docs-dir",
-        default="docs",
-        help="Directory where experiment process docs are written when --write-docs is set",
-    )
-    eqb.add_argument(
-        "--output",
-        default=None,
-        help="Optional path for the full experiment report JSON",
-    )
+    for short, _legacy, help_text in experiment_specs:
+        nested = exp_sub.add_parser(short, help=help_text)
+        _add_experiment_flags(nested)
+    # Back-compat for the flat `experiment-foo` aliases is handled via
+    # argv rewriting in `main()` so the main --help stays focused on core tools.
 
     return parser
+
+
+LEGACY_EXPERIMENT_ALIASES: dict[str, tuple[str, str]] = {
+    "experiment-localization-alignment": ("experiment", "localization-alignment"),
+    "experiment-render-backend-selection": ("experiment", "render-backend-selection"),
+    "experiment-localization-import": ("experiment", "localization-import"),
+    "experiment-query-transport-selection": ("experiment", "query-transport-selection"),
+    "experiment-query-request-import": ("experiment", "query-request-import"),
+    "experiment-live-localization-stream-import": ("experiment", "live-localization-stream-import"),
+    "experiment-route-capture-import": ("experiment", "route-capture-import"),
+    "experiment-sim2real-websocket-protocol": ("experiment", "sim2real-websocket-protocol"),
+    "experiment-localization-review-bundle-import": ("experiment", "localization-review-bundle-import"),
+    "experiment-query-cancellation-policy": ("experiment", "query-cancellation-policy"),
+    "experiment-query-coalescing-policy": ("experiment", "query-coalescing-policy"),
+    "experiment-query-error-mapping": ("experiment", "query-error-mapping"),
+    "experiment-query-queue-policy": ("experiment", "query-queue-policy"),
+    "experiment-query-source-identity": ("experiment", "query-source-identity"),
+    "experiment-query-timeout-policy": ("experiment", "query-timeout-policy"),
+    "experiment-query-response-build": ("experiment", "query-response-build"),
+}
+
+
+def _rewrite_legacy_experiment_argv(argv: list[str]) -> list[str]:
+    """Rewrite `gs-mapper experiment-foo ...` -> `gs-mapper experiment foo ...`.
+
+    Keeps old scripts + the READMEs from PR #67 working while the main
+    --help listing stays focused on core tools.
+    """
+    if not argv:
+        return argv
+    legacy = argv[0]
+    mapped = LEGACY_EXPERIMENT_ALIASES.get(legacy)
+    if mapped is None:
+        return argv
+    import warnings
+
+    warnings.warn(
+        f"`gs-mapper {legacy}` is deprecated; use `gs-mapper {mapped[0]} {mapped[1]}` instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return [mapped[0], mapped[1], *argv[1:]]
 
 
 def cmd_download(args: argparse.Namespace) -> None:
@@ -2475,6 +2196,37 @@ def cmd_sim2real_benchmark_images(args: argparse.Namespace) -> None:
     run_cli(args)
 
 
+def cmd_experiment(args: argparse.Namespace) -> None:
+    """Handle the nested `experiment` subcommand by deferring to the legacy handler."""
+    handler_map = {
+        "localization-alignment": cmd_experiment_localization_alignment,
+        "render-backend-selection": cmd_experiment_render_backend_selection,
+        "localization-import": cmd_experiment_localization_import,
+        "query-transport-selection": cmd_experiment_query_transport_selection,
+        "query-request-import": cmd_experiment_query_request_import,
+        "live-localization-stream-import": cmd_experiment_live_localization_stream_import,
+        "route-capture-import": cmd_experiment_route_capture_import,
+        "sim2real-websocket-protocol": cmd_experiment_sim2real_websocket_protocol,
+        "localization-review-bundle-import": cmd_experiment_localization_review_bundle_import,
+        "query-cancellation-policy": cmd_experiment_query_cancellation_policy,
+        "query-coalescing-policy": cmd_experiment_query_coalescing_policy,
+        "query-error-mapping": cmd_experiment_query_error_mapping,
+        "query-queue-policy": cmd_experiment_query_queue_policy,
+        "query-source-identity": cmd_experiment_query_source_identity,
+        "query-timeout-policy": cmd_experiment_query_timeout_policy,
+        "query-response-build": cmd_experiment_query_response_build,
+    }
+    subcmd = getattr(args, "experiment_command", None)
+    if subcmd is None:
+        print("Error: specify an experiment lab. Run `gs-mapper experiment --help`.", file=sys.stderr)
+        sys.exit(2)
+    handler = handler_map.get(subcmd)
+    if handler is None:
+        print(f"Unknown experiment lab: {subcmd}", file=sys.stderr)
+        sys.exit(1)
+    handler(args)
+
+
 def cmd_experiment_localization_alignment(args: argparse.Namespace) -> None:
     """Handle the experiment-localization-alignment subcommand."""
     from gs_sim2real.experiments.localization_alignment_lab import run_cli
@@ -2590,7 +2342,9 @@ def cmd_experiment_query_response_build(args: argparse.Namespace) -> None:
 def main(argv: list[str] | None = None) -> None:
     """Entry point for the GS Mapper CLI."""
     parser = build_parser()
-    args = parser.parse_args(argv)
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    rewritten = _rewrite_legacy_experiment_argv(raw_argv)
+    args = parser.parse_args(rewritten)
 
     if args.command is None:
         parser.print_help()
@@ -2610,22 +2364,7 @@ def main(argv: list[str] | None = None) -> None:
         "sim2real-server": cmd_sim2real_server,
         "sim2real-query": cmd_sim2real_query,
         "sim2real-benchmark-images": cmd_sim2real_benchmark_images,
-        "experiment-localization-alignment": cmd_experiment_localization_alignment,
-        "experiment-render-backend-selection": cmd_experiment_render_backend_selection,
-        "experiment-localization-import": cmd_experiment_localization_import,
-        "experiment-query-transport-selection": cmd_experiment_query_transport_selection,
-        "experiment-query-request-import": cmd_experiment_query_request_import,
-        "experiment-live-localization-stream-import": cmd_experiment_live_localization_stream_import,
-        "experiment-route-capture-import": cmd_experiment_route_capture_import,
-        "experiment-sim2real-websocket-protocol": cmd_experiment_sim2real_websocket_protocol,
-        "experiment-localization-review-bundle-import": cmd_experiment_localization_review_bundle_import,
-        "experiment-query-cancellation-policy": cmd_experiment_query_cancellation_policy,
-        "experiment-query-coalescing-policy": cmd_experiment_query_coalescing_policy,
-        "experiment-query-error-mapping": cmd_experiment_query_error_mapping,
-        "experiment-query-queue-policy": cmd_experiment_query_queue_policy,
-        "experiment-query-source-identity": cmd_experiment_query_source_identity,
-        "experiment-query-timeout-policy": cmd_experiment_query_timeout_policy,
-        "experiment-query-response-build": cmd_experiment_query_response_build,
+        "experiment": cmd_experiment,
     }
 
     handler = handlers.get(args.command)

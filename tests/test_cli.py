@@ -1380,7 +1380,8 @@ class TestCLIHelp:
         """experiment-localization-alignment parser accepts evaluation settings."""
         args = build_parser().parse_args(
             [
-                "experiment-localization-alignment",
+                "experiment",
+                "localization-alignment",
                 "--repetitions",
                 "32",
                 "--write-docs",
@@ -1399,7 +1400,8 @@ class TestCLIHelp:
         """experiment-render-backend-selection parser accepts evaluation settings."""
         args = build_parser().parse_args(
             [
-                "experiment-render-backend-selection",
+                "experiment",
+                "render-backend-selection",
                 "--repetitions",
                 "16",
                 "--write-docs",
@@ -1418,7 +1420,8 @@ class TestCLIHelp:
         """experiment-localization-import parser accepts evaluation settings."""
         args = build_parser().parse_args(
             [
-                "experiment-localization-import",
+                "experiment",
+                "localization-import",
                 "--repetitions",
                 "24",
                 "--write-docs",
@@ -1437,7 +1440,8 @@ class TestCLIHelp:
         """experiment-query-transport-selection parser accepts evaluation settings."""
         args = build_parser().parse_args(
             [
-                "experiment-query-transport-selection",
+                "experiment",
+                "query-transport-selection",
                 "--repetitions",
                 "20",
                 "--write-docs",
@@ -1456,7 +1460,8 @@ class TestCLIHelp:
         """experiment-query-request-import parser accepts evaluation settings."""
         args = build_parser().parse_args(
             [
-                "experiment-query-request-import",
+                "experiment",
+                "query-request-import",
                 "--repetitions",
                 "12",
                 "--write-docs",
@@ -1475,7 +1480,8 @@ class TestCLIHelp:
         """experiment-live-localization-stream-import parser accepts evaluation settings."""
         args = build_parser().parse_args(
             [
-                "experiment-live-localization-stream-import",
+                "experiment",
+                "live-localization-stream-import",
                 "--repetitions",
                 "10",
                 "--write-docs",
@@ -1494,7 +1500,8 @@ class TestCLIHelp:
         """experiment-route-capture-import parser accepts evaluation settings."""
         args = build_parser().parse_args(
             [
-                "experiment-route-capture-import",
+                "experiment",
+                "route-capture-import",
                 "--repetitions",
                 "18",
                 "--write-docs",
@@ -1513,7 +1520,8 @@ class TestCLIHelp:
         """experiment-sim2real-websocket-protocol parser accepts evaluation settings."""
         args = build_parser().parse_args(
             [
-                "experiment-sim2real-websocket-protocol",
+                "experiment",
+                "sim2real-websocket-protocol",
                 "--repetitions",
                 "14",
                 "--write-docs",
@@ -1532,7 +1540,8 @@ class TestCLIHelp:
         """experiment-localization-review-bundle-import parser accepts evaluation settings."""
         args = build_parser().parse_args(
             [
-                "experiment-localization-review-bundle-import",
+                "experiment",
+                "localization-review-bundle-import",
                 "--repetitions",
                 "22",
                 "--write-docs",
@@ -1551,7 +1560,8 @@ class TestCLIHelp:
         """experiment-query-response-build parser accepts evaluation settings."""
         args = build_parser().parse_args(
             [
-                "experiment-query-response-build",
+                "experiment",
+                "query-response-build",
                 "--repetitions",
                 "24",
                 "--write-docs",
@@ -1570,7 +1580,8 @@ class TestCLIHelp:
         """experiment-query-timeout-policy parser accepts evaluation settings."""
         args = build_parser().parse_args(
             [
-                "experiment-query-timeout-policy",
+                "experiment",
+                "query-timeout-policy",
                 "--repetitions",
                 "26",
                 "--write-docs",
@@ -1589,7 +1600,8 @@ class TestCLIHelp:
         """experiment-query-queue-policy parser accepts evaluation settings."""
         args = build_parser().parse_args(
             [
-                "experiment-query-queue-policy",
+                "experiment",
+                "query-queue-policy",
                 "--repetitions",
                 "28",
                 "--write-docs",
@@ -1608,7 +1620,8 @@ class TestCLIHelp:
         """experiment-query-cancellation-policy parser accepts evaluation settings."""
         args = build_parser().parse_args(
             [
-                "experiment-query-cancellation-policy",
+                "experiment",
+                "query-cancellation-policy",
                 "--repetitions",
                 "30",
                 "--write-docs",
@@ -1627,7 +1640,8 @@ class TestCLIHelp:
         """experiment-query-coalescing-policy parser accepts evaluation settings."""
         args = build_parser().parse_args(
             [
-                "experiment-query-coalescing-policy",
+                "experiment",
+                "query-coalescing-policy",
                 "--repetitions",
                 "32",
                 "--write-docs",
