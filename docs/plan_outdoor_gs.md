@@ -120,6 +120,29 @@ NTU #17 にそのまま適用した場合、多くのフレームが translation
 
 **結論**: NTU #17 は pose injection 無しでは shippable demo にならない。次に MCD で demo を作るなら `(a)` 別 session 選定（GNSS 付き、重複多い Kirinyaga / Tuas など）、`(b)` MCDVIRAL の GT pose csv をダウンロードして `--trajectory-format tum` で直接食わせる、のどちらか。本セッションではここで撤退し、NTU #17 は "known-failing scene" として scratched。成果物は保持: `outputs/mcd_ntu17_stereo_dust3r/` など（retain しても demo 用途なし）。
 
+### 4.3.3 GNSS+LiDAR 付き MCD session 候補（次セッション向け）
+
+MCDVIRAL のダウンロードページを監査して GNSS (VN100/VN200) + LiDAR (Ouster OS1-64) + camera + /tf_static を全部揃えた session を size 順にリスト化した。NTU #17 撤退後の後継候補は次のとおり:
+
+| Session | Size | Mount | Notes |
+|---------|------|-------|-------|
+| `tuhh_night_09` | **3.5 GB** | handheld | 最小。GNSS (VN200) + Ouster OS1-64 + D455b + D455t. 同セッションの `ltpb.bag` (312 KB) に calibration + /tf_static が入ると推測 |
+| `tuhh_night_07` | 10.2 GB | handheld | |
+| `tuhh_day_04`   | 12.5 GB | handheld | day light 条件 |
+| `kth_night_05`  | 14.2 GB | handheld | |
+| `ntu_day_02`    | **14.8 GB** | vehicle (ATV) | 最小の車載 session。Autoware bag 系と同種の GNSS + LiDAR + camera + /tf_static が期待できる |
+| `tuhh_night_08` | 16.8 GB | handheld | |
+| `ntu_night_13`  | 17.3 GB | vehicle | |
+| ... | ... | ... | full list: https://mcdviral.github.io/Download.html |
+
+ダウンロードは session 単位で Drive **folder** なので、単一 file ID しか扱わなかった `scripts/download_mcd_session.sh` ではなく `scripts/download_mcd_folder.sh` を使う（本 PR で追加）。folder は `https://drive.google.com/drive/folders/<ID>` の `<ID>` を渡せば `gdown --folder` で全 bag を再帰取得する:
+
+```bash
+scripts/download_mcd_folder.sh 1nEPiTXkVmLIhmBOVNpwSAEgnAXupnAxx data/mcd/tuhh_night_09/
+```
+
+取得後は既存の `--method mcd` + `--mcd-seed-poses-from-gnss` + `--mcd-tf-use-image-stamps` + `--mcd-export-depth` パイプラインがそのまま通る想定（Autoware bag 系で確認済）。ただし MCD handheld session は /tf_static の親 frame 名が Autoware と異なる可能性があるので、preprocess 実行時に `mcd.py` の TF lookup が拾えるか一度確認する（拾えなかった場合、`--mcd-reference-bag` 相当の frame override を足す）。
+
 ### 4.4 densification は 100k 級初期点でも Stable に走るよう修正済み
 
 以前は iter 500 以降の densify で `IndexError: mask [N] != tensor [N+num_clone]` が即発生していた。本セッションの修正で bag1 30k iter → 244k Gaussians まで完走。
