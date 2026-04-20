@@ -435,7 +435,7 @@ GS Mapper is glue around a lot of excellent upstream work. Thanks to:
 - [nerfstudio-project/nerfstudio](https://github.com/nerfstudio-project/nerfstudio) — optional secondary training backend. *Apache 2.0.*
 
 ### Datasets / rosbags
-- [MCDVIRAL](https://mcdviral.github.io/) — multi-campus rosbag dataset (NTU / KTH / TUHH), source of the `mcd-tuhh-day04` bundled demos. *CC BY-NC-SA 4.0.*
+- [MCDVIRAL](https://mcdviral.github.io/) — multi-campus rosbag dataset (NTU / KTH / TUHH), source of the `mcd-tuhh-day04` bundled demos. Sensor-suite calibration YAMLs (handheld / ATV) can be fetched with `scripts/download_mcd_calibration.sh`, which pins the upstream Google Drive file IDs listed on the Download page. *CC BY-NC-SA 4.0.*
 - [Autoware Leo Drive ISUZU bags](https://github.com/autowarefoundation/autoware) — public driving rosbags (bag1–bag6), source of the supervised + bag6 pose-free demos. *Apache 2.0.*
 
 ### Adjacent
