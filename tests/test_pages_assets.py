@@ -97,8 +97,8 @@ def test_splat_html_has_scene_picker_with_all_bundled_splats(assets_dir: Path) -
         assert f'value="assets/outdoor-demo/{name}"' in html, (
             f"scene picker does not expose {name}; add an <option> under #sceneSelect"
         )
-    # Picker needs JS that swaps location.search; enforce the known hook.
-    assert "sceneSelect" in html and "location.assign" in html
+    # Picker JS is shared — each viewer must reference the single bootstrap file.
+    assert "scene-picker.js" in html, 'splat.html must include <script src="scene-picker.js">'
 
 
 def test_splat_spark_has_scene_picker_and_spark_wiring(assets_dir: Path) -> None:
@@ -111,7 +111,7 @@ def test_splat_spark_has_scene_picker_and_spark_wiring(assets_dir: Path) -> None
         assert f'value="assets/outdoor-demo/{name}"' in html, (
             f"Spark picker does not expose {name}; add an <option> under #sceneSelect"
         )
-    assert "location.assign" in html
+    assert "scene-picker.js" in html, 'splat_spark.html must include <script src="scene-picker.js">'
     # Spark 2.0 needs SparkRenderer added to the scene and three >= r179, otherwise
     # the canvas renders blank. Enforce both at the source level.
     assert "SparkRenderer" in html, "splat_spark.html must instantiate SparkRenderer"
@@ -152,4 +152,27 @@ def test_splat_webgpu_has_scene_picker(assets_dir: Path) -> None:
         assert f'value="assets/outdoor-demo/{name}"' in html, (
             f"WebGPU picker does not expose {name}; add an <option> under #sceneSelect"
         )
-    assert "location.assign" in html
+    assert "scene-picker.js" in html, 'splat_webgpu.html must include <script src="scene-picker.js">'
+
+
+def test_shared_scene_picker_assets_present(assets_dir: Path) -> None:
+    """The shared scene-picker.js + scenes-list.json exist and agree with the bundled splats."""
+    docs_dir = REPO_ROOT / "docs"
+    js = docs_dir / "scene-picker.js"
+    index = docs_dir / "scenes-list.json"
+    assert js.is_file(), "shared docs/scene-picker.js is missing"
+    assert index.is_file(), "shared docs/scenes-list.json is missing"
+    # JS must contain the URL-sync hook the viewer tests previously asserted inline.
+    js_text = js.read_text(encoding="utf-8")
+    assert "location.assign" in js_text, "scene-picker.js must swap location on change"
+    assert "scenes-list.json" in js_text, "scene-picker.js must fetch the shared config"
+    # scenes-list.json should list every bundled splat so a data-driven picker in
+    # a viewer (empty <select>) auto-populates correctly.
+    import json as _json
+
+    data = _json.loads(index.read_text(encoding="utf-8"))
+    assert data.get("version") == "gs-mapper-scene-picker/v1"
+    indexed = {scene["url"] for scene in data.get("scenes", [])}
+    for name in sorted(p.name for p in (assets_dir / "outdoor-demo").glob("*.splat")):
+        url = f"assets/outdoor-demo/{name}"
+        assert url in indexed, f"scenes-list.json is missing {url}; add it to keep pickers in sync"

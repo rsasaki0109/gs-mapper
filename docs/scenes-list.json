@@ -1,0 +1,31 @@
+{
+  "version": "gs-mapper-scene-picker/v1",
+  "description": "List of bundled splats that every in-repo viewer (splat.html, splat_spark.html, splat_webgpu.html) exposes via the <select id=\"sceneSelect\"> picker. Adding a splat here makes it show up in all three viewers.",
+  "scenes": [
+    {
+      "url": "assets/outdoor-demo/outdoor-demo.splat",
+      "label": "Autoware 6-bag fused (supervised default)",
+      "summary": "Autoware Leo Drive 6-bag fused — supervised (GNSS + LiDAR + appearance + BA)"
+    },
+    {
+      "url": "assets/outdoor-demo/outdoor-demo-dust3r.splat",
+      "label": "bag6 cam0 \u2014 DUSt3R pose-free",
+      "summary": "Autoware bag6 cam0, 20 DUSt3R frames, no GNSS/LiDAR \u2014 pose-free"
+    },
+    {
+      "url": "assets/outdoor-demo/mcd-tuhh-day04.splat",
+      "label": "MCD tuhh_day_04 \u2014 DUSt3R pose-free",
+      "summary": "MCD tuhh_day_04 handheld day session, 20 DUSt3R frames \u2014 non-Autoware"
+    },
+    {
+      "url": "assets/outdoor-demo/bag6-mast3r.splat",
+      "label": "bag6 cam0 \u2014 MAST3R pose-free (metric)",
+      "summary": "Autoware bag6 cam0, 20 MAST3R frames \u2014 metric-aware pose-free"
+    },
+    {
+      "url": "assets/outdoor-demo/mcd-tuhh-day04-mast3r.splat",
+      "label": "MCD tuhh_day_04 \u2014 MAST3R pose-free (metric)",
+      "summary": "MCD tuhh_day_04 handheld day session, 20 MAST3R frames \u2014 metric-aware pose-free"
+    }
+  ]
+}

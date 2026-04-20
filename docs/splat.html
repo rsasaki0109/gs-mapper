@@ -310,37 +310,9 @@ other
 		<div id="caminfo">
 			<span id="camid"></span>
 		</div>
-		<script>
-			// Scene picker: syncs ?url= in the address bar and reloads so the
-			// splat viewer refetches. Also reflects the current ?url= value
-			// back into the <select> when the page loads via a shared link.
-			(function () {
-				const select = document.getElementById('sceneSelect');
-				const summary = document.getElementById('sceneSummary');
-				if (!select || !summary) return;
-				function applySummary() {
-					const opt = select.selectedOptions[0];
-					summary.textContent = opt ? (opt.dataset.summary || '') : '';
-				}
-				const params = new URLSearchParams(location.search);
-				const current = params.get('url');
-				if (current) {
-					for (const opt of select.options) {
-						if (opt.value === current) {
-							select.value = current;
-							break;
-						}
-					}
-				}
-				applySummary();
-				select.addEventListener('change', () => {
-					const value = select.value;
-					params.set('url', value);
-					const next = `${location.pathname}?${params.toString()}${location.hash}`;
-					location.assign(next);
-				});
-			})();
-		</script>
+		<!-- Scene picker bootstrap lives in a shared script so splat.html,
+		     splat_spark.html, and splat_webgpu.html all stay in sync. -->
+		<script src="scene-picker.js"></script>
 		<script src="splat-viewer/main.js"></script>
 	</body>
 </html>

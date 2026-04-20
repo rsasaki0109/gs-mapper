@@ -389,6 +389,30 @@ If you use this tool in your research, please cite the relevant dataset papers:
 }
 ```
 
+## Credits
+
+GS Mapper is glue around a lot of excellent upstream work. Thanks to:
+
+### Pose-free backends
+- [naver/dust3r](https://github.com/naver/dust3r) — pairwise pointmap network + `PointCloudOptimizer` global alignment, used by `gs-mapper photos-to-splat --preprocess dust3r`. *Licensed CC BY-NC-SA 4.0 (non-commercial).*
+- [naver/mast3r](https://github.com/naver/mast3r) — metric-aware descendant of DUSt3R with sparse global alignment, used by `--preprocess mast3r`. *Licensed CC BY-NC-SA 4.0 (non-commercial).*
+
+### Browser viewers
+- [antimatter15/splat](https://github.com/antimatter15/splat) by Kevin Kwok — the WebGL CPU-sort renderer that `docs/splat.html` vendors. *MIT.*
+- [sparkjsdev/spark](https://github.com/sparkjsdev/spark) 2.0 by [World Labs](https://www.worldlabs.ai/) — THREE.js-based renderer with view-dependent LoD, progressive streaming, VRAM virtualization, mobile / VR support. *MIT.*
+- [shrekshao/webgpu-3d-gaussian-splat-viewer](https://github.com/shrekshao/webgpu-3d-gaussian-splat-viewer) — WebGPU compute + radix-sort viewer bundled under `docs/splat-webgpu/`. *MIT.*
+
+### Training / exporter
+- [nerfstudio-project/gsplat](https://github.com/nerfstudio-project/gsplat) — the CUDA gaussian splatting kernels we wrap in `gs_sim2real.train.gsplat_trainer`. *Apache 2.0.*
+- [nerfstudio-project/nerfstudio](https://github.com/nerfstudio-project/nerfstudio) — optional secondary training backend. *Apache 2.0.*
+
+### Datasets / rosbags
+- [MCDVIRAL](https://mcdviral.github.io/) — multi-campus rosbag dataset (NTU / KTH / TUHH), source of the `mcd-tuhh-day04` bundled demos. *CC BY-NC-SA 4.0.*
+- [Autoware Leo Drive ISUZU bags](https://github.com/autowarefoundation/autoware) — public driving rosbags (bag1–bag6), source of the supervised + bag6 pose-free demos. *Apache 2.0.*
+
+### Adjacent
+- [rsasaki0109/simple_visual_slam](https://github.com/rsasaki0109/simple_visual_slam) — the compact Visual SLAM we reached for during MCD NTU #17 pose-injection experiments. *BSD-2-Clause.*
+
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.
