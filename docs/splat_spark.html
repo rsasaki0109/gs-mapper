@@ -25,8 +25,10 @@
       <a href="splat.html">antimatter15/splat viewer</a> but through
       <a href="https://github.com/sparkjsdev/spark">sparkjsdev/spark</a> 2.0 (MIT, built on
       THREE.js by World Labs — GPU-side sort, view-dependent LoD, progressive streaming,
-      VRAM virtualization — targets mobile / VR as well as desktop). Pick a scene below or
-      pass <code>?url=&lt;splat-path&gt;</code> for a custom splat.
+      VRAM virtualization — targets mobile / VR as well as desktop).
+      <strong>Enter VR</strong> via the bottom-right button on Meta Quest / Vision Pro
+      / any WebXR-capable browser to walk around the splat in immersive mode.
+      Pick a scene below or pass <code>?url=&lt;splat-path&gt;</code> for a custom splat.
       <a href="./">← back to the Three.js point viewer</a> ·
       <a href="splat.html">use the antimatter15 viewer</a>.
     </small>
@@ -61,6 +63,7 @@
   <script type="module">
     import * as THREE from "three";
     import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { VRButton } from "three/addons/webxr/VRButton.js";
     import { SparkRenderer, SplatMesh } from "@sparkjsdev/spark";
 
     const statusEl = document.getElementById("status");
@@ -78,7 +81,14 @@
     const renderer = new THREE.WebGLRenderer({ antialias: false });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
+    // Enable WebXR so Spark's splats can be entered in immersive-vr mode on
+    // Meta Quest / Vision Pro / any WebXR-capable browser. Requires HTTPS in
+    // production (GitHub Pages already serves HTTPS).
+    renderer.xr.enabled = true;
     hostEl.appendChild(renderer.domElement);
+    // Spark 2.0's SparkRenderer routes all SplatMesh draws through the same
+    // THREE.WebGLRenderer, so the XR session automatically picks them up.
+    document.body.appendChild(VRButton.createButton(renderer));
 
     // Spark 2.0 requires a SparkRenderer auxiliary object in the scene for the
     // SplatMesh(es) to actually rasterize. Without it SplatMesh loads silently

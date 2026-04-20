@@ -116,6 +116,10 @@ def test_splat_spark_has_scene_picker_and_spark_wiring(assets_dir: Path) -> None
     # the canvas renders blank. Enforce both at the source level.
     assert "SparkRenderer" in html, "splat_spark.html must instantiate SparkRenderer"
     assert "scene.add(spark)" in html, "SparkRenderer instance must be added to the scene"
+    # WebXR / "Enter VR" wiring: VRButton import + renderer.xr.enabled + button append.
+    assert "VRButton" in html, "splat_spark.html must import VRButton for Spark 2.0's WebXR support"
+    assert "renderer.xr.enabled = true" in html, "WebXR requires renderer.xr.enabled = true"
+    assert "VRButton.createButton(renderer)" in html, "VRButton must be mounted on the page"
     # three version pin (any patch of r179 / r180 / higher is fine).
     import re
 
