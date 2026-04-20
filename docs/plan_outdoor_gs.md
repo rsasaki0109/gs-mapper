@@ -155,7 +155,7 @@ scripts/download_mcd_folder.sh 1nEPiTXkVmLIhmBOVNpwSAEgnAXupnAxx data/mcd/tuhh_n
 
 1. day session 1 本 DL（`tuhh_day_04` 12.5 GB か `ntu_day_02` 14.8 GB）
 2. `/vn200/GPS` に valid fix があるか事前に spot-check（`status.status >= 0` が 1% 以上）
-3. MCDVIRAL calibration YAML を入手、`--mcd-static-calibration` みたいなフラグを足して `mcd.py` の TF lookup を bypass できるようにする
+3. MCDVIRAL calibration YAML を入手（2026-04-20: Download page 本体で発見済み、`scripts/download_mcd_calibration.sh <handheld|atv>` で取得可。※別 PR）。`--mcd-static-calibration <calib.yaml>` フラグが `preprocess` / `run` / `demo` に配線されたので、bag に /tf_static が無くても `body → <sensor>` の tree を YAML から注入して `_mcd_gnss_sparse_import` の TF lookup を通せる（`gs_sim2real.datasets.ros_tf.load_static_calibration_yaml`）。camera_frame / lidar_frame は YAML のセンサー名 (`d455b_color`, `mid70`, `os_sensor`, …) を `--mcd-camera-frame` / `--mcd-lidar-frame` に直接渡す
 4. preprocess → gsplat train → splat export → Pages bundle
 
 #### 4.3.3.b `tuhh_day_04` で image-only DUSt3R 経路が通った (2026-04-19)

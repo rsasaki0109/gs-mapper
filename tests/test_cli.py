@@ -509,6 +509,25 @@ class TestCLIHelp:
         assert args.mcd_lidar_frame == ""
         assert args.mcd_skip_lidar_seed is False
 
+    def test_cli_mcd_static_calibration_flag_on_all_subcommands(self) -> None:
+        """preprocess / run / demo all accept --mcd-static-calibration and default to ''."""
+        parser = build_parser()
+        # Each subcommand defaults the flag to empty string and accepts an explicit path.
+        for sub, required in (
+            ("preprocess", ["--method", "mcd"]),
+            ("run", []),
+            ("demo", []),
+        ):
+            argv = [sub, "--images", "data/mcd", "--output", "outputs/x", *required]
+            default = parser.parse_args(argv)
+            assert default.mcd_static_calibration == "", (
+                f"{sub} parser should default --mcd-static-calibration to '' (got {default.mcd_static_calibration!r})"
+            )
+            explicit = parser.parse_args(
+                [*argv, "--mcd-static-calibration", "/tmp/calib.yaml"],
+            )
+            assert explicit.mcd_static_calibration == "/tmp/calib.yaml"
+
     def test_cli_preprocess_mcd_list_topics_flag(self) -> None:
         """preprocess parser accepts MCD topic listing mode."""
         args = build_parser().parse_args(

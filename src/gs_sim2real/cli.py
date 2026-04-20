@@ -147,6 +147,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Multi-camera GNSS seed: resolve TF at each image time (/tf + /tf_static topology)",
     )
     pp.add_argument(
+        "--mcd-static-calibration",
+        default="",
+        help=(
+            "Path to an MCDVIRAL sensor calibration YAML (handheld/ATV rig; fetched with "
+            "scripts/download_mcd_calibration.sh). Populates the /tf_static tree when the bag "
+            "itself ships no TF — true for all kth_/tuhh_/ntu_ sessions. Forces --mcd-base-frame "
+            "to 'body' unless one is explicitly passed."
+        ),
+    )
+    pp.add_argument(
         "--mcd-lidar-frame",
         default="",
         help="For MCD GNSS seeding, LiDAR frame id under base_link (empty = identity T_base_lidar)",
@@ -449,6 +459,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Multi-camera GNSS seed: resolve TF at each image time (/tf + /tf_static topology)",
     )
     rn.add_argument(
+        "--mcd-static-calibration",
+        default="",
+        help=(
+            "Path to an MCDVIRAL sensor calibration YAML (handheld/ATV rig; fetched with "
+            "scripts/download_mcd_calibration.sh). Populates the /tf_static tree when the bag "
+            "itself ships no TF — true for all kth_/tuhh_/ntu_ sessions. Forces --mcd-base-frame "
+            "to 'body' unless one is explicitly passed."
+        ),
+    )
+    rn.add_argument(
         "--mcd-lidar-frame",
         default="",
         help="For MCD GNSS seeding, LiDAR frame id under base_link (empty = identity T_base_lidar)",
@@ -620,6 +640,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--mcd-tf-use-image-stamps",
         action="store_true",
         help="Multi-camera GNSS seed: resolve TF at each image time (/tf + /tf_static topology)",
+    )
+    dm.add_argument(
+        "--mcd-static-calibration",
+        default="",
+        help=(
+            "Path to an MCDVIRAL sensor calibration YAML (handheld/ATV rig; fetched with "
+            "scripts/download_mcd_calibration.sh). Populates the /tf_static tree when the bag "
+            "itself ships no TF — true for all kth_/tuhh_/ntu_ sessions. Forces --mcd-base-frame "
+            "to 'body' unless one is explicitly passed."
+        ),
     )
     dm.add_argument(
         "--mcd-lidar-frame",
@@ -1710,6 +1740,22 @@ def _mcd_gnss_sparse_import(
 
     tf_map = loader.build_tf_map(include_dynamic_tf=include_tf_dynamic)
 
+    static_calib_path = (getattr(args, "mcd_static_calibration", "") or "").strip()
+    if static_calib_path:
+        from gs_sim2real.datasets.ros_tf import load_static_calibration_yaml, merge_static_tf_maps
+
+        try:
+            calib_tf_map = load_static_calibration_yaml(static_calib_path, base_frame=base_frame)
+        except Exception as exc:
+            raise ValueError(f"--mcd-static-calibration={static_calib_path!r}: failed to load ({exc})") from exc
+        # bag-derived edges win on collision — the YAML is a fallback for the /tf_static-less
+        # MCD sessions, not an authoritative override when a rig already publishes its TF.
+        tf_map = merge_static_tf_maps(calib_tf_map, tf_map)
+        print(
+            f"MCD static calibration: +{len(calib_tf_map)} edges from {static_calib_path} "
+            f"(parent={base_frame}, merged total={len(tf_map)})"
+        )
+
     # --- Multi-camera: vehicle TUM + per-camera TF + multiview COLMAP ---
     if len(it_list) > 1:
         cameras: list[dict] = []
@@ -1774,6 +1820,14 @@ def _mcd_gnss_sparse_import(
         use_stamp_tf = getattr(args, "mcd_tf_use_image_stamps", False) and not disable_tf
         if use_stamp_tf:
             static_topo = loader.build_tf_map(include_dynamic_tf=False)
+            if static_calib_path:
+                from gs_sim2real.datasets.ros_tf import (
+                    load_static_calibration_yaml,
+                    merge_static_tf_maps,
+                )
+
+                calib_topo = load_static_calibration_yaml(static_calib_path, base_frame=base_frame)
+                static_topo = merge_static_tf_maps(calib_topo, static_topo)
             dyn = loader.collect_tf_dynamic_edges()
             hybrid_tf = HybridTfLookup(static_topo, dyn if len(dyn) > 0 else None)
             print("MCD: per-image TF extrinsics (HybridTfLookup: /tf_static topology + /tf samples)")

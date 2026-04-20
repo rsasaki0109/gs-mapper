@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -166,3 +167,72 @@ class HybridTfLookup:
             cur = parent
 
         return T_accum
+
+
+def load_static_calibration_yaml(
+    path: str | Path,
+    *,
+    base_frame: str = "body",
+) -> StaticTfMap:
+    """Load an MCDVIRAL-style sensor calibration YAML into a :class:`StaticTfMap`.
+
+    MCDVIRAL distributes its handheld / ATV calibration as ``body: { <sensor>:
+    { T: [[…4×4…]], intrinsics, distortion_*, rostopic, timeshift_cam_imu } }``
+    where ``T`` is the 4×4 transform that takes a point expressed in the sensor
+    frame to the body frame (``p_body = T @ p_sensor``). Each ``<sensor>`` entry
+    becomes one edge in the returned tree with the sensor as the child and
+    ``base_frame`` as the parent. The caller can then pass that tree anywhere a
+    bag-derived ``StaticTfMap`` would normally plug in (e.g. MCD preprocess).
+
+    The ``base_frame`` argument lets you re-label the YAML's parent key so the
+    returned map matches whatever frame name the caller is already using
+    downstream (MCD preprocess defaults to ``base_link``).
+
+    Sensors whose ``T`` cannot be parsed as a 4×4 float matrix are skipped with
+    a warning rather than failing the whole load.
+    """
+    import yaml
+
+    p = Path(path)
+    with p.open("r", encoding="utf-8") as f:
+        doc = yaml.safe_load(f)
+
+    if not isinstance(doc, dict):
+        raise ValueError(f"calibration YAML {p} has no top-level mapping")
+    body = doc.get("body")
+    if not isinstance(body, dict):
+        raise ValueError(f"calibration YAML {p} has no 'body:' mapping (expected MCDVIRAL handheld/ATV format)")
+
+    tf_map = StaticTfMap()
+    for sensor_name, entry in body.items():
+        if not isinstance(entry, dict):
+            continue
+        T_raw = entry.get("T")
+        if T_raw is None:
+            continue
+        try:
+            T = np.asarray(T_raw, dtype=np.float64)
+        except (TypeError, ValueError):
+            logger.warning("calibration YAML: sensor %r has non-numeric T; skipping", sensor_name)
+            continue
+        if T.shape != (4, 4):
+            logger.warning(
+                "calibration YAML: sensor %r T must be 4×4, got %s; skipping",
+                sensor_name,
+                T.shape,
+            )
+            continue
+        tf_map.add(base_frame, str(sensor_name), T)
+
+    return tf_map
+
+
+def merge_static_tf_maps(*maps: StaticTfMap) -> StaticTfMap:
+    """Combine several :class:`StaticTfMap`\\ s into one; later maps win on child-key collisions."""
+    out = StaticTfMap()
+    for m in maps:
+        if m is None:
+            continue
+        for child, (parent, T) in m._child_to_edge.items():  # noqa: SLF001 — internal merge
+            out.add(parent, child, T)
+    return out
