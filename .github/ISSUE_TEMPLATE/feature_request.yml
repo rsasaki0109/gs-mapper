@@ -1,0 +1,43 @@
+name: Feature request
+description: A new CLI flag, pose-free backend, viewer feature, or documented workflow.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        CONTRIBUTING.md § "Where to start" lists the seams where new features
+        are easiest to slot in. Aim the request at one of those landing spots
+        if you can.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's the underlying problem
+      description: Describe the user-facing gap, not the solution you already have in mind.
+      placeholder: |
+        I have a folder of 200 phone photos and photos-to-splat's 20-frame
+        default throws away most of them. I'd like to keep the full set.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Rough proposal
+      description: Optional. If you already see a shape for the fix, sketch it.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - CLI (src/gs_sim2real/cli.py)
+        - Pose-free backend (DUSt3R / MAST3R)
+        - Training / exporter (gsplat, PLY -> .splat)
+        - Viewer (docs/splat*.html)
+        - Docs / demo story
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Optional.

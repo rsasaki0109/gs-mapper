@@ -1,0 +1,53 @@
+name: Bug report
+description: Something that used to work, doesn't. Or a CLI/viewer crash.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. To keep triage fast, please include a minimal
+        reproducer — CONTRIBUTING.md § "Reporting issues" has the details.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened
+      description: One or two sentences. What you did, what you expected, what you got.
+      placeholder: |
+        Ran `gs-mapper photos-to-splat --images ./my_photos`. Expected a .splat,
+        got a stack trace out of DUSt3R's `inference.py` on frame 7.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproducer
+      description: |
+        For pose-free / training bugs a zip of frames works. For trainer bugs a
+        100-line synthetic COLMAP text model is enough. CLI-shaped bugs — paste
+        the exact command + its full stderr.
+      render: bash
+    validations:
+      required: true
+  - type: input
+    id: component
+    attributes:
+      label: Component
+      description: Which subcommand or viewer? (e.g. `gs-mapper photos-to-splat`, `docs/splat_spark.html`)
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: |
+        For pose-free / training bugs include OS, GPU (`nvidia-smi | head -3`),
+        PyTorch + CUDA versions, and DUSt3R/MAST3R commit hashes if applicable.
+        For viewer bugs include browser + version + OS.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs / stack trace
+      render: text

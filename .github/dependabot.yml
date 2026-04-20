@@ -1,0 +1,37 @@
+version: 2
+
+# Dependabot is scoped intentionally narrowly: we only want bump PRs for the
+# things that actually run in CI (GitHub Actions + the Python pins in
+# pyproject.toml). Upstream pose-free / training backends are vendored clones
+# under `external/` and handled by hand — see CONTRIBUTING.md.
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+      include: scope
+    labels:
+      - dependencies
+      - ci
+
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+      include: scope
+    labels:
+      - dependencies
+    ignore:
+      # Torch / CUDA pins are coupled to the gsplat / DUSt3R / MAST3R upstreams
+      # and need a human to bump them together with the external clones.
+      - dependency-name: "torch"
+      - dependency-name: "torchvision"
+      - dependency-name: "torchaudio"
