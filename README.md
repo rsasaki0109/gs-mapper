@@ -38,6 +38,14 @@ GitHub Pages hosts four views of the same 6-bag Autoware Leo Drive ISUZU bundle:
 
 The supervised default uses the full MCD pose-import stack. Pose-free variants use the pipeline you can invoke yourself with `gs-mapper photos-to-splat --preprocess dust3r` or `--preprocess mast3r`.
 
+### Mobile
+
+Spark 2.0 is built for mobile / VR as well as desktop and the scene picker reflows cleanly on a phone-sized viewport. Dogfooded via Playwright with the iPhone 14 device profile (390×664, DPR 3) against the live Pages site — scene picker, blurb, and canvas all fit and the `?url=...` deep links keep working:
+
+![WebGPU viewer on iPhone 14 viewport (390x664, DPR 3)](docs/images/demo-sweep/mobile_iphone14_webgpu.png)
+
+Open the live demo on your phone: [splat_spark.html](https://rsasaki0109.github.io/gs-mapper/splat_spark.html), [splat.html](https://rsasaki0109.github.io/gs-mapper/splat.html), or [splat_webgpu.html](https://rsasaki0109.github.io/gs-mapper/splat_webgpu.html) (WebGPU viewer needs Chrome / Edge 113+ or recent Safari TP).
+
 ### Quality push: 3k vs 15k MAST3R training
 
 Pose-free MAST3R variants are trained 5× longer than the DUSt3R ones because the sparse MAST3R seed (~300k confidence-matched descriptors) can actually absorb the extra iterations. At 3k iter gsplat has 767k gauss with visible gaps in surfaces; at 15k iter it converges to 923k gauss with sharper structure — L1 drops from ~0.18 to ~0.16 and the canvas looks noticeably less blobby.
