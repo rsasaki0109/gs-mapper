@@ -101,6 +101,31 @@ def test_splat_html_has_scene_picker_with_all_bundled_splats(assets_dir: Path) -
     assert "sceneSelect" in html and "location.assign" in html
 
 
+def test_splat_spark_has_scene_picker_and_spark_wiring(assets_dir: Path) -> None:
+    """Spark viewer ships the same picker and must use the SparkRenderer wrapper."""
+    html = (REPO_ROOT / "docs" / "splat_spark.html").read_text(encoding="utf-8")
+    # Same picker contract as splat.html.
+    assert 'id="sceneSelect"' in html, "Spark viewer is missing the scene picker"
+    bundled = sorted(p.name for p in (assets_dir / "outdoor-demo").glob("*.splat"))
+    for name in bundled:
+        assert f'value="assets/outdoor-demo/{name}"' in html, (
+            f"Spark picker does not expose {name}; add an <option> under #sceneSelect"
+        )
+    assert "location.assign" in html
+    # Spark 2.0 needs SparkRenderer added to the scene and three >= r179, otherwise
+    # the canvas renders blank. Enforce both at the source level.
+    assert "SparkRenderer" in html, "splat_spark.html must instantiate SparkRenderer"
+    assert 'scene.add(spark)' in html, "SparkRenderer instance must be added to the scene"
+    # three version pin (any patch of r179 / r180 / higher is fine).
+    import re
+
+    version_matches = re.findall(r"three@0\.(\d+)\.\d+", html)
+    assert version_matches, "splat_spark.html should import a pinned three.js version"
+    assert all(int(v) >= 179 for v in version_matches), (
+        f"Spark 2.0 requires three >= r179; found {version_matches}"
+    )
+
+
 def test_webgpu_viewer_bundle_present() -> None:
     """shrekshao WebGPU viewer bundle must be present alongside the wrapper page."""
     docs_dir = REPO_ROOT / "docs"

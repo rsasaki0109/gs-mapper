@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>GS Mapper — Spark (WebGL2) Gaussian Splat Viewer</title>
+<title>GS Mapper — Spark 2.0 (WebGL2 / THREE.js) Gaussian Splat Viewer</title>
 <style>
   body { margin: 0; background: #0d1117; color: #e6edf3; font-family: system-ui, sans-serif; overflow: hidden; }
   #info {
@@ -18,27 +18,40 @@
 </head>
 <body>
   <div id="info">
-    <h3>GS Mapper — Spark renderer (experimental, advanced WebGL2 Gaussian Splatting)</h3>
+    <h3>GS Mapper — Spark 2.0 (WebGL2 / THREE.js) Gaussian Splat Viewer</h3>
     <small>
-      Loads the same <code>assets/outdoor-demo/outdoor-demo.splat</code> used by the
+      Loads the same <code>.splat</code> bundle as the
       <a href="splat.html">antimatter15/splat viewer</a> but through
-      <a href="https://github.com/sparkjsdev/spark">sparkjsdev/spark</a> (MIT, THREE.js-based
-      renderer with GPU-side sort + LoD). <strong>Experimental:</strong> Spark's workers can
-      show a black canvas under headless browsers (Playwright, swiftshader) even though the
-      splat loads; on Chrome/Firefox with a real GPU it should render.
-      Override with <code>?url=&lt;splat-path&gt;</code>.
+      <a href="https://github.com/sparkjsdev/spark">sparkjsdev/spark</a> 2.0 (MIT, built on
+      THREE.js by World Labs — GPU-side sort, view-dependent LoD, progressive streaming,
+      VRAM virtualization — targets mobile / VR as well as desktop). Pick a scene below or
+      pass <code>?url=&lt;splat-path&gt;</code> for a custom splat.
       <a href="./">← back to the Three.js point viewer</a> ·
-      <a href="splat.html">use the always-on antimatter15 viewer</a>.
+      <a href="splat.html">use the antimatter15 viewer</a>.
     </small>
   </div>
+
+  <p class="nohf" id="scenePickerRow" style="position: absolute; top: 78px; left: 14px; right: 14px; z-index: 10; margin: 0;">
+    <small>
+      <label for="sceneSelect"><strong>Scene:</strong></label>
+      <select id="sceneSelect" data-testid="scene-picker">
+        <option value="assets/outdoor-demo/outdoor-demo.splat">Autoware 6-bag fused (supervised default)</option>
+        <option value="assets/outdoor-demo/outdoor-demo-dust3r.splat">bag6 cam0 — DUSt3R pose-free</option>
+        <option value="assets/outdoor-demo/mcd-tuhh-day04.splat">MCD tuhh_day_04 — DUSt3R pose-free</option>
+        <option value="assets/outdoor-demo/bag6-mast3r.splat">bag6 cam0 — MAST3R pose-free (metric)</option>
+        <option value="assets/outdoor-demo/mcd-tuhh-day04-mast3r.splat">MCD tuhh_day_04 — MAST3R pose-free (metric)</option>
+      </select>
+    </small>
+  </p>
+
   <div id="canvas-host"></div>
   <div id="status">initializing…</div>
 
   <script type="importmap">
   {
     "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.178.0/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.178.0/examples/jsm/",
+      "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
       "@sparkjsdev/spark": "https://cdn.jsdelivr.net/npm/@sparkjsdev/spark@2.0.0/dist/spark.module.min.js"
     }
   }
@@ -47,7 +60,7 @@
   <script type="module">
     import * as THREE from "three";
     import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-    import { SplatMesh } from "@sparkjsdev/spark";
+    import { SparkRenderer, SplatMesh } from "@sparkjsdev/spark";
 
     const statusEl = document.getElementById("status");
     const hostEl = document.getElementById("canvas-host");
@@ -56,17 +69,25 @@
     scene.background = new THREE.Color(0x0d1117);
 
     const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
-    // Match the Spark README example: camera at origin, splats placed in front.
-    camera.position.set(0, 0, 0);
+    // Match the antimatter15 viewer's default framing (camera ~30 m from a
+    // 17 m-extent splat centred at the origin) so the bundled scene picker
+    // options all land inside the frustum with the OrbitControls target at 0,0,0.
+    camera.position.set(26.8, 12.0, 23.1);
 
     const renderer = new THREE.WebGLRenderer({ antialias: false });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
     hostEl.appendChild(renderer.domElement);
 
+    // Spark 2.0 requires a SparkRenderer auxiliary object in the scene for the
+    // SplatMesh(es) to actually rasterize. Without it SplatMesh loads silently
+    // but the canvas stays blank.
+    const spark = new SparkRenderer({ renderer });
+    scene.add(spark);
+
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.target.set(0, 0, -40);
+    controls.target.set(3.1, -0.67, -0.6);
     controls.update();
 
     const params = new URLSearchParams(location.search);
@@ -74,11 +95,11 @@
 
     statusEl.textContent = `loading ${splatUrl}…`;
     const splat = new SplatMesh({ url: splatUrl });
-    // Spark's README example flips splats via quat(1,0,0,0) to reconcile the
-    // file convention with THREE.js Y-up. Position the splat well in front of
-    // the origin so it lands inside the camera's frustum.
-    splat.quaternion.set(1, 0, 0, 0);
-    splat.position.set(0, 0, -40);
+    // Our antimatter15 splats are centred at the origin and rescaled so the max-axis
+    // extent is ~17 m. Leave Spark's default orientation alone — the Spark README
+    // quat flip is for .spz files, which use a different axis convention from the
+    // .splat exports we produce (matching antimatter15's Y-up expectation).
+    splat.position.set(0, 0, 0);
     scene.add(splat);
 
     if (splat.initialized && typeof splat.initialized.then === "function") {
@@ -104,6 +125,24 @@
       controls.update();
       renderer.render(scene, camera);
     });
+  </script>
+
+  <script>
+    (function () {
+      const select = document.getElementById("sceneSelect");
+      if (!select) return;
+      const params = new URLSearchParams(location.search);
+      const current = params.get("url");
+      if (current) {
+        for (const opt of select.options) {
+          if (opt.value === current) { select.value = current; break; }
+        }
+      }
+      select.addEventListener("change", () => {
+        params.set("url", select.value);
+        location.assign(`${location.pathname}?${params.toString()}${location.hash}`);
+      });
+    })();
   </script>
 </body>
 </html>
