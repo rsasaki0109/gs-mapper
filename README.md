@@ -56,6 +56,20 @@ Pose-free MAST3R variants are trained 5× longer than the DUSt3R ones because th
 
 DUSt3R variants are kept at 3k iter because their aligner output saturates earlier (no extra descriptor signal for later iterations to exploit).
 
+### Benchmark (this repo, bundled demos)
+
+Numbers below are the end-to-end wall-clock and quality figures for the five bundled splats, measured on a single RTX 4070 Ti Super (16 GB). The "Pose → sparse" column is pose-free backend run time on 20 frames with `scene_graph=complete`; "Train" is `gs-mapper train` on that sparse output. Supervised figures are from the multi-bag MCD-pose-import training that produces `outdoor-demo.splat`.
+
+| Scene | Pose → sparse | Recovered poses | Scene extent | gsplat iter | Train wall-clock | Trained gauss | Final L1 | Shipped splat |
+|-------|---------------|-----------------|--------------|-------------|------------------|---------------|----------|----------------|
+| Autoware 6-bag (supervised) | GNSS + `/tf_static` + LiDAR seed (6120 cams across 6 bags) | 6120/6120 | metric (bag-fused ENU) | 30 000 | ~hours | 1.48M → 80k filter | ~0.06 | 2.56 MB / 80k gauss |
+| bag6 cam0 — DUSt3R | ~3 min | 19 / 20 | 1.02 m (unscaled) | 3 000 | 276 s | 5.57M → 400k filter | ~0.18 | 12.8 MB / 400k gauss |
+| bag6 cam0 — MAST3R | ~3 min | **20 / 20** | **28.1 m (metric)** | 15 000 | 285 s | 923k | ~0.16 | 12.8 MB / 400k gauss |
+| MCD tuhh_day_04 — DUSt3R | ~3 min | 19 / 20 | 1.78 m (unscaled) | 3 000 | 147 s | 3.23M → 400k filter | ~0.18 | 12.8 MB / 400k gauss |
+| MCD tuhh_day_04 — MAST3R | ~5 min | **20 / 20** | **59.0 m (metric)** | 15 000 | 413 s | 1.15M | ~0.16 | 12.8 MB / 400k gauss |
+
+Every `.splat` is capped at the antimatter15 400 000-gauss / 12.8 MB size via `gs-mapper export --format splat --max-points 400000`, which is well under what Chrome can stream over Pages on mobile. The supervised demo uses a different filter budget (80k after opacity/scale gate) because its dense reconstruction already absorbs the supervised signal, and a smaller splat loads faster on the default scene.
+
 GitHub Pages is deployed by [`.github/workflows/pages.yml`](.github/workflows/pages.yml) on `push` to `main`.
 
 ## Concept

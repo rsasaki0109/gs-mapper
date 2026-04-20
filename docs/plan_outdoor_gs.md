@@ -372,3 +372,38 @@ pytest tests/ -v
 | **本書** (`docs/plan_outdoor_gs.md`) | **屋外パイプラインの文脈・判断・失敗の履歴・長引きそうな blocker** |
 
 エージェントは **実装の細部はソースと `CLAUDE.md`、方針と地雷は本書** を参照すると迷いにくい。
+
+## 15. セッション 2026-04-19〜2026-04-20 の差分要約
+
+Claude + Codex 併走で PR #55〜#75 の 21 本を merge。OSS としての顔と中身を両軸で整えたセッション。
+
+**Pose-free パス (新機能)**: PR #55 で DUSt3R を `stub → real` に差し替え、`PoseFreeProcessor(method="dust3r")` + `scripts/run_dust3r.py` で CLI からも回せるように。PR #66 で MAST3R を第 2 backend として同 shape で wire、`scripts/run_mast3r.py` も PR #70 で対称化。`gs-mapper photos-to-splat` (PR #62) で JPG ディレクトリ → `.splat` が一撃。`gs-mapper export --format splat` も同 PR で追加。
+
+**Bundled demo (5 scene)**:
+1. `outdoor-demo.splat` — supervised GNSS + LiDAR 6-bag fused (既存)
+2. `outdoor-demo-dust3r.splat` — PR #55、bag6 cam0 DUSt3R pose-free
+3. `bag6-mast3r.splat` — PR #66、MAST3R metric + 15k iter (PR #70 で quality push)
+4. `mcd-tuhh-day04.splat` — PR #64、MCD 非-Autoware day session DUSt3R
+5. `mcd-tuhh-day04-mast3r.splat` — PR #67、MCD MAST3R 15k iter
+
+**Viewer (3 本完全 symmetry)**: `splat.html` / `splat_spark.html` / `splat_webgpu.html` に PR #65 / #71 / #72 で scene picker 移植、PR #73 で `docs/scene-picker.js` + `docs/scenes-list.json` に DRY。Spark 2.0 の blank canvas は PR #71 で解決 (SparkRenderer 追加 + three r179 pin)。PR #74 で iPhone 14 viewport dogfood + `splat_spark.html` viewport meta 追加。
+
+**MCD 経路の知見**:
+- NTU #17 は image-only 全滅 (PR #58): COLMAP / DUSt3R ×3 / ORB-SLAM3 全部 frame-to-frame match 不足で詰む。night handheld + GPS-denied + repetitive texture の組み合わせが原因。
+- `scripts/download_mcd_folder.sh` (PR #60) で folder 全体を `gdown --folder` で 1 本取得可。
+- tuhh_night_09 は vn200 GPS が全 sample lat/lon/alt=0 (PR #61) — **night handheld は GPS 取れてない**。
+- tuhh_day_04 は image-only DUSt3R で 19/20 非退化 + gsplat 収束 (PR #64) — day session なら GNSS/calibration 無しで demo 化可能。
+- MCDVIRAL calibration YAML は未公開、`--method mcd` の GNSS+LiDAR 経路を回すには別途入手が必要。
+
+**OSS 顔整備**:
+- README hero GIF (PR #68): Playwright で scene picker cycle 録画 → 640×360 / 760 KB GIF。
+- README 比較表 + A/B サムネイル (PR #67)、mobile 節 (PR #74)、Credits 節 (PR #73)、Benchmark 表 (PR #75)。
+- CLI cleanup (PR #69): `experiment-*` 14 本を `gs-mapper experiment <lab>` nested subparser に隔離、legacy alias は argv rewriter で back-compat、`gs-mapper --help` が痩せた。
+- Robotics smoke (PR #59): `scripts/robotics_smoke.py` で PLY → render → bridge payload を ROS なしで貫通、CI 対応。
+- GGRt は upstream の CUDA extension 依存で integration 断念、PR #63 で docs を現実に揃えて "reference only" とラベリング。
+
+**次セッション向け着手候補**:
+- MCD day session を GNSS + calibration YAML 経由で正規 `--method mcd` に乗せる（§4.3.3.b の playbook から）。
+- CoVLA の HF access 承認後、`gs-mapper photos-to-splat --preprocess mast3r` で demo 化。
+- WebXR (Enter VR) button を Spark viewer に露出。
+- `docs/experiments.md` 系 lab の整理（14 本残存）。
