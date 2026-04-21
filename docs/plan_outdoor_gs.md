@@ -453,6 +453,8 @@ PYTHONPATH=src python3 -m gs_sim2real.cli preprocess \
   --external-slam-output outputs/loger_smoke/artifacts
 ```
 
+MASt3R-SLAM は 2026-04-21 時点では source/output contract まで確認済み。公式 `main.py` は dataset の `save_results` が有効な経路で `logs/<save-as>/<sequence>.txt` trajectory と `<sequence>.ply` reconstruction を保存するため、repo 側は `--external-slam-system mast3r-slam --external-slam-output logs/<save-as>` で受けられる。full smoke は未実行。手元 clone には checkpoint がなく、現在の Python 環境では `pyrealsense2`、`lietorch`、`mast3r`、`in3d` が未充足。依存は repo へ入れず、MASt3R-SLAM 専用 venv + checkpoint 3点を揃えてから外部artifactだけ戻す方針。
+
 VGGT-SLAM 2.0 smoke も同日実走済み。`/tmp/ext_slam_probe/VGGT-SLAM` を Python 3.11 の隔離 venv (`/tmp/vggt-slam-venv`) に入れ、`requirements.txt` + `third_party/salad` + `MIT-SPARK/VGGT_SPARK` + `vggt-slam` editable install で import まで通った。上流 `main.py` は `--max_loops 0` でも SALAD checkpoint と Viewer を初期化するため、ローカルclone側だけ `VGGT_SLAM_NO_RETRIEVAL=1` / `VGGT_SLAM_NO_VIEWER=1` で無効化する薄いパッチを当てた。
 
 ```bash
