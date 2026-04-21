@@ -49,6 +49,7 @@ class ExternalSLAMImportRunPlan:
     profile: ExternalSLAMImportProfile
     output_dir: str
     artifact_dir: str
+    manifest_path: str
     dry_run_command: tuple[str, ...]
 
 
@@ -118,6 +119,8 @@ def _build_run_plan(
 ) -> ExternalSLAMImportRunPlan:
     output_dir = Path(ctx.output_root) / profile.name
     artifact_dir = Path(ctx.artifact_root) / profile.artifact_subdir
+    manifest_suffix = "json" if ctx.manifest_format == "json" else "txt"
+    manifest_path = output_dir / f"manifest.{manifest_suffix}"
     require_pointcloud = ctx.require_pointcloud if profile.require_pointcloud is None else profile.require_pointcloud
     min_point_count = ctx.min_point_count if profile.min_point_count is None else profile.min_point_count
     allow_dropped = ctx.allow_dropped_images if profile.allow_dropped_images is None else profile.allow_dropped_images
@@ -159,6 +162,7 @@ def _build_run_plan(
         profile=profile,
         output_dir=str(output_dir),
         artifact_dir=str(artifact_dir),
+        manifest_path=str(manifest_path),
         dry_run_command=tuple(command),
     )
 
@@ -177,6 +181,7 @@ def plan_to_dict(plan: ExternalSLAMImportPlan) -> dict[str, Any]:
                 "intent": run.profile.intent,
                 "artifactDir": run.artifact_dir,
                 "outputDir": run.output_dir,
+                "manifestPath": run.manifest_path,
                 "dryRunCommand": list(run.dry_run_command),
             }
             for run in plan.runs
@@ -196,8 +201,8 @@ def render_plan_markdown(plan: ExternalSLAMImportPlan) -> str:
     lines = [
         "# External SLAM Import Preflight Plan",
         "",
-        "| Run | System | Artifact Dir | Gate Command |",
-        "| --- | --- | --- | --- |",
+        "| Run | System | Artifact Dir | Manifest | Gate Command |",
+        "| --- | --- | --- | --- | --- |",
     ]
     for run in plan.runs:
         lines.append(
@@ -207,6 +212,7 @@ def render_plan_markdown(plan: ExternalSLAMImportPlan) -> str:
                     run.profile.label,
                     run.profile.system,
                     f"`{run.artifact_dir}`",
+                    f"`{run.manifest_path}`",
                     f"`{render_shell_command(run.dry_run_command, pythonpath=plan.context.pythonpath)}`",
                 ]
             )
@@ -218,15 +224,20 @@ def render_plan_markdown(plan: ExternalSLAMImportPlan) -> str:
 def render_plan_shell(plan: ExternalSLAMImportPlan) -> str:
     """Render all dry-run gate commands as a shell runbook."""
 
-    lines = ["set -euo pipefail", ""]
+    lines = ["set -euo pipefail", "status=0", ""]
     for run in plan.runs:
         lines.extend(
             [
                 f"# {run.profile.label}",
-                render_shell_command(run.dry_run_command, pythonpath=plan.context.pythonpath),
+                f"mkdir -p {shlex.quote(str(Path(run.manifest_path).parent))}",
+                (
+                    f"{render_shell_command(run.dry_run_command, pythonpath=plan.context.pythonpath)} "
+                    f"> {shlex.quote(run.manifest_path)} || status=$?"
+                ),
                 "",
             ]
         )
+    lines.append('exit "$status"')
     return "\n".join(lines)
 
 

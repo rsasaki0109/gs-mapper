@@ -6,7 +6,13 @@ import json
 import os
 import subprocess
 import sys
+from pathlib import Path
 
+from gs_sim2real.experiments.external_slam_import_collect import (
+    collect_external_slam_import_preflight_results,
+    render_external_slam_import_report_json,
+    render_external_slam_import_report_markdown,
+)
 from gs_sim2real.experiments.external_slam_import_plan import (
     ExternalSLAMImportPlanContext,
     build_external_slam_import_plan,
@@ -41,6 +47,7 @@ def test_external_slam_import_plan_contains_all_default_frontends() -> None:
         assert "--external-slam-require-pointcloud" in command
     assert commands[0][commands[0].index("--external-slam-output") + 1] == "outputs/slam/mast3r-slam"
     assert commands[1][commands[1].index("--external-slam-output") + 1] == "outputs/slam/vggt-slam"
+    assert plan.runs[0].manifest_path == "outputs/imports/bag6_mast3r_slam/manifest.json"
 
 
 def test_external_slam_import_plan_renders_json_markdown_and_shell() -> None:
@@ -54,10 +61,15 @@ def test_external_slam_import_plan_renders_json_markdown_and_shell() -> None:
 
     assert payload["type"] == "external-slam-import-plan"
     assert payload["runs"][0]["system"] == "mast3r-slam"
+    assert payload["runs"][0]["manifestPath"] == "imports/bag6_mast3r_slam/manifest.json"
     assert "External SLAM Import Preflight Plan" in markdown
     assert "Bag6 VGGT-SLAM 2.0" in markdown
+    assert "`imports/bag6_mast3r_slam/manifest.json`" in markdown
     assert "PYTHONPATH=src python3 -m gs_sim2real.cli preprocess" in shell
     assert "--external-slam-fail-on-dry-run-gate" in shell
+    assert "mkdir -p imports/bag6_mast3r_slam" in shell
+    assert "> imports/bag6_mast3r_slam/manifest.json || status=$?" in shell
+    assert 'exit "$status"' in shell
 
 
 def test_plan_external_slam_imports_script_can_emit_single_profile_json() -> None:
@@ -88,3 +100,73 @@ def test_plan_external_slam_imports_script_can_emit_single_profile_json() -> Non
     command = payload["runs"][0]["dryRunCommand"]
     assert command[command.index("--external-slam-system") + 1] == "pi3"
     assert command[command.index("--external-slam-output") + 1] == "outputs/pi3_candidates/pi3"
+    assert payload["runs"][0]["manifestPath"] == "outputs/external_slam_imports/bag6_pi3/manifest.json"
+
+
+def test_collect_external_slam_import_preflight_results_reads_saved_manifests(tmp_path) -> None:
+    plan = build_external_slam_import_plan(ExternalSLAMImportPlanContext(output_root=str(tmp_path / "imports")))
+    manifest_path = Path(plan.runs[0].manifest_path)
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "type": "external-slam-artifact-manifest",
+                "system": "mast3r-slam",
+                "images": {"imageCount": 3},
+                "trajectory": {"poseCount": 3},
+                "alignment": {
+                    "alignedFrameCount": 3,
+                    "droppedImageCount": 0,
+                    "unusedPoseCount": 0,
+                },
+                "pointcloud": {"pointCount": 123},
+                "gate": {"passed": True},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    report = collect_external_slam_import_preflight_results(plan)
+    markdown = render_external_slam_import_report_markdown(report)
+    payload = json.loads(render_external_slam_import_report_json(report))
+    first = report["runs"][0]
+
+    assert report["passedCount"] == 1
+    assert report["missingCount"] == 3
+    assert first["gatePassed"] is True
+    assert first["imageCount"] == 3
+    assert first["poseCount"] == 3
+    assert first["alignedFrameCount"] == 3
+    assert first["pointCount"] == 123
+    assert first["missing"] == []
+    assert "# External SLAM Import Preflight Results" in markdown
+    assert "1/4 gates passed" in markdown
+    assert payload["type"] == "external-slam-import-preflight-report"
+
+
+def test_collect_external_slam_imports_script_can_emit_missing_json(tmp_path) -> None:
+    env = dict(os.environ)
+    env["PYTHONPATH"] = "src"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/collect_external_slam_imports.py",
+            "--format",
+            "json",
+            "--profile",
+            "bag6_pi3",
+            "--output-root",
+            str(tmp_path / "missing"),
+        ],
+        check=True,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+
+    assert payload["type"] == "external-slam-import-preflight-report"
+    assert payload["missingCount"] == 1
+    assert payload["runs"][0]["name"] == "bag6_pi3"
+    assert payload["runs"][0]["missing"] == ["manifest"]
