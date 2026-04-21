@@ -267,6 +267,8 @@ def run_colmap(
     matching: str = "exhaustive",
     gpu_index: int = 0,
     use_gpu: bool = True,
+    colmap_path: str = "colmap",
+    single_camera_per_folder: bool = False,
 ) -> Path:
     """Run the full COLMAP SfM pipeline on a directory of images.
 
@@ -278,6 +280,8 @@ def run_colmap(
         matching: Matching strategy, one of "exhaustive" or "sequential".
         gpu_index: GPU index for COLMAP feature extraction (unused, reserved).
         use_gpu: Whether to use GPU for feature extraction and matching.
+        colmap_path: Path to the COLMAP executable.
+        single_camera_per_folder: Reserved for MCD multi-topic callers; ignored by this COLMAP wrapper.
 
     Returns:
         Path to the sparse reconstruction output directory.
@@ -286,7 +290,8 @@ def run_colmap(
         FileNotFoundError: If COLMAP is not found on PATH.
         subprocess.CalledProcessError: If a COLMAP step fails.
     """
-    processor = COLMAPProcessor()
+    del single_camera_per_folder
+    processor = COLMAPProcessor(colmap_path=colmap_path)
     return processor.run_sfm(
         image_dir=image_dir,
         output_dir=output_dir,
