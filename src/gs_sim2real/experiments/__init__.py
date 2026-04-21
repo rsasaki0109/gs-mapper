@@ -15,6 +15,10 @@ from .localization_review_bundle_import_lab import (
     build_localization_review_bundle_import_experiment_report,
     build_localization_review_bundle_import_process_section,
 )
+from .mcd_quality_plan import (
+    MCDQualityPlanContext,
+    build_mcd_quality_plan,
+)
 from .outdoor_training_features_lab import (
     EXPERIMENT_OUTDOOR_TRAINING_PROFILES,
     build_outdoor_training_features_experiment_report,
@@ -99,6 +103,8 @@ __all__ = [
     "EXPERIMENT_QUERY_TRANSPORT_POLICIES",
     "EXPERIMENT_RENDER_BACKEND_POLICIES",
     "EXPERIMENT_ROUTE_CAPTURE_BUNDLE_IMPORT_POLICIES",
+    "MCDQualityPlanContext",
+    "build_mcd_quality_plan",
     "build_localization_alignment_experiment_report",
     "build_localization_alignment_process_section",
     "build_localization_estimate_import_experiment_report",

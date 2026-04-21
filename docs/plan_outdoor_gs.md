@@ -30,7 +30,7 @@
 | B | Waymo 実データ E2E | code path / prereq script はあるが、実データと Python 3.10 環境が必要。 |
 | C | NMEA / GNSS / IMU robustness | IMU orientation CSV normalization、NMEA checksum validation、GNSS timestamp anomaly、IMU angular-velocity yaw fallback の first slices は対応済み。 |
 | C | depth / appearance / sky の比較評価 | `outdoor-training-features` experiment lab で first slice 整理済み。実データ PSNR/LPIPS run は未実施。 |
-| D | MCD `ntu_day_02` quality push | 長い valid-GNSS session、multi-camera、training budget 比較が必要。 |
+| D | MCD `ntu_day_02` quality push | `scripts/plan_mcd_quality_runs.py` で single/multi-camera quality run matrix は整理済み。実データ再実走と比較 metric 採取は未実施。 |
 
 ## 現在の production assets
 
@@ -53,6 +53,7 @@
 | --- | --- | --- |
 | MCD calibration / static TF | `src/gs_sim2real/datasets/ros_tf.py`, `scripts/download_mcd_calibration.sh` | MCDVIRAL official calibration YAML を downloader 経由で取得。YAML は CC BY-NC-SA なので repo に commit しない。 |
 | MCD supervised sparse import | `src/gs_sim2real/cli.py`, `src/gs_sim2real/datasets/mcd.py` | `--mcd-static-calibration`、single-camera colorize/depth、CameraInfo 欠落時の PINHOLE 合成、zero-GNSS guard、IMU orientation CSV normalization、angular-velocity yaw fallback。 |
+| MCD quality run planning | `src/gs_sim2real/experiments/mcd_quality_plan.py`, `scripts/plan_mcd_quality_runs.py` | `ntu_day_02` の baseline / single-camera BA / multi-camera BA の preprocess→train→export commands と expected artifacts を生成。 |
 | External SLAM import | `src/gs_sim2real/preprocess/external_slam.py`, `src/gs_sim2real/preprocess/external_slam_artifacts/` | facade + profile/resolver/materializer/importer 分割済み。VGGT-SLAM / MASt3R-SLAM 実走済み、Pi3 / LoGeR 候補追加済み。 |
 | Outdoor feature comparison | `src/gs_sim2real/experiments/outdoor_training_features_lab.py` | depth supervision、appearance embedding、pose refinement、sky-mask profile を同一 fixture で比較。real metric run 前の planning harness。 |
 | Pages scene contract | `docs/scenes-list.json`, `scripts/pages_scene_manifest.py`, `tests/test_pages_assets.py` | README table、preview capture、hero GIF、3 viewer picker を manifest に揃える。 |
@@ -105,6 +106,12 @@ MCD GNSS を新 session で使う前:
 
 ```bash
 python3 scripts/check_mcd_gnss.py <session-dir> --gnss-topic /vn200/GPS
+```
+
+MCD `ntu_day_02` quality run matrix を出す場合:
+
+```bash
+python3 scripts/plan_mcd_quality_runs.py --format markdown
 ```
 
 ## Scope Boundaries
