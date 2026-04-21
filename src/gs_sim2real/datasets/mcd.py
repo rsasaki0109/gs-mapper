@@ -1517,13 +1517,20 @@ def _load_imu_orientation_csv(path: str | Path) -> np.ndarray | None:
                 qw = float(row["orientation_w"])
             except (KeyError, ValueError):
                 continue
-            rows.append((ts, qx, qy, qz, qw))
+            quat = np.array([qx, qy, qz, qw], dtype=np.float64)
+            norm = float(np.linalg.norm(quat))
+            if not (np.isfinite(ts) and np.all(np.isfinite(quat))) or norm < 1e-9:
+                continue
+            quat /= norm
+            rows.append((ts, float(quat[0]), float(quat[1]), float(quat[2]), float(quat[3])))
     if not rows:
         return None
     arr = np.asarray(sorted(rows, key=lambda r: r[0]), dtype=np.float64)
-    # Reject bags whose IMU topic reports identity all the way through.
-    quat_std = arr[:, 1:].std(axis=0).sum()
-    if quat_std < 1e-6:
+    # Reject bags whose IMU topic reports identity all the way through. A
+    # constant non-identity attitude is still useful, e.g. stationary rig
+    # warm-up or a fixed mount orientation.
+    identity_rows = (np.linalg.norm(arr[:, 1:4], axis=1) < 1e-6) & (np.abs(np.abs(arr[:, 4]) - 1.0) < 1e-6)
+    if bool(np.all(identity_rows)):
         return None
     return arr
 

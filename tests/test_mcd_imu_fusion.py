@@ -53,6 +53,35 @@ def test_load_imu_orientation_csv_rejects_all_identity(tmp_path: Path) -> None:
     assert _load_imu_orientation_csv(p) is None
 
 
+def test_load_imu_orientation_csv_keeps_constant_non_identity_orientation(tmp_path: Path) -> None:
+    p = tmp_path / "imu.csv"
+    s = 0.7071067811865475
+    _write_imu_csv(p, [(1.0, 0.0, 0.0, s, s), (2.0, 0.0, 0.0, s, s)])
+
+    arr = _load_imu_orientation_csv(p)
+
+    assert arr is not None and arr.shape == (2, 5)
+    np.testing.assert_allclose(arr[:, 1:], np.array([[0.0, 0.0, s, s], [0.0, 0.0, s, s]]), atol=1e-6)
+
+
+def test_load_imu_orientation_csv_skips_invalid_quaternions(tmp_path: Path) -> None:
+    p = tmp_path / "imu.csv"
+    _write_imu_csv(
+        p,
+        [
+            (1.0, 0.0, 0.0, 0.0, 0.0),
+            (2.0, float("nan"), 0.0, 0.0, 1.0),
+            (3.0, 0.0, 0.0, 0.7071068, 0.7071068),
+        ],
+    )
+
+    arr = _load_imu_orientation_csv(p)
+
+    assert arr is not None and arr.shape == (1, 5)
+    assert arr[0, 0] == 3.0
+    assert np.linalg.norm(arr[0, 1:]) == pytest.approx(1.0, abs=1e-6)
+
+
 def test_load_imu_orientation_csv_returns_none_when_missing(tmp_path: Path) -> None:
     assert _load_imu_orientation_csv(tmp_path / "does_not_exist.csv") is None
 

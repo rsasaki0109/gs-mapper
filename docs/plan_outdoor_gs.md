@@ -28,7 +28,7 @@
 | A | 公開 docs の継続整理 | `docs/experiments.md` は index 化済み。本書の長い履歴は archive 化済み。今後は古い詳細を archive 側へ追記する。 |
 | A | 8-scene viewer smoke 継続運用 | `docs/scenes-list.json` source of truth 化済み。pre-PR で `pytest tests/test_pages_assets.py -q` を通す。 |
 | B | Waymo 実データ E2E | code path / prereq script はあるが、実データと Python 3.10 環境が必要。 |
-| C | NMEA / GNSS / IMU robustness | 未着手。まず小さい parser / normalization unit から切る。 |
+| C | NMEA / GNSS / IMU robustness | IMU orientation CSV normalization の first slice は対応済み。残りは NMEA checksum / GNSS timestamp anomaly / IMU angular-velocity fusion。 |
 | C | depth / appearance / sky の比較評価 | 実装済み要素はあるが、比較実験としては未整理。 |
 | D | MCD `ntu_day_02` quality push | 長い valid-GNSS session、multi-camera、training budget 比較が必要。 |
 
@@ -52,7 +52,7 @@
 | Area | Files | Notes |
 | --- | --- | --- |
 | MCD calibration / static TF | `src/gs_sim2real/datasets/ros_tf.py`, `scripts/download_mcd_calibration.sh` | MCDVIRAL official calibration YAML を downloader 経由で取得。YAML は CC BY-NC-SA なので repo に commit しない。 |
-| MCD supervised sparse import | `src/gs_sim2real/cli.py`, `src/gs_sim2real/datasets/mcd.py` | `--mcd-static-calibration`、single-camera colorize/depth、CameraInfo 欠落時の PINHOLE 合成、zero-GNSS guard。 |
+| MCD supervised sparse import | `src/gs_sim2real/cli.py`, `src/gs_sim2real/datasets/mcd.py` | `--mcd-static-calibration`、single-camera colorize/depth、CameraInfo 欠落時の PINHOLE 合成、zero-GNSS guard、IMU orientation CSV normalization。 |
 | External SLAM import | `src/gs_sim2real/preprocess/external_slam.py`, `src/gs_sim2real/preprocess/external_slam_artifacts/` | facade + profile/resolver/materializer/importer 分割済み。VGGT-SLAM / MASt3R-SLAM 実走済み、Pi3 / LoGeR 候補追加済み。 |
 | Pages scene contract | `docs/scenes-list.json`, `scripts/pages_scene_manifest.py`, `tests/test_pages_assets.py` | README table、preview capture、hero GIF、3 viewer picker を manifest に揃える。 |
 | README preview capture | `scripts/capture_readme_splat_previews.py` | WebGL は headed Chromium 推奨。`--out-dir` で smoke capture を一時出力可能。 |
@@ -119,6 +119,7 @@ python3 scripts/check_mcd_gnss.py <session-dir> --gnss-topic /vn200/GPS
 - MCD topic は `/vn200/GPS` の大文字 `GPS`。`/vn200/gps` ではない。
 - `tuhh_day_04` の `/vn200/GPS` は all-zero。supervised GNSS demo には使わない。
 - MCD calibration YAML は公式 Download page から取得できるが、license 上 repo に YAML を commit しない。
+- IMU orientation CSV は zero-length / non-finite quaternion を無視し、全 identity のときだけ姿勢なし扱いにする。一定の non-identity mount orientation は有効な姿勢として残す。
 - `capture_readme_splat_previews.py` は headless だと WebGL canvas が真っ黒になることがある。CI では静的 contract test、実 capture は headed smoke として扱う。
 - `docs/scenes-list.json` に production scene を追加したら、README table、viewer picker 3 種、preview PNG が `tests/test_pages_assets.py` で一致する必要がある。
 - Waymo は code path があっても実データ E2E 未検証。Python 3.10 venv と dataset agreement を先に確認する。
