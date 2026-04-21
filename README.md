@@ -218,10 +218,11 @@ If poses come from an external front-end such as MASt3R-SLAM, VGGT-SLAM 2.0,
 LoGeR, or Pi3/Pi3X, keep those heavy dependencies outside this repo and import
 their exported trajectory as data. `external-slam` accepts TUM/KITTI/NMEA
 trajectories plus an optional `.ply` / `.npy` / `.pcd` point cloud, then writes
-the COLMAP sparse model used by the normal training commands. Pi3/Pi3X and
-LoGeR-style pose tensors can also be passed as `--trajectory` when they are
-stored in `.npy`, `.npz`, `.pt`, or `.pth` files with a `camera_poses` or
-`poses` array of camera-to-world matrices.
+the COLMAP sparse model used by the normal training commands. Pi3/Pi3X returns
+`camera_poses` in its model output, and LoGeR can write `--output_txt`; both can
+be imported without linking those packages into this repo. Pose tensors can also
+be passed as `--trajectory` when they are stored in `.npy`, `.npz`, `.pt`, or
+`.pth` files with a `camera_poses` or `poses` array of camera-to-world matrices.
 
 ```bash
 gs-mapper preprocess \

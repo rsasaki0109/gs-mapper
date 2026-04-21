@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import cv2
 import numpy as np
@@ -69,6 +70,19 @@ def test_pi3_pointcloud_only_still_requires_trajectory(tmp_path: Path) -> None:
         resolve_external_slam_artifacts(system="pi3", artifact_dir=artifact_dir)
 
 
+def test_resolve_pi3_camera_pose_tensor_from_output_directory(tmp_path: Path) -> None:
+    artifact_dir = tmp_path / "pi3_out"
+    artifact_dir.mkdir()
+    poses = np.repeat(np.eye(4)[None, ...], 2, axis=0)
+    np.save(artifact_dir / "camera_poses.npy", poses)
+    (artifact_dir / "result.ply").write_text("ply\n")
+
+    artifacts = resolve_external_slam_artifacts(system="pi3", artifact_dir=artifact_dir)
+
+    assert artifacts.trajectory_path == artifact_dir / "camera_poses.npy"
+    assert artifacts.pointcloud_path == artifact_dir / "result.ply"
+
+
 def test_materialize_npz_camera_poses_to_tum(tmp_path: Path) -> None:
     poses = np.repeat(np.eye(4)[None, ...], 2, axis=0)
     poses[1, 0, 3] = 1.5
@@ -82,6 +96,28 @@ def test_materialize_npz_camera_poses_to_tum(tmp_path: Path) -> None:
         lines[0] == "10.000000000 0.000000000 0.000000000 0.000000000 0.000000000 0.000000000 0.000000000 1.000000000"
     )
     assert lines[1].startswith("11.000000000 1.500000000 0.000000000 0.000000000")
+
+
+def test_materialize_torch_nested_pi3_sequence_to_tum(tmp_path: Path) -> None:
+    torch = pytest.importorskip("torch")
+    poses = torch.eye(4).repeat(2, 1, 1)
+    poses[1, 2, 3] = 2.0
+    pose_file = tmp_path / "predictions.pt"
+    torch.save(
+        {
+            "pi3_sequence": SimpleNamespace(
+                camera_poses=poses,
+                timestamps=torch.tensor([3.0, 4.0]),
+            )
+        },
+        pose_file,
+    )
+
+    tum_path = materialize_pose_tensor_trajectory(pose_file, tmp_path / "converted")
+
+    lines = [line for line in tum_path.read_text().splitlines() if line and not line.startswith("#")]
+    assert lines[0].startswith("3.000000000 0.000000000 0.000000000 0.000000000")
+    assert lines[1].startswith("4.000000000 0.000000000 0.000000000 2.000000000")
 
 
 def test_import_external_slam_writes_colmap_from_npz_pose_container(tmp_path: Path) -> None:

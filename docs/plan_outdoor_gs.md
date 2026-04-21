@@ -406,6 +406,8 @@ gs-mapper preprocess \
 
 `--external-slam-output` 配下から `poses.txt` / `trajectory.txt` / `*.tum` と `*.ply` / `*.npy` / `*.pcd` を自動探索する。Pi3/Pi3X は標準 example が点群 PLY 中心なので、3DGS training へ進むには別途 camera trajectory を `--trajectory` で渡す。Pi3 / Pi3X / LoGeR などの Python 出力が `camera_poses` または `poses` の camera-to-world 行列を `.npy` / `.npz` / `.pt` / `.pth` に保存している場合は、そのファイル自体を `--trajectory` に渡せる。`external-slam` 側で一時TUMへ materialize してから既存 importer に流す。
 
+2026-04-21 追記: `external_slam.py` は互換 facade に縮小し、`external_slam_artifacts/` 配下へ profile 定義、artifact resolver、pose tensor materializer、COLMAP import orchestration を分割した。公式 Pi3/Pi3X は `camera_poses` (camera-to-world, OpenCV, `B x N x 4 x 4`) を返すため、`camera_poses.npy` / `.npz` / `.pt` / `.pth` を自動探索候補に追加。LoGeR の公開 demo は `--output_txt` で TUM trajectory を吐けるほか、`output_folder` の `.pt` 内に `camera_poses` を保存する経路があるので、LoGeR profile も `output_txt.txt` / `predictions.pt` / `*.pt` を候補にした。MASt3R-SLAM は `logs/<save-as>/<sequence>.txt` と `.ply` を保存する既存仕様のまま `*.txt` / `*.ply` で受ける。
+
 2026-04-21 Codex smoke: `outputs/bag6_mast3r/poses.npy` を TUM `trajectory.txt` に変換し、`pts3d.npy` を外部点群 artifact として `outputs/external_slam_smoke/mast3r_artifacts/` に置いた。次のコマンドで `trajectory.txt` / `pts3d.npy` の自動探索が通り、`outputs/external_slam_smoke/mast3r_import/sparse/0` に `cameras.txt` / `images.txt` / `points3D.txt` を生成。結果は 20 images / 1000 points で、`require_colmap_sparse_model()` も通過した。
 
 ```bash
