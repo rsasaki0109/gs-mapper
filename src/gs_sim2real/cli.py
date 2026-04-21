@@ -1624,6 +1624,7 @@ def _run_external_slam_preprocess_to_colmap(
     try:
         if getattr(args, "external_slam_dry_run", False):
             manifest = external_slam_module.build_external_slam_artifact_manifest(
+                image_dir=images_dir,
                 system=getattr(args, "external_slam_system", "generic"),
                 artifact_dir=getattr(args, "external_slam_output", None),
                 trajectory_path=getattr(args, "trajectory", None),

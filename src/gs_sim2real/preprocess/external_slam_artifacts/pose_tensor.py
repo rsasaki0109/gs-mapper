@@ -49,6 +49,17 @@ def materialize_pose_tensor_trajectory(trajectory_path: str | Path, output_dir: 
     return tum_path
 
 
+def inspect_pose_tensor_artifact(trajectory_path: str | Path) -> dict[str, Any]:
+    """Read pose tensor metadata without materializing a trajectory file."""
+
+    poses, timestamps = _load_pose_tensor_artifact(Path(trajectory_path))
+    return {
+        "poseCount": int(len(poses)),
+        "timestampCount": int(len(timestamps)),
+        "poseShape": list(poses.shape),
+    }
+
+
 def _load_pose_tensor_artifact(path: Path) -> tuple[np.ndarray, np.ndarray]:
     suffix = path.suffix.lower()
     if suffix == ".npz":

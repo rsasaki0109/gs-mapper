@@ -88,6 +88,8 @@ def test_resolve_pi3_camera_pose_tensor_from_output_directory(tmp_path: Path) ->
 
 
 def test_build_external_slam_manifest_marks_tensor_materialization(tmp_path: Path) -> None:
+    image_dir = tmp_path / "images"
+    _write_dummy_images(image_dir, count=2)
     artifact_dir = tmp_path / "pi3_out"
     artifact_dir.mkdir()
     poses = np.repeat(np.eye(4)[None, ...], 2, axis=0)
@@ -100,6 +102,7 @@ def test_build_external_slam_manifest_marks_tensor_materialization(tmp_path: Pat
     )
 
     manifest = build_external_slam_artifact_manifest(
+        image_dir=image_dir,
         system="pi3",
         artifact_dir=artifact_dir,
         trajectory_path="camera_poses.npz",
@@ -113,10 +116,37 @@ def test_build_external_slam_manifest_marks_tensor_materialization(tmp_path: Pat
     assert manifest["displayName"] == "Pi3/Pi3X"
     assert manifest["trajectory"]["materialization"] == "pose_tensor_to_tum"
     assert manifest["pointcloud"]["materialization"] == "point_tensor_to_npy"
+    assert manifest["trajectory"]["poseCount"] == 2
+    assert manifest["pointcloud"]["pointCount"] == 4
+    assert manifest["images"]["imageCount"] == 2
+    assert manifest["alignment"]["status"] == "ok"
+    assert manifest["alignment"]["alignedFrameCount"] == 2
     assert manifest["trajectory"]["bytes"] > 0
     assert "External SLAM artifacts: Pi3/Pi3X (pi3)" in text
     assert "materialization=pose_tensor_to_tum" in text
+    assert "2 aligned" in text
     assert payload["pointcloud"]["path"].endswith("points.npz")
+
+
+def test_build_external_slam_manifest_flags_count_mismatch(tmp_path: Path) -> None:
+    image_dir = tmp_path / "images"
+    _write_dummy_images(image_dir, count=3)
+    artifact_dir = tmp_path / "mast3r_out"
+    artifact_dir.mkdir()
+    (artifact_dir / "poses.txt").write_text("0 0 0 0 0 0 0 1\n1 1 0 0 0 0 0 1\n")
+
+    manifest = build_external_slam_artifact_manifest(
+        image_dir=image_dir,
+        system="mast3r-slam",
+        artifact_dir=artifact_dir,
+    )
+
+    assert manifest["trajectory"]["poseCount"] == 2
+    assert manifest["images"]["imageCount"] == 3
+    assert manifest["alignment"]["status"] == "warning"
+    assert manifest["alignment"]["alignedFrameCount"] == 2
+    assert manifest["alignment"]["droppedImageCount"] == 1
+    assert manifest["alignment"]["unusedPoseCount"] == 0
 
 
 def test_materialize_npz_camera_poses_to_tum(tmp_path: Path) -> None:

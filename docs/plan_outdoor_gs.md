@@ -97,6 +97,9 @@ gs-mapper preprocess --method external-slam --images <images-dir> \
   --external-slam-dry-run --external-slam-manifest-format json
 ```
 
+Dry-run manifest には trajectory pose 数、point cloud 点数、入力画像数、sequential fallback 時に何 frame が
+align されるかを含める。
+
 README preview PNG を再生成する場合:
 
 ```bash

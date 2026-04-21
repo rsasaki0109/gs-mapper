@@ -60,6 +60,23 @@ def materialize_point_tensor_cloud(
     return cloud_path
 
 
+def inspect_point_tensor_artifact(pointcloud_path: str | Path) -> dict[str, Any]:
+    """Read point tensor metadata without writing a flattened cloud."""
+
+    pointcloud_path = Path(pointcloud_path)
+    data = _load_point_tensor_artifact(pointcloud_path)
+    points = _extract_points(data, role=str(pointcloud_path))
+    confidence = _extract_optional_confidence(data, len(points))
+    colors = _extract_optional_colors(data, len(points))
+    return {
+        "pointCount": int(len(points)),
+        "finitePointCount": int(np.sum(np.all(np.isfinite(points), axis=1))),
+        "pointShape": list(points.shape),
+        "hasConfidence": confidence is not None,
+        "hasColor": colors is not None,
+    }
+
+
 def _load_point_tensor_artifact(path: Path) -> Any:
     suffix = path.suffix.lower()
     if suffix == ".npz":

@@ -1134,6 +1134,10 @@ class TestCLIHelp:
 
         monkeypatch.setattr(external_slam_module, "import_external_slam", forbidden_import_external_slam)
 
+        image_dir = tmp_path / "images"
+        image_dir.mkdir()
+        for idx in range(3):
+            (image_dir / f"frame_{idx:06d}.jpg").write_bytes(b"jpg")
         artifact_dir = tmp_path / "mast3r_out"
         artifact_dir.mkdir()
         (artifact_dir / "poses.txt").write_text("0 0 0 0 0 0 0 1\n1 1 0 0 0 0 0 1\n")
@@ -1143,7 +1147,7 @@ class TestCLIHelp:
             [
                 "preprocess",
                 "--images",
-                str(tmp_path / "images"),
+                str(image_dir),
                 "--output",
                 str(tmp_path / "out"),
                 "--method",
@@ -1161,13 +1165,14 @@ class TestCLIHelp:
         out = capsys.readouterr().out
         assert "External SLAM artifacts: MASt3R-SLAM (mast3r-slam)" in out
         assert "materialization=direct" in out
+        assert "warning (2 aligned, 1 dropped images, 0 unused poses)" in out
         assert "External SLAM dry run complete." in out
 
         json_args = build_parser().parse_args(
             [
                 "preprocess",
                 "--images",
-                str(tmp_path / "images"),
+                str(image_dir),
                 "--output",
                 str(tmp_path / "out"),
                 "--method",
@@ -1187,6 +1192,9 @@ class TestCLIHelp:
         payload = json.loads(capsys.readouterr().out)
         assert payload["type"] == "external-slam-artifact-manifest"
         assert payload["system"] == "mast3r-slam"
+        assert payload["images"]["imageCount"] == 3
+        assert payload["alignment"]["status"] == "warning"
+        assert payload["alignment"]["droppedImageCount"] == 1
 
     def test_cmd_preprocess_mcd_list_topics_mode(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path, capsys: pytest.CaptureFixture[str]
