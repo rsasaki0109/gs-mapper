@@ -406,6 +406,17 @@ gs-mapper preprocess \
 
 `--external-slam-output` 配下から `poses.txt` / `trajectory.txt` / `*.tum` と `*.ply` / `*.npy` / `*.pcd` を自動探索する。Pi3/Pi3X は標準 example が点群 PLY 中心なので、3DGS training へ進むには別途 camera trajectory を `--trajectory` で渡す。
 
+2026-04-21 Codex smoke: `outputs/bag6_mast3r/poses.npy` を TUM `trajectory.txt` に変換し、`pts3d.npy` を外部点群 artifact として `outputs/external_slam_smoke/mast3r_artifacts/` に置いた。次のコマンドで `trajectory.txt` / `pts3d.npy` の自動探索が通り、`outputs/external_slam_smoke/mast3r_import/sparse/0` に `cameras.txt` / `images.txt` / `points3D.txt` を生成。結果は 20 images / 1000 points で、`require_colmap_sparse_model()` も通過した。
+
+```bash
+PYTHONPATH=src python3 -m gs_sim2real.cli preprocess \
+  --images outputs/bag6_mast3r/images \
+  --output outputs/external_slam_smoke/mast3r_import \
+  --method external-slam \
+  --external-slam-system mast3r-slam \
+  --external-slam-output outputs/external_slam_smoke/mast3r_artifacts
+```
+
 ### 9.4 PLY → .splat → Pages デプロイ
 
 ```python
