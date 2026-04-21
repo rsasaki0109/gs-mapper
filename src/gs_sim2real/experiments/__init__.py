@@ -15,6 +15,11 @@ from .localization_review_bundle_import_lab import (
     build_localization_review_bundle_import_experiment_report,
     build_localization_review_bundle_import_process_section,
 )
+from .outdoor_training_features_lab import (
+    EXPERIMENT_OUTDOOR_TRAINING_PROFILES,
+    build_outdoor_training_features_experiment_report,
+    build_outdoor_training_features_process_section,
+)
 from .query_cancellation_policy_lab import (
     EXPERIMENT_QUERY_CANCELLATION_POLICIES,
     build_query_cancellation_policy_experiment_report,
@@ -82,6 +87,7 @@ from .render_backend_selection_lab import (
 __all__ = [
     "EXPERIMENT_ALIGNMENT_STRATEGIES",
     "EXPERIMENT_LOCALIZATION_ESTIMATE_IMPORT_POLICIES",
+    "EXPERIMENT_OUTDOOR_TRAINING_PROFILES",
     "EXPERIMENT_QUERY_CANCELLATION_POLICIES",
     "EXPERIMENT_QUERY_COALESCING_POLICIES",
     "EXPERIMENT_QUERY_ERROR_MAPPING_POLICIES",
@@ -99,6 +105,8 @@ __all__ = [
     "build_localization_estimate_import_process_section",
     "build_localization_review_bundle_import_experiment_report",
     "build_localization_review_bundle_import_process_section",
+    "build_outdoor_training_features_experiment_report",
+    "build_outdoor_training_features_process_section",
     "build_query_cancellation_policy_experiment_report",
     "build_query_cancellation_policy_process_section",
     "build_query_coalescing_policy_experiment_report",

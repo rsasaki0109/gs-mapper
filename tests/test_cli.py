@@ -145,6 +145,12 @@ class TestCLIHelp:
             main(["experiment-render-backend-selection", "--help"])
         assert exc_info.value.code == 0
 
+    def test_cli_experiment_outdoor_training_features_help(self) -> None:
+        """Running experiment-outdoor-training-features --help raises SystemExit(0)."""
+        with pytest.raises(SystemExit) as exc_info:
+            main(["experiment-outdoor-training-features", "--help"])
+        assert exc_info.value.code == 0
+
     def test_cli_experiment_localization_import_help(self) -> None:
         """Running experiment-localization-import --help raises SystemExit(0)."""
         with pytest.raises(SystemExit) as exc_info:
@@ -1579,6 +1585,26 @@ class TestCLIHelp:
         assert args.write_docs is True
         assert args.docs_dir == "docs-lab"
         assert args.output == "render-backend-report.json"
+
+    def test_cli_experiment_outdoor_training_features_flags(self) -> None:
+        """experiment-outdoor-training-features parser accepts evaluation settings."""
+        args = build_parser().parse_args(
+            [
+                "experiment",
+                "outdoor-training-features",
+                "--repetitions",
+                "12",
+                "--write-docs",
+                "--docs-dir",
+                "docs-lab",
+                "--output",
+                "outdoor-training-features-report.json",
+            ]
+        )
+        assert args.repetitions == 12
+        assert args.write_docs is True
+        assert args.docs_dir == "docs-lab"
+        assert args.output == "outdoor-training-features-report.json"
 
     def test_cli_experiment_localization_import_flags(self) -> None:
         """experiment-localization-import parser accepts evaluation settings."""

@@ -1020,6 +1020,11 @@ def build_parser() -> argparse.ArgumentParser:
             "Compare render backend-selection policies and optionally refresh experiment docs",
         ),
         (
+            "outdoor-training-features",
+            "experiment-outdoor-training-features",
+            "Compare outdoor depth/appearance/pose/sky training feature bundles",
+        ),
+        (
             "localization-import",
             "experiment-localization-import",
             "Compare localization estimate import policies and optionally refresh experiment docs",
@@ -1123,6 +1128,7 @@ def build_parser() -> argparse.ArgumentParser:
 LEGACY_EXPERIMENT_ALIASES: dict[str, tuple[str, str]] = {
     "experiment-localization-alignment": ("experiment", "localization-alignment"),
     "experiment-render-backend-selection": ("experiment", "render-backend-selection"),
+    "experiment-outdoor-training-features": ("experiment", "outdoor-training-features"),
     "experiment-localization-import": ("experiment", "localization-import"),
     "experiment-query-transport-selection": ("experiment", "query-transport-selection"),
     "experiment-query-request-import": ("experiment", "query-request-import"),
@@ -1845,6 +1851,7 @@ def cmd_experiment(args: argparse.Namespace) -> None:
     handler_map = {
         "localization-alignment": cmd_experiment_localization_alignment,
         "render-backend-selection": cmd_experiment_render_backend_selection,
+        "outdoor-training-features": cmd_experiment_outdoor_training_features,
         "localization-import": cmd_experiment_localization_import,
         "query-transport-selection": cmd_experiment_query_transport_selection,
         "query-request-import": cmd_experiment_query_request_import,
@@ -1881,6 +1888,13 @@ def cmd_experiment_localization_alignment(args: argparse.Namespace) -> None:
 def cmd_experiment_render_backend_selection(args: argparse.Namespace) -> None:
     """Handle the experiment-render-backend-selection subcommand."""
     from gs_sim2real.experiments.render_backend_selection_lab import run_cli
+
+    run_cli(args)
+
+
+def cmd_experiment_outdoor_training_features(args: argparse.Namespace) -> None:
+    """Handle the experiment-outdoor-training-features subcommand."""
+    from gs_sim2real.experiments.outdoor_training_features_lab import run_cli
 
     run_cli(args)
 

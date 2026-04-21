@@ -27,6 +27,7 @@ def write_repo_experiment_process_docs(
     live_localization_stream_import_report: dict[str, Any] | None = None,
     route_capture_bundle_import_report: dict[str, Any] | None = None,
     sim2real_websocket_protocol_report: dict[str, Any] | None = None,
+    outdoor_training_features_report: dict[str, Any] | None = None,
 ) -> dict[str, str]:
     """Write shared repo experiment docs using all currently tracked experiment seams."""
     from .localization_alignment_lab import (
@@ -52,6 +53,10 @@ def write_repo_experiment_process_docs(
     from .query_error_mapping_lab import (
         build_query_error_mapping_experiment_report,
         build_query_error_mapping_process_section,
+    )
+    from .outdoor_training_features_lab import (
+        build_outdoor_training_features_experiment_report,
+        build_outdoor_training_features_process_section,
     )
     from .render_backend_selection_lab import (
         build_render_backend_selection_experiment_report,
@@ -116,9 +121,11 @@ def write_repo_experiment_process_docs(
     websocket_protocol_report = (
         sim2real_websocket_protocol_report or build_sim2real_websocket_protocol_experiment_report()
     )
+    outdoor_features_report = outdoor_training_features_report or build_outdoor_training_features_experiment_report()
     sections = [
         build_localization_alignment_process_section(alignment_report),
         build_render_backend_selection_process_section(backend_report),
+        build_outdoor_training_features_process_section(outdoor_features_report),
         build_localization_estimate_import_process_section(import_report),
         build_localization_review_bundle_import_process_section(review_bundle_import_report),
         build_query_cancellation_policy_process_section(cancellation_policy_report),
