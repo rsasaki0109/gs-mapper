@@ -58,9 +58,9 @@ complete in under 30 seconds.
 | New CLI subcommand / flag | `src/gs_sim2real/cli.py` + matching handler + a parser test under `tests/test_cli.py` |
 | Pose-free backend | `src/gs_sim2real/preprocess/pose_free.py` + a `scripts/run_<name>.py` thin CLI + `tests/test_run_<name>_script.py` smoke |
 | Training / exporter | `src/gs_sim2real/train/` + `src/gs_sim2real/viewer/web_export.py` |
-| New bundled demo splat | `docs/assets/outdoor-demo/<name>.splat` + entry in `docs/scenes-list.json` + matching `tests/test_pages_assets.py` assertion |
+| New bundled demo splat | `docs/assets/outdoor-demo/<name>.splat` + `docs/scenes-list.json` preview entry + README table/thumbnail + `tests/test_pages_assets.py` |
 | Viewer change | `docs/splat.html` / `docs/splat_spark.html` / `docs/splat_webgpu.html` + shared `docs/scene-picker.js` when adjusting picker behaviour |
-| Outdoor-pipeline context / decision log | `docs/plan_outdoor_gs.md` (not the README) |
+| Outdoor-pipeline current handoff / decision log | `docs/plan_outdoor_gs.md` (full 2026-04 history is linked from there) |
 | User-facing quickstart / demo story | `README.md` + `docs/images/demo-sweep/` thumbnails |
 
 ## Bundled demo splats
@@ -68,13 +68,15 @@ complete in under 30 seconds.
 When you add a new `.splat` under `docs/assets/outdoor-demo/`, three things
 need to stay in sync or CI will fail:
 
-1. Register it in `docs/scenes-list.json` so every viewer picker sees it.
-2. Add an `<option value="assets/outdoor-demo/<name>.splat">` to each of
-   `docs/splat.html`, `docs/splat_spark.html`, `docs/splat_webgpu.html`
-   (or leave those `<select>`s empty and let `scene-picker.js` auto-populate
-   from the JSON).
-3. Add a `test_<name>_splat_present` assertion to `tests/test_pages_assets.py`
-   mirroring the existing ones (presence + 32-byte alignment + picker link).
+1. Register it in `docs/scenes-list.json` with `url`, `preview`, `label`, and
+   `summary`.
+2. Add the README table row and regenerate the preview PNG with
+   `scripts/capture_readme_splat_previews.py`.
+3. Keep the pre-populated picker options in `docs/splat.html`,
+   `docs/splat_spark.html`, and `docs/splat_webgpu.html` in the same order as
+   `docs/scenes-list.json`.
+4. Extend `tests/test_pages_assets.py` when the new splat needs a
+   scene-specific invariant beyond the shared manifest/picker/README checks.
 
 Shipped splats are capped at the antimatter15 400 000-gauss / 12.8 MB
 budget via `gs-mapper export --format splat --max-points 400000` — please
@@ -99,9 +101,9 @@ Good small first PRs:
 
 ## What's intentionally out of scope
 
-See `docs/plan_outdoor_gs.md` §13 for the "don't touch" list — renaming
-the `gs_sim2real` package path, merging the `gs-sim2real` legacy alias
-away, large-scale DreamWalker reorgs, antimatter15/splat vendored-code
+See `docs/plan_outdoor_gs.md` "Scope Boundaries" for the "don't touch" list —
+renaming the `gs_sim2real` package path, merging the `gs-sim2real` legacy
+alias away, large-scale DreamWalker reorgs, antimatter15/splat vendored-code
 refactors, etc.
 
 ## Reporting issues

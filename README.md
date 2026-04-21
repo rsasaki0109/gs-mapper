@@ -292,7 +292,7 @@ gs-mapper train --data outputs/fused --output outputs/fused_train \
 
 The live demo is trained on a 5-bag fusion (bag1+2+3+4+6, 15 cameras, 5040 registered frames, 1.43M Gaussians).
 
-See `docs/plan_outdoor_gs.md` for the detailed outdoor pipeline handoff (status, blockers, known-good conditions).
+See `docs/plan_outdoor_gs.md` for the current outdoor pipeline handoff (status, blockers, known-good conditions); it links to the full 2026-04 history archive.
 
 Then either:
 
