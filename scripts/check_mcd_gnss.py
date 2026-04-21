@@ -38,6 +38,8 @@ def print_summary(summary: GnssPreflightSummary) -> None:
     print(f"  invalid status: {summary.invalid_status_samples}")
     print(f"  non-finite: {summary.nonfinite_samples}")
     print(f"  valid time range: {_fmt_sec(summary.first_valid_sec)} .. {_fmt_sec(summary.last_valid_sec)}")
+    print(f"  valid timestamp regressions: {summary.nonmonotonic_valid_timestamps}")
+    print(f"  valid timestamp duplicates: {summary.duplicate_valid_timestamps}")
 
     print("\n=== Trajectory ===")
     if summary.reference_wgs84 is None:

@@ -125,3 +125,41 @@ def test_scan_can_flatten_altitude_spike(monkeypatch, tmp_path: Path) -> None:
     assert summary.altitude_span_m > 9000.0
     assert summary.vertical_extent_m < 1e-3
     assert any("flattened altitude" in warning for warning in summary.warnings)
+
+
+def test_scan_rejects_regressing_valid_timestamps(monkeypatch, tmp_path: Path) -> None:
+    _touch_bag(tmp_path)
+    _patch_navsat_reader(
+        monkeypatch,
+        [
+            (10.0, 35.0, 139.0, 5.0),
+            (12.0, 35.00002, 139.00003, 5.0),
+            (11.0, 35.00004, 139.00006, 5.0),
+        ],
+    )
+
+    summary = preflight.scan_mcd_gnss(tmp_path, gnss_topic="/vn200/GPS", min_translation_m=1.0)
+
+    assert not summary.ok
+    assert summary.nonmonotonic_valid_timestamps == 1
+    assert summary.duplicate_valid_timestamps == 0
+    assert any("timestamps regressed" in failure for failure in summary.failures)
+
+
+def test_scan_warns_on_duplicate_valid_timestamps(monkeypatch, tmp_path: Path) -> None:
+    _touch_bag(tmp_path)
+    _patch_navsat_reader(
+        monkeypatch,
+        [
+            (10.0, 35.0, 139.0, 5.0),
+            (10.0, 35.00002, 139.00003, 5.0),
+            (12.0, 35.00004, 139.00006, 5.0),
+        ],
+    )
+
+    summary = preflight.scan_mcd_gnss(tmp_path, gnss_topic="/vn200/GPS", min_translation_m=1.0)
+
+    assert summary.ok
+    assert summary.nonmonotonic_valid_timestamps == 0
+    assert summary.duplicate_valid_timestamps == 1
+    assert any("timestamps repeated" in warning for warning in summary.warnings)

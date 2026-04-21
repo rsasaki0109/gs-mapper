@@ -28,7 +28,7 @@
 | A | 公開 docs の継続整理 | `docs/experiments.md` は index 化済み。本書の長い履歴は archive 化済み。今後は古い詳細を archive 側へ追記する。 |
 | A | 8-scene viewer smoke 継続運用 | `docs/scenes-list.json` source of truth 化済み。pre-PR で `pytest tests/test_pages_assets.py -q` を通す。 |
 | B | Waymo 実データ E2E | code path / prereq script はあるが、実データと Python 3.10 環境が必要。 |
-| C | NMEA / GNSS / IMU robustness | IMU orientation CSV normalization と NMEA checksum validation の first slices は対応済み。残りは GNSS timestamp anomaly / IMU angular-velocity fusion。 |
+| C | NMEA / GNSS / IMU robustness | IMU orientation CSV normalization、NMEA checksum validation、GNSS timestamp anomaly の first slices は対応済み。残りは IMU angular-velocity fusion。 |
 | C | depth / appearance / sky の比較評価 | 実装済み要素はあるが、比較実験としては未整理。 |
 | D | MCD `ntu_day_02` quality push | 長い valid-GNSS session、multi-camera、training budget 比較が必要。 |
 

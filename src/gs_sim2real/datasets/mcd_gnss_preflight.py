@@ -46,6 +46,8 @@ class GnssPreflightSummary:
     altitude_span_m: float = 0.0
     horizontal_speed_p95_mps: float | None = None
     horizontal_speed_max_mps: float | None = None
+    nonmonotonic_valid_timestamps: int = 0
+    duplicate_valid_timestamps: int = 0
     image_timestamps: ImageTimestampSummary | None = None
     failures: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -253,6 +255,8 @@ class MCDGnssPreflight:
         summary.horizontal_path_length_m = float(diff_xy.sum())
         ts = np.array([row[0] for row in valid_rows], dtype=np.float64)
         dt = np.diff(ts)
+        summary.nonmonotonic_valid_timestamps = int(np.count_nonzero(dt < 0.0))
+        summary.duplicate_valid_timestamps = int(np.count_nonzero(dt == 0.0))
         positive_dt = dt > 0.0
         if np.any(positive_dt):
             horizontal_speed = diff_xy[positive_dt] / dt[positive_dt]
@@ -285,6 +289,10 @@ class MCDGnssPreflight:
                 f"horizontal p95 speed {summary.horizontal_speed_p95_mps:.3f} m/s > allowed "
                 f"{cfg.max_horizontal_speed_p95_mps:.3f} m/s"
             )
+        if summary.nonmonotonic_valid_timestamps:
+            summary.failures.append(f"valid GNSS timestamps regressed {summary.nonmonotonic_valid_timestamps} times")
+        if summary.duplicate_valid_timestamps:
+            summary.warnings.append(f"valid GNSS timestamps repeated {summary.duplicate_valid_timestamps} times")
         if summary.zero_placeholder_samples and summary.valid_samples == 0:
             summary.failures.append("all finite GNSS fixes are zero placeholders")
         elif summary.zero_placeholder_samples:
