@@ -13,6 +13,15 @@ import pytest
 from gs_sim2real.preprocess.lidar_slam import LiDARSLAMProcessor
 
 
+def _with_nmea_checksum(sentence: str) -> str:
+    payload = sentence[1:] if sentence.startswith("$") else sentence
+    payload = payload.split("*", 1)[0]
+    checksum = 0
+    for char in payload:
+        checksum ^= ord(char)
+    return f"${payload}*{checksum:02X}"
+
+
 class TestNMEAHelpers:
     """Tests for NMEA parsing and ENU conversion."""
 
@@ -57,10 +66,10 @@ class TestNMEALoading:
         path.write_text(
             "\n".join(
                 [
-                    "$GPRMC,123519,A,4807.038,N,01131.000,E,010.0,090.0,230394,,,A*00",
-                    "$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*00",
-                    "$GPRMC,123520,A,4807.038,N,01131.001,E,010.0,090.0,230394,,,A*00",
-                    "$GPGGA,123520,4807.038,N,01131.001,E,1,08,0.9,545.4,M,46.9,M,,*00",
+                    _with_nmea_checksum("$GPRMC,123519,A,4807.038,N,01131.000,E,010.0,090.0,230394,,,A"),
+                    _with_nmea_checksum("$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,"),
+                    _with_nmea_checksum("$GPRMC,123520,A,4807.038,N,01131.001,E,010.0,090.0,230394,,,A"),
+                    _with_nmea_checksum("$GPGGA,123520,4807.038,N,01131.001,E,1,08,0.9,545.4,M,46.9,M,,"),
                 ]
             )
         )
@@ -86,8 +95,8 @@ class TestNMEALoading:
         path.write_text(
             "\n".join(
                 [
-                    "$GPGGA,000001,3500.000,N,13900.000,E,1,08,0.9,10.0,M,0.0,M,,*00",
-                    "$GPGGA,000002,3500.000,N,13900.001,E,1,08,0.9,10.0,M,0.0,M,,*00",
+                    _with_nmea_checksum("$GPGGA,000001,3500.000,N,13900.000,E,1,08,0.9,10.0,M,0.0,M,,"),
+                    _with_nmea_checksum("$GPGGA,000002,3500.000,N,13900.001,E,1,08,0.9,10.0,M,0.0,M,,"),
                 ]
             )
         )
@@ -102,9 +111,15 @@ class TestNMEALoading:
     def test_load_nmea_crlf_and_blank_lines(self, tmp_path: Path) -> None:
         """Should tolerate Windows CRLF and stray blank lines."""
         path = tmp_path / "crlf.nmea"
-        path.write_bytes(
-            b"\r\n\r\n$GPGGA,000001,3500.000,N,13900.000,E,1,08,0.9,10.0,M,0.0,M,,*00\r\n"
-            b"$GPGGA,000002,3500.000,N,13900.001,E,1,08,0.9,10.0,M,0.0,M,,*00\r\n"
+        path.write_text(
+            "\r\n\r\n"
+            + "\r\n".join(
+                [
+                    _with_nmea_checksum("$GPGGA,000001,3500.000,N,13900.000,E,1,08,0.9,10.0,M,0.0,M,,"),
+                    _with_nmea_checksum("$GPGGA,000002,3500.000,N,13900.001,E,1,08,0.9,10.0,M,0.0,M,,"),
+                ]
+            )
+            + "\r\n"
         )
 
         timestamps, poses = LiDARSLAMProcessor()._load_nmea_trajectory(path)
@@ -118,10 +133,10 @@ class TestNMEALoading:
         path.write_text(
             "\n".join(
                 [
-                    "$GNRMC,123519,A,4807.038,N,01131.000,E,010.0,090.0,230394,,,A*00",
-                    "$GNGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*00",
-                    "$GNRMC,123520,A,4807.038,N,01131.001,E,010.0,090.0,230394,,,A*00",
-                    "$GNGGA,123520,4807.038,N,01131.001,E,1,08,0.9,545.4,M,46.9,M,,*00",
+                    _with_nmea_checksum("$GNRMC,123519,A,4807.038,N,01131.000,E,010.0,090.0,230394,,,A"),
+                    _with_nmea_checksum("$GNGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,"),
+                    _with_nmea_checksum("$GNRMC,123520,A,4807.038,N,01131.001,E,010.0,090.0,230394,,,A"),
+                    _with_nmea_checksum("$GNGGA,123520,4807.038,N,01131.001,E,1,08,0.9,545.4,M,46.9,M,,"),
                 ]
             )
         )
@@ -136,8 +151,11 @@ class TestNMEALoading:
         path = tmp_path / "bom.nmea"
         path.write_bytes(
             (
-                "\ufeff$GPGGA,000001,3500.000,N,13900.000,E,1,08,0.9,10.0,M,0.0,M,,*00\n"
-                "$GPGGA,000002,3500.000,N,13900.001,E,1,08,0.9,10.0,M,0.0,M,,*00\n"
+                "\ufeff"
+                + _with_nmea_checksum("$GPGGA,000001,3500.000,N,13900.000,E,1,08,0.9,10.0,M,0.0,M,,")
+                + "\n"
+                + _with_nmea_checksum("$GPGGA,000002,3500.000,N,13900.001,E,1,08,0.9,10.0,M,0.0,M,,")
+                + "\n"
             ).encode("utf-8")
         )
 
@@ -154,7 +172,7 @@ class TestNMEALoading:
 
         bad = tmp_path / "bad.nmea"
         bad.write_text(
-            "$GPGGA,000001,3500.000,N,13900.000,E,0,08,0.9,10.0,M,0.0,M,,*00\n"  # fix quality 0
+            _with_nmea_checksum("$GPGGA,000001,3500.000,N,13900.000,E,0,08,0.9,10.0,M,0.0,M,,") + "\n"  # fix quality 0
         )
         with pytest.raises(ValueError, match="No valid NMEA"):
             LiDARSLAMProcessor()._load_nmea_trajectory(bad)
