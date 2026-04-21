@@ -431,6 +431,17 @@ PYTHONPATH=src python3 -m gs_sim2real.cli preprocess \
   --pointcloud outputs/bag6_mast3r/pts3d.npy
 ```
 
+Pi3X official model でも smoke 済み。`/tmp/ext_slam_probe/Pi3` を repo 外に置き、`plyfile` だけを `/tmp/pi3-smoke-site` に target install して、既存 Python/Torch から `yyfz233/Pi3X` をロードした。bag6 cam0 の先頭5枚を `PIXEL_LIMIT=120000` で推論し、`camera_poses.npz` (`1 x 5 x 4 x 4`) と `points.npy` (100000 points) を `outputs/pi3x_smoke/artifacts/` に保存。trajectory extent は `[14.552, 4.343, 4.545]`、4/4 steps が非ゼロ。次の `external-slam` import は 5 images / 100000 points の COLMAP sparse を作り、`gsplat --iterations 10` も `outputs/pi3x_smoke/train_smoke/point_cloud.ply` まで成功した。
+
+```bash
+PYTHONPATH=src python3 -m gs_sim2real.cli preprocess \
+  --images outputs/pi3x_smoke/images \
+  --output outputs/pi3x_smoke/imported_colmap \
+  --method external-slam \
+  --external-slam-system pi3 \
+  --external-slam-output outputs/pi3x_smoke/artifacts
+```
+
 VGGT-SLAM 2.0 smoke も同日実走済み。`/tmp/ext_slam_probe/VGGT-SLAM` を Python 3.11 の隔離 venv (`/tmp/vggt-slam-venv`) に入れ、`requirements.txt` + `third_party/salad` + `MIT-SPARK/VGGT_SPARK` + `vggt-slam` editable install で import まで通った。上流 `main.py` は `--max_loops 0` でも SALAD checkpoint と Viewer を初期化するため、ローカルclone側だけ `VGGT_SLAM_NO_RETRIEVAL=1` / `VGGT_SLAM_NO_VIEWER=1` で無効化する薄いパッチを当てた。
 
 ```bash
