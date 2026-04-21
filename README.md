@@ -13,9 +13,11 @@ gs-mapper photos-to-splat --images ./my_photos --output outputs/my_splat
 # -> outputs/my_splat/my_photos.splat  (open in splat.html?url=...)
 ```
 
-[![Scene picker cycling through 5 bundled splats on github.io](docs/images/demo-sweep/hero.gif)](https://rsasaki0109.github.io/gs-mapper/splat.html)
+[![Scene picker cycling through bundled splats on github.io](docs/images/demo-sweep/hero.gif)](https://rsasaki0109.github.io/gs-mapper/splat.html)
 
-DUSt3R or MAST3R for pose-free preprocessing, gsplat for training, and an antimatter15/splat-compatible `.splat` binary out the other end. Five bundled demo scenes A/B-compare the pose-free output against a supervised (GNSS + LiDAR + appearance + BA) baseline on the same scenes — pick any from the scene dropdown on the [live viewer](https://rsasaki0109.github.io/gs-mapper/splat.html).
+DUSt3R or MAST3R for pose-free preprocessing, gsplat for training, and an antimatter15/splat-compatible `.splat` binary out the other end. **Six** production bundled demo scenes A/B-compare pose-free outputs against supervised GNSS + LiDAR baselines — pick any from the scene dropdown on the [live viewer](https://rsasaki0109.github.io/gs-mapper/splat.html). The old MCD `tuhh_day_04` zero-GNSS artifact is retained only as a diagnostic file in this branch, not as a production picker item.
+
+Table thumbnails are **full-canvas grabs** from `splat.html` (UI chrome hidden) so they stay readable when GitHub scales them down. Regenerate with `DISPLAY=:0 python3 scripts/capture_readme_splat_previews.py` after adding or changing a `.splat` (requires Playwright + GPU-backed WebGL).
 
 ---
 
@@ -32,7 +34,7 @@ GitHub Pages hosts four views of the same 6-bag Autoware Leo Drive ISUZU bundle:
 | [`/splat_spark.html`](https://rsasaki0109.github.io/gs-mapper/splat_spark.html) | `sparkjsdev/spark` 2.0 (WebGL2, ESM) | THREE.js-based World Labs renderer with view-dependent LoD, progressive streaming, and VRAM virtualization. Handles mobile / VR as well as desktop; an **Enter VR** button is wired up for WebXR-capable devices (Meta Quest / Vision Pro). Ships its own scene picker. |
 | [`/splat_webgpu.html`](https://rsasaki0109.github.io/gs-mapper/splat_webgpu.html) | `shrekshao/webgpu-3d-gaussian-splat-viewer` (WebGPU, GPU radix sort) | True WebGPU: compute-shader preprocess + radix sort per frame. Requires Chrome 113+, Edge 113+, or Safari TP with WebGPU enabled. |
 
-`splat.html` ships a scene picker that toggles between the supervised demo and four pose-free variants. Each splat is a 400k-gauss / 12.8 MB antimatter15 binary trained by the pipeline in this repo.
+`splat.html` ships a scene picker across **two** supervised splats (Autoware fused and MCD `ntu_day_02`) plus **four** pose-free variants. Each shipped pose-free `.splat` and the MCD supervised splat are capped at a 400k-gauss / 12.8 MB antimatter15 binary; the default Autoware supervised scene uses a smaller 80k gauss export for faster first paint (see table footnote).
 
 | Scene | Preview | Pipeline |
 |-------|---------|----------|
@@ -41,8 +43,11 @@ GitHub Pages hosts four views of the same 6-bag Autoware Leo Drive ISUZU bundle:
 | bag6 cam0 — MAST3R pose-free (metric) | [![](docs/images/demo-sweep/04_bag6-mast3r.png)](https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/bag6-mast3r.splat) | Same 20 frames → MAST3R sparse global alignment → gsplat **15k** iter. Metric-scale, 20/20 non-degenerate poses. See [Quality push](#quality-push-3k-vs-15k-mast3r-training) for the before/after |
 | MCD tuhh_day_04 — DUSt3R pose-free | [![](docs/images/demo-sweep/03_mcd-tuhh-day04.png)](https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/mcd-tuhh-day04.splat) | 20 color frames of a non-Autoware MCD day handheld session → DUSt3R → gsplat 3k iter |
 | MCD tuhh_day_04 — MAST3R pose-free (metric) | [![](docs/images/demo-sweep/05_mcd-tuhh-day04-mast3r.png)](https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/mcd-tuhh-day04-mast3r.splat) | Same frames → MAST3R → gsplat **15k** iter. Matrix completes {bag6, MCD} × {DUSt3R, MAST3R} |
+| MCD ntu_day_02 — supervised | [![](docs/images/demo-sweep/06_mcd-ntu-day02-supervised.png)](https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/outdoor-demo/mcd-ntu-day02-supervised.splat) | ATV session with valid `/vn200/GPS` after warm-up trim → ATV calibration YAML → LiDAR-seeded COLMAP sparse + depth-supervised gsplat 30k iter |
 
-The supervised default uses the full MCD pose-import stack. Pose-free variants use the pipeline you can invoke yourself with `gs-mapper photos-to-splat --preprocess dust3r` or `--preprocess mast3r`.
+The Autoware supervised default uses the full multi-bag pose-import stack. The MCD supervised row uses `ntu_day_02` because `tuhh_day_04` publishes all-zero GNSS; that rejected zero-GNSS artifact remains documented in `docs/plan_outdoor_gs.md`. Pose-free variants use the pipeline you can invoke yourself with `gs-mapper photos-to-splat --preprocess dust3r` or `--preprocess mast3r`.
+
+Before running GNSS-seeded MCD preprocessing on a new session, run `scripts/check_mcd_gnss.py <session-dir> --gnss-topic /vn200/GPS` and require non-zero fixes plus a non-trivial ENU trajectory extent.
 
 ### Mobile
 
@@ -64,7 +69,7 @@ DUSt3R variants are kept at 3k iter because their aligner output saturates earli
 
 ### Benchmark (this repo, bundled demos)
 
-Numbers below are the end-to-end wall-clock and quality figures for the five bundled splats, measured on a single RTX 4070 Ti Super (16 GB). The "Pose → sparse" column is pose-free backend run time on 20 frames with `scene_graph=complete`; "Train" is `gs-mapper train` on that sparse output. Supervised figures are from the multi-bag MCD-pose-import training that produces `outdoor-demo.splat`.
+Numbers below are the end-to-end wall-clock and quality figures for the production bundled splats, measured on a single RTX 4070 Ti Super (16 GB). The "Pose → sparse" column is pose-free backend run time on 20 frames with `scene_graph=complete` or the supervised import path. "Train" is `gs-mapper train` on that sparse output. Supervised Autoware figures are from the multi-bag pose-import training that produces `outdoor-demo.splat`. The rejected MCD `tuhh_day_04` GNSS attempt is excluded because its `/vn200/GPS` bag contains only all-zero fixes.
 
 | Scene | Pose → sparse | Recovered poses | Scene extent | gsplat iter | Train wall-clock | Trained gauss | Final L1 | Shipped splat |
 |-------|---------------|-----------------|--------------|-------------|------------------|---------------|----------|----------------|
@@ -73,8 +78,9 @@ Numbers below are the end-to-end wall-clock and quality figures for the five bun
 | bag6 cam0 — MAST3R | ~3 min | **20 / 20** | **28.1 m (metric)** | 15 000 | 285 s | 923k | ~0.16 | 12.8 MB / 400k gauss |
 | MCD tuhh_day_04 — DUSt3R | ~3 min | 19 / 20 | 1.78 m (unscaled) | 3 000 | 147 s | 3.23M → 400k filter | ~0.18 | 12.8 MB / 400k gauss |
 | MCD tuhh_day_04 — MAST3R | ~5 min | **20 / 20** | **59.0 m (metric)** | 15 000 | 413 s | 1.15M | ~0.16 | 12.8 MB / 400k gauss |
+| MCD ntu_day_02 — supervised | GNSS + ATV calibration + LiDAR seed (400 cams after 35 s trim) | 400/400 | 250 m horizontal GNSS extent | 30 000 | 500 s | 906k → 400k filter | 0.195 | 12.8 MB / 400k gauss |
 
-Every `.splat` is capped at the antimatter15 400 000-gauss / 12.8 MB size via `gs-mapper export --format splat --max-points 400000`, which is well under what Chrome can stream over Pages on mobile. The supervised demo uses a different filter budget (80k after opacity/scale gate) because its dense reconstruction already absorbs the supervised signal, and a smaller splat loads faster on the default scene.
+Every production 400k `.splat` is capped at the antimatter15 400 000-gauss / 12.8 MB size via `gs-mapper export --format splat --max-points 400000`, which is well under what Chrome can stream over Pages on mobile. The **Autoware** supervised default uses a different filter budget (80k after opacity/scale gate) because its dense reconstruction already absorbs the supervised signal, and a smaller splat loads faster on the default scene.
 
 GitHub Pages is deployed by [`.github/workflows/pages.yml`](.github/workflows/pages.yml) on `push` to `main`.
 

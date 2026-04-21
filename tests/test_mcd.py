@@ -35,6 +35,97 @@ class TestAntennaOffsetBaseLink:
                 antenna_offset_base=(0.0, 0.0, 1.0),
             )
 
+    def test_extract_navsat_trajectory_rejects_zero_placeholder_fixes(self, monkeypatch, tmp_path):
+        """All-zero NavSatFix placeholders should not produce a static trajectory."""
+        bag_path = tmp_path / "zero_gps.bag"
+        bag_path.write_bytes(b"bag")
+
+        class FakeReader:
+            def __init__(self, paths, **kwargs):
+                assert paths == [bag_path]
+                self.connection = SimpleNamespace(topic="/vn200/GPS", msgtype="sensor_msgs/msg/NavSatFix")
+                self.topics = {
+                    "/vn200/GPS": SimpleNamespace(connections=[self.connection]),
+                }
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def messages(self, connections):
+                assert connections == [self.connection]
+                for idx in range(3):
+                    yield self.connection, int((idx + 1) * 1e9), b""
+
+            def deserialize(self, rawdata, msgtype):
+                return SimpleNamespace(
+                    latitude=0.0,
+                    longitude=0.0,
+                    altitude=0.0,
+                    status=SimpleNamespace(status=0),
+                )
+
+        monkeypatch.setattr(MCDLoader, "_get_anyreader", staticmethod(lambda: FakeReader))
+
+        with pytest.raises(ValueError, match="Need at least 2 NavSatFix samples"):
+            MCDLoader(tmp_path).extract_navsat_trajectory(tmp_path / "out", gnss_topic="/vn200/GPS")
+
+    def test_extract_navsat_trajectory_can_flatten_altitude_spike(self, monkeypatch, tmp_path):
+        """Optional altitude flattening should prevent VectorNav warm-up spikes from entering TUM z."""
+        bag_path = tmp_path / "gps_spike.bag"
+        bag_path.write_bytes(b"bag")
+        rows = [
+            (1.0, 35.0, 139.0, 10000.0),
+            (2.0, 35.00001, 139.00001, 5.0),
+            (3.0, 35.00002, 139.00002, 5.0),
+        ]
+
+        class FakeReader:
+            def __init__(self, paths, **kwargs):
+                assert paths == [bag_path]
+                self.connection = SimpleNamespace(topic="/vn200/GPS", msgtype="sensor_msgs/msg/NavSatFix")
+                self.topics = {
+                    "/vn200/GPS": SimpleNamespace(connections=[self.connection]),
+                }
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def messages(self, connections):
+                assert connections == [self.connection]
+                for idx, row in enumerate(rows):
+                    yield self.connection, int(row[0] * 1e9), str(idx).encode("ascii")
+
+            def deserialize(self, rawdata, msgtype):
+                _, lat, lon, alt = rows[int(rawdata.decode("ascii"))]
+                return SimpleNamespace(
+                    latitude=lat,
+                    longitude=lon,
+                    altitude=alt,
+                    status=SimpleNamespace(status=0),
+                )
+
+        monkeypatch.setattr(MCDLoader, "_get_anyreader", staticmethod(lambda: FakeReader))
+
+        tum_path = Path(
+            MCDLoader(tmp_path).extract_navsat_trajectory(
+                tmp_path / "out",
+                gnss_topic="/vn200/GPS",
+                flatten_altitude=True,
+            )
+        )
+
+        z_values = [float(line.split()[3]) for line in tum_path.read_text(encoding="utf-8").splitlines()]
+        assert max(abs(z) for z in z_values) < 1e-3
+        assert '"altitude_mode": "flattened_median"' in (tum_path.parent / "origin_wgs84.json").read_text(
+            encoding="utf-8"
+        )
+
 
 class TestFindBagPaths:
     """Tests for rosbag path discovery."""

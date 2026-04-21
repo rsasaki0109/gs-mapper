@@ -384,11 +384,22 @@ class GsplatTrainer:
         """Parse COLMAP images.txt."""
         images = {}
         with open(path) as f:
-            lines = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+            lines = [line.rstrip("\n") for line in f if not line.lstrip().startswith("#")]
 
-        # images.txt has pairs of lines: metadata + 2D points
-        for i in range(0, len(lines), 2):
-            parts = lines[i].split()
+        # images.txt has pairs of lines: metadata + 2D points. The 2D
+        # points line may be blank for pose-seeded imports, so blank lines
+        # must be preserved until after the paired metadata line is skipped.
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
+            if not line:
+                i += 1
+                continue
+
+            parts = line.split()
+            if len(parts) < 10:
+                i += 1
+                continue
             img_id = int(parts[0])
             qw, qx, qy, qz = float(parts[1]), float(parts[2]), float(parts[3]), float(parts[4])
             tx, ty, tz = float(parts[5]), float(parts[6]), float(parts[7])
@@ -400,6 +411,7 @@ class GsplatTrainer:
                 "camera_id": cam_id,
                 "name": name,
             }
+            i += 2
         return images
 
     def _load_points3d_txt(self, path: Path) -> np.ndarray:

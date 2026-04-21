@@ -15,6 +15,11 @@ def assets_dir() -> Path:
     return REPO_ROOT / "docs" / "assets"
 
 
+def _scene_picker_urls() -> list[str]:
+    data = json.loads((REPO_ROOT / "docs" / "scenes-list.json").read_text(encoding="utf-8"))
+    return [scene["url"] for scene in data.get("scenes", [])]
+
+
 def test_scenes_index_json_parses(assets_dir: Path) -> None:
     p = assets_dir / "scenes.json"
     data = json.loads(p.read_text(encoding="utf-8"))
@@ -85,18 +90,34 @@ def test_mcd_tuhh_day04_dust3r_splat_present(assets_dir: Path) -> None:
     assert "mcd-tuhh-day04.splat" in html
 
 
+def test_mcd_ntu_day02_supervised_splat_present(assets_dir: Path) -> None:
+    """The valid-GNSS MCD supervised splat must be bundled and linked."""
+    splat = assets_dir / "outdoor-demo" / "mcd-ntu-day02-supervised.splat"
+    assert splat.is_file(), "missing MCD ntu_day_02 supervised splat"
+    size = splat.stat().st_size
+    assert size > 1_000_000, f"splat looks too small ({size} bytes)"
+    assert size % 32 == 0, f"splat is not 32-byte aligned ({size} bytes)"
+    html = (REPO_ROOT / "docs" / "splat.html").read_text(encoding="utf-8")
+    assert "mcd-ntu-day02-supervised.splat" in html
+    assert "MCD ntu_day_02" in html
+
+
+def test_mcd_tuhh_day04_zero_gnss_diagnostic_not_in_production_picker() -> None:
+    """The rejected all-zero GNSS artifact must not be exposed as a production scene."""
+    urls = set(_scene_picker_urls())
+    assert "assets/outdoor-demo/mcd-tuhh-day04-supervised.splat" not in urls
+    html = (REPO_ROOT / "docs" / "splat.html").read_text(encoding="utf-8")
+    assert "mcd-tuhh-day04-supervised.splat" not in html
+    assert "zero-GNSS diagnostic" not in html
+
+
 def test_splat_html_has_scene_picker_with_all_bundled_splats(assets_dir: Path) -> None:
     """The <select id="sceneSelect"> must list every bundled .splat."""
     html = (REPO_ROOT / "docs" / "splat.html").read_text(encoding="utf-8")
     assert 'id="sceneSelect"' in html, "scene picker <select> is missing"
     assert 'data-testid="scene-picker"' in html
-    # Each bundled splat under docs/assets/outdoor-demo/ should appear as an <option value=...>.
-    bundled = sorted(p.name for p in (assets_dir / "outdoor-demo").glob("*.splat"))
-    assert bundled, "no bundled .splat files found — test fixture is wrong"
-    for name in bundled:
-        assert f'value="assets/outdoor-demo/{name}"' in html, (
-            f"scene picker does not expose {name}; add an <option> under #sceneSelect"
-        )
+    for url in _scene_picker_urls():
+        assert f'value="{url}"' in html, f"scene picker does not expose {url}; add an <option> under #sceneSelect"
     # Picker JS is shared — each viewer must reference the single bootstrap file.
     assert "scene-picker.js" in html, 'splat.html must include <script src="scene-picker.js">'
 
@@ -106,11 +127,8 @@ def test_splat_spark_has_scene_picker_and_spark_wiring(assets_dir: Path) -> None
     html = (REPO_ROOT / "docs" / "splat_spark.html").read_text(encoding="utf-8")
     # Same picker contract as splat.html.
     assert 'id="sceneSelect"' in html, "Spark viewer is missing the scene picker"
-    bundled = sorted(p.name for p in (assets_dir / "outdoor-demo").glob("*.splat"))
-    for name in bundled:
-        assert f'value="assets/outdoor-demo/{name}"' in html, (
-            f"Spark picker does not expose {name}; add an <option> under #sceneSelect"
-        )
+    for url in _scene_picker_urls():
+        assert f'value="{url}"' in html, f"Spark picker does not expose {url}; add an <option> under #sceneSelect"
     assert "scene-picker.js" in html, 'splat_spark.html must include <script src="scene-picker.js">'
     # Spark 2.0 needs SparkRenderer added to the scene and three >= r179, otherwise
     # the canvas renders blank. Enforce both at the source level.
@@ -151,11 +169,8 @@ def test_splat_webgpu_has_scene_picker(assets_dir: Path) -> None:
     html = (REPO_ROOT / "docs" / "splat_webgpu.html").read_text(encoding="utf-8")
     assert 'id="sceneSelect"' in html, "WebGPU viewer is missing the scene picker"
     assert 'data-testid="scene-picker"' in html
-    bundled = sorted(p.name for p in (assets_dir / "outdoor-demo").glob("*.splat"))
-    for name in bundled:
-        assert f'value="assets/outdoor-demo/{name}"' in html, (
-            f"WebGPU picker does not expose {name}; add an <option> under #sceneSelect"
-        )
+    for url in _scene_picker_urls():
+        assert f'value="{url}"' in html, f"WebGPU picker does not expose {url}; add an <option> under #sceneSelect"
     assert "scene-picker.js" in html, 'splat_webgpu.html must include <script src="scene-picker.js">'
 
 
@@ -170,13 +185,13 @@ def test_shared_scene_picker_assets_present(assets_dir: Path) -> None:
     js_text = js.read_text(encoding="utf-8")
     assert "location.assign" in js_text, "scene-picker.js must swap location on change"
     assert "scenes-list.json" in js_text, "scene-picker.js must fetch the shared config"
-    # scenes-list.json should list every bundled splat so a data-driven picker in
-    # a viewer (empty <select>) auto-populates correctly.
+    # scenes-list.json should point only at production picker splats, and every
+    # listed splat must exist on disk.
     import json as _json
 
     data = _json.loads(index.read_text(encoding="utf-8"))
     assert data.get("version") == "gs-mapper-scene-picker/v1"
-    indexed = {scene["url"] for scene in data.get("scenes", [])}
-    for name in sorted(p.name for p in (assets_dir / "outdoor-demo").glob("*.splat")):
-        url = f"assets/outdoor-demo/{name}"
-        assert url in indexed, f"scenes-list.json is missing {url}; add it to keep pickers in sync"
+    indexed = [scene["url"] for scene in data.get("scenes", [])]
+    assert indexed, "scenes-list.json has no production scenes"
+    for url in indexed:
+        assert (REPO_ROOT / "docs" / url).is_file(), f"scenes-list.json points at missing asset {url}"

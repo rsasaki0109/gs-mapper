@@ -26,6 +26,11 @@
       "url": "assets/outdoor-demo/mcd-tuhh-day04-mast3r.splat",
       "label": "MCD tuhh_day_04 \u2014 MAST3R pose-free (metric)",
       "summary": "MCD tuhh_day_04 handheld day session, 20 MAST3R frames \u2014 metric-aware pose-free"
+    },
+    {
+      "url": "assets/outdoor-demo/mcd-ntu-day02-supervised.splat",
+      "label": "MCD ntu_day_02 \u2014 supervised",
+      "summary": "MCD ntu_day_02 ATV session, GNSS + ATV calibration + LiDAR-seeded depth-supervised gsplat."
     }
   ]
 }

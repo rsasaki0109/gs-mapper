@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any
 
 import numpy as np
+import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -166,3 +168,47 @@ class HybridTfLookup:
             cur = parent
 
         return T_accum
+
+
+def merge_static_tf_maps(*maps: StaticTfMap) -> StaticTfMap:
+    """Merge static TF trees in order; later maps override the same child frame."""
+    out = StaticTfMap()
+    for m in maps:
+        for child, (parent, T) in m._child_to_edge.items():
+            out.add(parent, child, T)
+    return out
+
+
+def load_static_calibration_yaml(path: str | Path, *, base_frame: str = "base_link") -> StaticTfMap:
+    """Load MCDVIRAL ``body:`` calibration YAML (sensor names → 4×4 ``T`` in parent frame).
+
+    The file maps each child sensor to ``T_{base}`` from child (``p_base = T @ p_child``),
+    consistent with :class:`StaticTfMap` / ROS ``TransformStamped`` conventions.
+    """
+    p = Path(path)
+    raw = yaml.safe_load(p.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict) or "body" not in raw:
+        raise ValueError(f"calibration YAML missing top-level 'body' key: {p}")
+    body = raw["body"]
+    if not isinstance(body, dict):
+        raise ValueError(f"calibration 'body' must be a mapping: {p}")
+
+    parent = normalize_frame_id(base_frame)
+    out = StaticTfMap()
+    for child_name, entry in body.items():
+        child_key = normalize_frame_id(str(child_name))
+        if not isinstance(entry, dict):
+            continue
+        T_list = entry.get("T")
+        if T_list is None:
+            continue
+        try:
+            arr = np.asarray(T_list, dtype=np.float64)
+            if arr.shape != (4, 4):
+                logger.warning("skip %s: expected 4×4 T, got shape %s", child_key, arr.shape)
+                continue
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("skip %s: bad T (%s)", child_key, exc)
+            continue
+        out.add(parent, child_key, arr)
+    return out

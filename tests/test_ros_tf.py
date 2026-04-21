@@ -11,6 +11,8 @@ from gs_sim2real.datasets.ros_tf import (
     StaticTfMap,
     TimestampedTfEdges,
     geometry_transform_to_matrix,
+    load_static_calibration_yaml,
+    merge_static_tf_maps,
     normalize_frame_id,
 )
 
@@ -74,6 +76,40 @@ class TestTimestampedTfEdges:
         e.finalize()
         got = e.nearest("base", "cam", 1_100_000_000)
         assert got is not None and np.allclose(got, T0)
+
+
+class TestMergeStaticTfMaps:
+    def test_latter_map_overrides_child(self) -> None:
+        a = StaticTfMap()
+        a.add("base", "cam", np.eye(4))
+        b = StaticTfMap()
+        Tb = np.eye(4)
+        Tb[0, 3] = 5.0
+        b.add("base", "cam", Tb)
+        m = merge_static_tf_maps(a, b)
+        T = m.lookup("base", "cam")
+        assert T is not None and np.allclose(T[0, 3], 5.0)
+
+
+class TestLoadStaticCalibrationYaml:
+    def test_loads_body_edges(self, tmp_path) -> None:
+        p = tmp_path / "calib.yaml"
+        p.write_text(
+            "body:\n  mycam:\n    T:\n    - [1, 0, 0, 1]\n    - [0, 1, 0, 0]\n    - [0, 0, 1, 0]\n    - [0, 0, 0, 1]\n",
+            encoding="utf-8",
+        )
+        m = load_static_calibration_yaml(p, base_frame="base_link")
+        T = m.lookup("base_link", "mycam")
+        assert T is not None and np.allclose(T[0, 3], 1.0)
+
+    def test_missing_body_raises(self, tmp_path) -> None:
+        p = tmp_path / "bad.yaml"
+        p.write_text("foo: {}\n", encoding="utf-8")
+        try:
+            load_static_calibration_yaml(p)
+        except ValueError:
+            return
+        raise AssertionError("expected ValueError")
 
 
 class TestHybridTfLookup:

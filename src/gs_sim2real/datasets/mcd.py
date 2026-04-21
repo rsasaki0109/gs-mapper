@@ -132,6 +132,10 @@ class MCDLoader:
         "/d435i/imu",
     )
     DEFAULT_GNSS_TOPICS = (
+        "/vn200/GPS",
+        "/vn100/GPS",
+        "/vn200/gps",
+        "/vn100/gps",
         "/gnss/fix",
         "/gps/fix",
         "/fix",
@@ -159,6 +163,7 @@ class MCDLoader:
         max_frames: int = 100,
         every_n: int = 1,
         save_image_timestamps: bool = False,
+        start_offset_sec: float = 0.0,
     ) -> str:
         """Extract camera frames from an MCD rosbag or pre-extracted images."""
         output_path = Path(output_dir)
@@ -199,10 +204,16 @@ class MCDLoader:
 
             extracted_counts = {connection.topic: 0 for connection in connections}
             seen_counts = {connection.topic: 0 for connection in connections}
+            first_timestamps = {connection.topic: None for connection in connections}
             timestamp_rows: list[tuple[str, int]] = []
 
             for connection, timestamp_ns, rawdata in reader.messages(connections=connections):
                 topic_name = connection.topic
+                ts_sec = float(timestamp_ns) * 1e-9
+                if first_timestamps[topic_name] is None:
+                    first_timestamps[topic_name] = ts_sec
+                if start_offset_sec > 0.0 and ts_sec - first_timestamps[topic_name] < start_offset_sec:
+                    continue
                 idx = seen_counts[topic_name]
                 seen_counts[topic_name] += 1
                 if idx % every_n != 0:
@@ -265,6 +276,7 @@ class MCDLoader:
         max_frames: int = 100,
         every_n: int = 1,
         save_timestamps: bool = False,
+        start_offset_sec: float = 0.0,
     ) -> str:
         """Extract LiDAR point clouds from an MCD rosbag as ``.npy`` arrays."""
         output_path = Path(output_dir)
@@ -293,7 +305,16 @@ class MCDLoader:
             if connection is None:
                 raise FileNotFoundError("No supported PointCloud2 topic found in the provided MCD rosbag.")
 
-            for idx, (_, timestamp_ns, rawdata) in enumerate(reader.messages(connections=[connection])):
+            seen_count = 0
+            first_ts: float | None = None
+            for _, timestamp_ns, rawdata in reader.messages(connections=[connection]):
+                ts_sec = float(timestamp_ns) * 1e-9
+                if first_ts is None:
+                    first_ts = ts_sec
+                if start_offset_sec > 0.0 and ts_sec - first_ts < start_offset_sec:
+                    continue
+                idx = seen_count
+                seen_count += 1
                 if idx % every_n != 0:
                     continue
                 if count >= max_frames:
@@ -809,6 +830,8 @@ class MCDLoader:
         antenna_offset_base: tuple[float, float, float] | None = None,
         reference_origin: tuple[float, float, float] | None = None,
         imu_csv_path: str | Path | None = None,
+        flatten_altitude: bool = False,
+        start_offset_sec: float = 0.0,
     ) -> str:
         """Write ``sensor_msgs/NavSatFix`` samples to a TUM trajectory file (local ENU).
 
@@ -831,6 +854,19 @@ class MCDLoader:
         (linearly interpolated to the GNSS timestamp) instead of the default
         identity + motion-inferred yaw. This improves robustness for stationary
         segments and sharp turns.
+
+        Some public MCD bags publish placeholder NavSatFix messages at
+        latitude=longitude=0. Treat those as missing fixes so pose-seeded
+        preprocessing fails instead of producing a static ENU trajectory.
+
+        ``flatten_altitude`` projects all fixes to the median valid altitude
+        before ENU conversion. This is useful for VectorNav bags whose first
+        seconds contain an implausible altitude warm-up spike while horizontal
+        latitude/longitude are already usable.
+
+        ``start_offset_sec`` skips the selected GNSS topic's initial seconds.
+        Use the same offset for image/LiDAR extraction when trimming sensor
+        warm-up.
         """
         from gs_sim2real.preprocess.lidar_slam import LiDARSLAMProcessor
 
@@ -847,10 +883,7 @@ class MCDLoader:
             raise FileNotFoundError(f"No rosbag found in {self.data_dir}; cannot extract NavSatFix trajectory.")
 
         reader_cls = self._get_anyreader()
-        rows_ts: list[float] = []
-        rows_e: list[float] = []
-        rows_n: list[float] = []
-        rows_u: list[float] = []
+        valid_rows: list[tuple[float, float, float, float]] = []
         connection = None
 
         with self._create_reader(reader_cls, bag_paths) as reader:
@@ -863,20 +896,22 @@ class MCDLoader:
             if connection is None:
                 raise FileNotFoundError("No sensor_msgs/NavSatFix topic found in the provided MCD rosbag.")
 
-            ref_lat: float | None = None
-            ref_lon: float | None = None
-            ref_alt: float | None = None
-            if reference_origin is not None:
-                ref_lat, ref_lon, ref_alt = (float(x) for x in reference_origin)
-            count = 0
+            first_ts: float | None = None
             for _, timestamp_ns, rawdata in reader.messages(connections=[connection]):
-                if max_poses is not None and count >= max_poses:
+                ts = float(timestamp_ns) * 1e-9
+                if first_ts is None:
+                    first_ts = ts
+                if start_offset_sec > 0.0 and ts - first_ts < start_offset_sec:
+                    continue
+                if max_poses is not None and len(valid_rows) >= max_poses:
                     break
                 msg = reader.deserialize(rawdata, connection.msgtype)
                 lat = float(getattr(msg, "latitude", float("nan")))
                 lon = float(getattr(msg, "longitude", float("nan")))
                 alt = float(getattr(msg, "altitude", 0.0))
                 if not (np.isfinite(lat) and np.isfinite(lon)):
+                    continue
+                if abs(lat) < 1e-12 and abs(lon) < 1e-12:
                     continue
                 st = getattr(msg, "status", None)
                 if st is not None:
@@ -887,20 +922,30 @@ class MCDLoader:
                     except (TypeError, ValueError):
                         pass
 
-                if ref_lat is None:
-                    ref_lat, ref_lon, ref_alt = lat, lon, alt
+                valid_rows.append((ts, lat, lon, alt))
 
-                assert ref_lat is not None and ref_lon is not None and ref_alt is not None
-                east, north, up = LiDARSLAMProcessor._wgs84_to_enu(lat, lon, alt, ref_lat, ref_lon, ref_alt)
-                ts = float(timestamp_ns) * 1e-9
-                rows_ts.append(ts)
-                rows_e.append(float(east))
-                rows_n.append(float(north))
-                rows_u.append(float(up))
-                count += 1
-
+        count = len(valid_rows)
         if count < 2:
             raise ValueError(f"Need at least 2 NavSatFix samples for a trajectory, got {count} from {connection.topic}")
+
+        if reference_origin is not None:
+            ref_lat, ref_lon, ref_alt = (float(x) for x in reference_origin)
+        else:
+            ref_lat, ref_lon, ref_alt = valid_rows[0][1], valid_rows[0][2], valid_rows[0][3]
+            if flatten_altitude:
+                ref_alt = float(np.median([row[3] for row in valid_rows]))
+
+        rows_ts: list[float] = []
+        rows_e: list[float] = []
+        rows_n: list[float] = []
+        rows_u: list[float] = []
+        for ts, lat, lon, alt in valid_rows:
+            alt_for_enu = ref_alt if flatten_altitude else alt
+            east, north, up = LiDARSLAMProcessor._wgs84_to_enu(lat, lon, alt_for_enu, ref_lat, ref_lon, ref_alt)
+            rows_ts.append(ts)
+            rows_e.append(float(east))
+            rows_n.append(float(north))
+            rows_u.append(float(up))
 
         east_a = np.array(rows_e, dtype=np.float64)
         north_a = np.array(rows_n, dtype=np.float64)
@@ -960,6 +1005,8 @@ class MCDLoader:
                     "ref_lon": float(ref_lon),
                     "ref_alt": float(ref_alt),
                     "source": "reference_origin" if reference_origin is not None else "first_fix",
+                    "altitude_mode": "flattened_median" if flatten_altitude else "navsat_altitude",
+                    "start_offset_sec": float(start_offset_sec),
                 },
                 indent=2,
             )

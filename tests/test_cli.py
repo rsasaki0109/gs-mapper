@@ -509,6 +509,63 @@ class TestCLIHelp:
         assert args.mcd_lidar_frame == ""
         assert args.mcd_skip_lidar_seed is False
 
+    def test_cli_mcd_static_calibration_flag_preprocess_run_demo(self) -> None:
+        """preprocess / run / demo parsers accept MCD GNSS calibration flags."""
+        p = build_parser()
+        a = p.parse_args(
+            [
+                "preprocess",
+                "--images",
+                "x",
+                "--output",
+                "o",
+                "--method",
+                "mcd",
+                "--mcd-static-calibration",
+                "c.yaml",
+                "--mcd-flatten-gnss-altitude",
+                "--mcd-start-offset-sec",
+                "35",
+            ]
+        )
+        assert a.mcd_static_calibration == "c.yaml"
+        assert a.mcd_flatten_gnss_altitude is True
+        assert a.mcd_start_offset_sec == 35.0
+        b = p.parse_args(
+            [
+                "run",
+                "--images",
+                "x",
+                "--output",
+                "o",
+                "--mcd-static-calibration",
+                "c.yaml",
+                "--mcd-flatten-gnss-altitude",
+                "--mcd-start-offset-sec",
+                "35",
+            ]
+        )
+        assert b.mcd_static_calibration == "c.yaml"
+        assert b.mcd_flatten_gnss_altitude is True
+        assert b.mcd_start_offset_sec == 35.0
+        c = p.parse_args(
+            [
+                "demo",
+                "--images",
+                "x",
+                "--output",
+                "o",
+                "--mcd-static-calibration",
+                "c.yaml",
+                "--mcd-flatten-gnss-altitude",
+                "--mcd-start-offset-sec",
+                "35",
+            ]
+        )
+        assert c.mcd_static_calibration == "c.yaml"
+        assert c.mcd_flatten_gnss_altitude is True
+        assert c.mcd_start_offset_sec == 35.0
+
     def test_cli_preprocess_mcd_list_topics_flag(self) -> None:
         """preprocess parser accepts MCD topic listing mode."""
         args = build_parser().parse_args(

@@ -1,5 +1,5 @@
-"""Record the README hero GIF by driving the scene picker through every
-bundled splat in the local ``splat.html`` viewer via Playwright, then let
+"""Record the README hero GIF by driving the scene picker through the
+production bundled splats in the local ``splat.html`` viewer via Playwright, then let
 ffmpeg convert the captured WebM to a looping GIF.
 
 Outputs:
@@ -54,6 +54,7 @@ def main() -> int:
             "assets/outdoor-demo/bag6-mast3r.splat",
             "assets/outdoor-demo/mcd-tuhh-day04.splat",
             "assets/outdoor-demo/mcd-tuhh-day04-mast3r.splat",
+            "assets/outdoor-demo/mcd-ntu-day02-supervised.splat",
         ]
         with sync_playwright() as pw:
             browser = pw.chromium.launch(

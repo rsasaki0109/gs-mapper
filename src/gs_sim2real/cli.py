@@ -98,6 +98,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="For MCD preprocessing, NavSatFix topic used with --mcd-seed-poses-from-gnss (default: try /gnss/fix)",
     )
     pp.add_argument(
+        "--mcd-flatten-gnss-altitude",
+        action="store_true",
+        help="For MCD GNSS seeding, project NavSatFix altitude to the median valid altitude before ENU conversion",
+    )
+    pp.add_argument(
+        "--mcd-start-offset-sec",
+        type=float,
+        default=0.0,
+        help="For MCD preprocessing, skip the first N seconds of image/LiDAR/GNSS streams",
+    )
+    pp.add_argument(
         "--mcd-seed-poses-from-gnss",
         action="store_true",
         help="For MCD preprocessing, write COLMAP sparse from GNSS (NavSatFix) + images; single --image-topic only",
@@ -106,6 +117,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--mcd-base-frame",
         default="base_link",
         help="For MCD GNSS seeding, parent frame for /tf_static lookup (default: base_link)",
+    )
+    pp.add_argument(
+        "--mcd-static-calibration",
+        default="",
+        help="MCDVIRAL rig calibration YAML (body→sensor 4×4 T) when bags lack /tf_static",
     )
     pp.add_argument(
         "--mcd-camera-frame",
@@ -400,6 +416,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="For --preprocess-method mcd, NavSatFix topic for --mcd-seed-poses-from-gnss (default: try /gnss/fix)",
     )
     rn.add_argument(
+        "--mcd-flatten-gnss-altitude",
+        action="store_true",
+        help="For MCD GNSS seeding, project NavSatFix altitude to the median valid altitude before ENU conversion",
+    )
+    rn.add_argument(
+        "--mcd-start-offset-sec",
+        type=float,
+        default=0.0,
+        help="For MCD preprocessing, skip the first N seconds of image/LiDAR/GNSS streams",
+    )
+    rn.add_argument(
         "--mcd-seed-poses-from-gnss",
         action="store_true",
         help="For --preprocess-method mcd, COLMAP sparse from GNSS + images; single --image-topic only",
@@ -408,6 +435,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--mcd-base-frame",
         default="base_link",
         help="For MCD GNSS seeding, parent frame for /tf_static lookup (default: base_link)",
+    )
+    rn.add_argument(
+        "--mcd-static-calibration",
+        default="",
+        help="MCDVIRAL rig calibration YAML (body→sensor 4×4 T) when bags lack /tf_static",
     )
     rn.add_argument(
         "--mcd-camera-frame",
@@ -573,6 +605,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="For --preprocess-method mcd, NavSatFix topic for --mcd-seed-poses-from-gnss (default: try /gnss/fix)",
     )
     dm.add_argument(
+        "--mcd-flatten-gnss-altitude",
+        action="store_true",
+        help="For MCD GNSS seeding, project NavSatFix altitude to the median valid altitude before ENU conversion",
+    )
+    dm.add_argument(
+        "--mcd-start-offset-sec",
+        type=float,
+        default=0.0,
+        help="For MCD preprocessing, skip the first N seconds of image/LiDAR/GNSS streams",
+    )
+    dm.add_argument(
         "--mcd-seed-poses-from-gnss",
         action="store_true",
         help="For --preprocess-method mcd, COLMAP sparse from GNSS + images; single --image-topic only",
@@ -581,6 +624,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--mcd-base-frame",
         default="base_link",
         help="For MCD GNSS seeding, parent frame for /tf_static lookup (default: base_link)",
+    )
+    dm.add_argument(
+        "--mcd-static-calibration",
+        default="",
+        help="MCDVIRAL rig calibration YAML (body→sensor 4×4 T) when bags lack /tf_static",
     )
     dm.add_argument(
         "--mcd-camera-frame",
@@ -1142,6 +1190,7 @@ def cmd_preprocess(args: argparse.Namespace) -> None:
             max_frames=args.max_frames,
             every_n=args.every_n,
             save_image_timestamps=seed_gnss,
+            start_offset_sec=max(0.0, float(getattr(args, "mcd_start_offset_sec", 0.0) or 0.0)),
         )
         print(f"MCD frames available at: {images_out}")
         if args.extract_lidar:
@@ -1151,6 +1200,7 @@ def cmd_preprocess(args: argparse.Namespace) -> None:
                 max_frames=args.max_frames,
                 every_n=args.every_n,
                 save_timestamps=getattr(args, "mcd_seed_poses_from_gnss", False),
+                start_offset_sec=max(0.0, float(getattr(args, "mcd_start_offset_sec", 0.0) or 0.0)),
             )
             print(f"MCD LiDAR extracted to: {lidar_dir}")
         if args.extract_imu:
@@ -1516,6 +1566,84 @@ def _mcd_antenna_offset_base(args: argparse.Namespace) -> tuple[float, float, fl
     return (float(v[0]), float(v[1]), float(v[2]))
 
 
+def _mcd_static_calibration_tf(args: argparse.Namespace):
+    """Load optional MCDVIRAL ``body:`` YAML as a :class:`~gs_sim2real.datasets.ros_tf.StaticTfMap`."""
+    from gs_sim2real.datasets.ros_tf import load_static_calibration_yaml
+
+    raw = getattr(args, "mcd_static_calibration", None)
+    if not raw:
+        return None
+    path = str(raw).strip()
+    if not path:
+        return None
+    p = Path(path).expanduser()
+    if not p.is_file():
+        raise FileNotFoundError(f"--mcd-static-calibration: not a file: {p}")
+    base = (getattr(args, "mcd_base_frame", None) or "base_link").strip()
+    return load_static_calibration_yaml(p, base_frame=base)
+
+
+def _mcd_write_pinhole_from_calibration_yaml(
+    args: argparse.Namespace, colmap_dir: Path, image_topic: str
+) -> str | None:
+    """Synthesize ``extract_camera_info``-style PINHOLE JSON when bags omit ``CameraInfo``."""
+    import json
+
+    import yaml
+
+    from gs_sim2real.datasets.mcd import MCDLoader
+
+    raw = getattr(args, "mcd_static_calibration", None)
+    if not raw:
+        return None
+    ypath = Path(str(raw).strip()).expanduser()
+    if not ypath.is_file():
+        return None
+    doc = yaml.safe_load(ypath.read_text(encoding="utf-8"))
+    body = doc.get("body") if isinstance(doc, dict) else None
+    if not isinstance(body, dict):
+        return None
+
+    label = MCDLoader._sanitize_topic_name(image_topic)
+    child = (getattr(args, "mcd_camera_frame", None) or "").strip()
+    entry = None
+    chosen = child
+    if child and child in body:
+        entry = body[child]
+    else:
+        for name, ent in body.items():
+            if not isinstance(ent, dict):
+                continue
+            rt = str(ent.get("rostopic") or "").strip().rstrip("/")
+            it = str(image_topic).strip().rstrip("/")
+            if rt == it:
+                entry = ent
+                chosen = str(name)
+                break
+    if entry is None or not isinstance(entry, dict):
+        return None
+    intr = entry.get("intrinsics")
+    res = entry.get("resolution")
+    if not intr or len(intr) < 4 or not res or len(res) < 2:
+        return None
+    calib_dir = colmap_dir / "calibration"
+    calib_dir.mkdir(parents=True, exist_ok=True)
+    out_path = calib_dir / f"{label}.json"
+    payload = {
+        "width": int(res[0]),
+        "height": int(res[1]),
+        "fx": float(intr[0]),
+        "fy": float(intr[1]),
+        "cx": float(intr[2]),
+        "cy": float(intr[3]),
+        "frame_id": (chosen or child or "").strip(),
+    }
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+    print(f"MCD: PINHOLE calibration from YAML → {out_path}")
+    return str(out_path)
+
+
 def _resolve_mcd_imu_csv(args, colmap_dir: Path) -> str | None:
     """Return the path to an IMU CSV that extract_navsat_trajectory can interpolate."""
     if getattr(args, "mcd_skip_imu_orientation", False):
@@ -1707,8 +1835,20 @@ def _mcd_gnss_sparse_import(
         calib_files = loader.extract_camera_info(colmap_dir, image_topics=it_list)
         for p in calib_files:
             print(f"MCD camera calibration: {p}")
+        if len(calib_files) < len(it_list):
+            for topic in it_list[len(calib_files) :]:
+                alt = _mcd_write_pinhole_from_calibration_yaml(args, colmap_dir, str(topic))
+                if alt:
+                    calib_files.append(alt)
+
+    static_calib_tf = _mcd_static_calibration_tf(args)
+    from gs_sim2real.datasets.ros_tf import merge_static_tf_maps
 
     tf_map = loader.build_tf_map(include_dynamic_tf=include_tf_dynamic)
+    if static_calib_tf is not None:
+        n_yaml = len(static_calib_tf)
+        tf_map = merge_static_tf_maps(static_calib_tf, tf_map)
+        print(f"MCD: merged calibration YAML ({n_yaml} edges) with bag TF → {len(tf_map)} static edges")
 
     # --- Multi-camera: vehicle TUM + per-camera TF + multiview COLMAP ---
     if len(it_list) > 1:
@@ -1758,6 +1898,8 @@ def _mcd_gnss_sparse_import(
             antenna_offset_base=_mcd_antenna_offset_base(args),
             reference_origin=ref_origin,
             imu_csv_path=imu_csv_for_gnss,
+            flatten_altitude=getattr(args, "mcd_flatten_gnss_altitude", False),
+            start_offset_sec=max(0.0, float(getattr(args, "mcd_start_offset_sec", 0.0) or 0.0)),
         )
         if ref_origin is not None:
             print(f"MCD vehicle GNSS trajectory (TUM, shared origin {ref_origin}): {tum_path}")
@@ -1774,6 +1916,8 @@ def _mcd_gnss_sparse_import(
         use_stamp_tf = getattr(args, "mcd_tf_use_image_stamps", False) and not disable_tf
         if use_stamp_tf:
             static_topo = loader.build_tf_map(include_dynamic_tf=False)
+            if static_calib_tf is not None:
+                static_topo = merge_static_tf_maps(static_calib_tf, static_topo)
             dyn = loader.collect_tf_dynamic_edges()
             hybrid_tf = HybridTfLookup(static_topo, dyn if len(dyn) > 0 else None)
             print("MCD: per-image TF extrinsics (HybridTfLookup: /tf_static topology + /tf samples)")
@@ -1859,6 +2003,8 @@ def _mcd_gnss_sparse_import(
                 antenna_offset_base=_mcd_antenna_offset_base(args),
                 reference_origin=ref_origin_single,
                 imu_csv_path=imu_csv_for_single,
+                flatten_altitude=getattr(args, "mcd_flatten_gnss_altitude", False),
+                start_offset_sec=max(0.0, float(getattr(args, "mcd_start_offset_sec", 0.0) or 0.0)),
             )
             vehicle_path = Path(vehicle_tum)
             lidar_side = vehicle_path.with_name("gnss_trajectory_vehicle.tum")
@@ -1881,6 +2027,8 @@ def _mcd_gnss_sparse_import(
         antenna_offset_base=_mcd_antenna_offset_base(args),
         reference_origin=ref_origin_single,
         imu_csv_path=imu_csv_for_single,
+        flatten_altitude=getattr(args, "mcd_flatten_gnss_altitude", False),
+        start_offset_sec=max(0.0, float(getattr(args, "mcd_start_offset_sec", 0.0) or 0.0)),
     )
     print(f"MCD GNSS trajectory (TUM): {tum_path}")
 
@@ -1888,6 +2036,47 @@ def _mcd_gnss_sparse_import(
         seeded = _mcd_lidar_world_seed(loader, colmap_dir, lidar_tum_path, tf_map, base_frame, args)
         if seeded is not None:
             pointcloud_path = seeded
+
+    if pointcloud_path and it_list and len(it_list) == 1:
+        pinhole0 = _pinhole_tuple_from_json(Path(calib_path)) if calib_path else None
+        # Single-topic extract_frames writes flat ``images/frame_*.jpg`` (no topic subdir).
+        cam_mono = {
+            "subdir": "",
+            "camera_id": 1,
+            "camera_frame": camera_frame,
+            "T_base_cam": T_base_cam,
+            "pinhole": pinhole0,
+        }
+        hybrid_mono = None
+        use_stamp_tf_mono = getattr(args, "mcd_tf_use_image_stamps", False) and not disable_tf
+        if use_stamp_tf_mono:
+            static_topo_m = loader.build_tf_map(include_dynamic_tf=False)
+            if static_calib_tf is not None:
+                static_topo_m = merge_static_tf_maps(static_calib_tf, static_topo_m)
+            dyn_m = loader.collect_tf_dynamic_edges()
+            hybrid_mono = HybridTfLookup(static_topo_m, dyn_m if len(dyn_m) > 0 else None)
+            print("MCD: per-image TF (HybridTfLookup) for single-camera depth/colorize")
+        if not getattr(args, "mcd_skip_lidar_colorize", False):
+            pointcloud_path = _mcd_colorize_seed(
+                loader,
+                Path(pointcloud_path),
+                images_out,
+                tum_path,
+                [cam_mono],
+                hybrid_mono,
+                base_frame,
+            )
+        if getattr(args, "mcd_export_depth", False) and pointcloud_path:
+            _mcd_export_depth_maps(
+                loader,
+                Path(pointcloud_path),
+                colmap_dir,
+                images_out,
+                tum_path,
+                [cam_mono],
+                hybrid_mono,
+                base_frame,
+            )
 
     sparse_dir = import_lidar_slam(
         trajectory_path=tum_path,
@@ -1919,6 +2108,7 @@ def _run_mcd_preprocess_to_colmap(
         max_frames=args.max_frames,
         every_n=args.every_n,
         save_image_timestamps=seed_gnss,
+        start_offset_sec=max(0.0, float(getattr(args, "mcd_start_offset_sec", 0.0) or 0.0)),
     )
     print(f"MCD frames available at: {images_out}")
 
@@ -1929,6 +2119,7 @@ def _run_mcd_preprocess_to_colmap(
             max_frames=args.max_frames,
             every_n=args.every_n,
             save_timestamps=True,
+            start_offset_sec=max(0.0, float(getattr(args, "mcd_start_offset_sec", 0.0) or 0.0)),
         )
         print(f"MCD LiDAR extracted to: {lidar_dir}")
 

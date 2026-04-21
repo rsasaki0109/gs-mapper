@@ -26,6 +26,12 @@ trap "rm -f ${tmp_html}" EXIT
 curl -sL -o "${tmp_html}" "https://drive.google.com/uc?export=download&id=${id}"
 uuid=$(grep -oE 'name="uuid" value="[^"]+"' "${tmp_html}" | head -1 | sed 's/.*value="//;s/"//')
 if [ -z "${uuid}" ]; then
+    if ! grep -qi '<html' "${tmp_html}"; then
+        mv "${tmp_html}" "${out}"
+        trap - EXIT
+        printf "\nSaved %s\n" "${out}"
+        exit 0
+    fi
     printf "could not extract uuid from Drive confirm page (is the file public?)\n" >&2
     exit 1
 fi
