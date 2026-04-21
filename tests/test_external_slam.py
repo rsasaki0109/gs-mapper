@@ -11,12 +11,15 @@ import numpy as np
 import pytest
 
 from gs_sim2real.preprocess.external_slam import (
+    ExternalSLAMManifestGatePolicy,
     build_external_slam_artifact_manifest,
+    evaluate_external_slam_manifest_gate,
     import_external_slam,
     materialize_pose_tensor_trajectory,
     normalize_system,
     render_external_slam_artifact_manifest_json,
     render_external_slam_artifact_manifest_text,
+    render_external_slam_manifest_gate_text,
     resolve_external_slam_artifacts,
 )
 
@@ -147,6 +150,42 @@ def test_build_external_slam_manifest_flags_count_mismatch(tmp_path: Path) -> No
     assert manifest["alignment"]["alignedFrameCount"] == 2
     assert manifest["alignment"]["droppedImageCount"] == 1
     assert manifest["alignment"]["unusedPoseCount"] == 0
+
+
+def test_external_slam_manifest_gate_flags_dropped_images_and_point_count(tmp_path: Path) -> None:
+    image_dir = tmp_path / "images"
+    _write_dummy_images(image_dir, count=3)
+    artifact_dir = tmp_path / "pi3_out"
+    artifact_dir.mkdir()
+    poses = np.repeat(np.eye(4)[None, ...], 2, axis=0)
+    np.savez(artifact_dir / "camera_poses.npz", camera_poses=poses)
+    np.savez(artifact_dir / "points.npz", points=np.zeros((2, 2, 3), dtype=np.float32))
+    manifest = build_external_slam_artifact_manifest(
+        image_dir=image_dir,
+        system="pi3",
+        artifact_dir=artifact_dir,
+        trajectory_path="camera_poses.npz",
+        pointcloud_path="points.npz",
+    )
+
+    strict_gate = evaluate_external_slam_manifest_gate(
+        manifest,
+        ExternalSLAMManifestGatePolicy(require_pointcloud=True, min_point_count=5),
+    )
+    failed = {check["name"] for check in strict_gate["checks"] if not check["passed"]}
+    loose_gate = evaluate_external_slam_manifest_gate(
+        manifest,
+        ExternalSLAMManifestGatePolicy(
+            allow_dropped_images=True,
+            require_pointcloud=True,
+            min_point_count=4,
+        ),
+    )
+
+    assert strict_gate["passed"] is False
+    assert failed == {"dropped_images", "point_count"}
+    assert "External SLAM manifest gate: fail" in render_external_slam_manifest_gate_text(strict_gate)
+    assert loose_gate["passed"] is True
 
 
 def test_materialize_npz_camera_poses_to_tum(tmp_path: Path) -> None:

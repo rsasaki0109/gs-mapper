@@ -629,6 +629,13 @@ class TestCLIHelp:
                 "--external-slam-dry-run",
                 "--external-slam-manifest-format",
                 "json",
+                "--external-slam-fail-on-dry-run-gate",
+                "--external-slam-min-aligned-frames",
+                "3",
+                "--external-slam-allow-dropped-images",
+                "--external-slam-require-pointcloud",
+                "--external-slam-min-point-count",
+                "10",
             ]
         )
         assert args.method == "external-slam"
@@ -639,6 +646,11 @@ class TestCLIHelp:
         assert args.pinhole_calib == "camera.json"
         assert args.external_slam_dry_run is True
         assert args.external_slam_manifest_format == "json"
+        assert args.external_slam_fail_on_dry_run_gate is True
+        assert args.external_slam_min_aligned_frames == 3
+        assert args.external_slam_allow_dropped_images is True
+        assert args.external_slam_require_pointcloud is True
+        assert args.external_slam_min_point_count == 10
 
     def test_cli_run_lidar_slam_flags(self) -> None:
         """run parser accepts lidar-slam trajectory settings."""
@@ -1166,6 +1178,8 @@ class TestCLIHelp:
         assert "External SLAM artifacts: MASt3R-SLAM (mast3r-slam)" in out
         assert "materialization=direct" in out
         assert "warning (2 aligned, 1 dropped images, 0 unused poses)" in out
+        assert "External SLAM manifest gate: fail" in out
+        assert "dropped_images" in out
         assert "External SLAM dry run complete." in out
 
         json_args = build_parser().parse_args(
@@ -1195,6 +1209,30 @@ class TestCLIHelp:
         assert payload["images"]["imageCount"] == 3
         assert payload["alignment"]["status"] == "warning"
         assert payload["alignment"]["droppedImageCount"] == 1
+        assert payload["gate"]["passed"] is False
+
+        fail_args = build_parser().parse_args(
+            [
+                "preprocess",
+                "--images",
+                str(image_dir),
+                "--output",
+                str(tmp_path / "out"),
+                "--method",
+                "external-slam",
+                "--external-slam-system",
+                "mast3r-slam",
+                "--external-slam-output",
+                str(artifact_dir),
+                "--external-slam-dry-run",
+                "--external-slam-fail-on-dry-run-gate",
+            ]
+        )
+
+        with pytest.raises(SystemExit) as exc_info:
+            cli.cmd_preprocess(fail_args)
+
+        assert exc_info.value.code == 2
 
     def test_cmd_preprocess_mcd_list_topics_mode(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path, capsys: pytest.CaptureFixture[str]

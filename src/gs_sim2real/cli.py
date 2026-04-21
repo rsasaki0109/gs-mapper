@@ -70,6 +70,33 @@ def _add_external_slam_args(parser: argparse.ArgumentParser, *, context: str) ->
             default="text",
             help="Manifest format for --external-slam-dry-run (default: text)",
         )
+        parser.add_argument(
+            "--external-slam-fail-on-dry-run-gate",
+            action="store_true",
+            help="Exit with status 2 when the external SLAM dry-run manifest gate fails",
+        )
+        parser.add_argument(
+            "--external-slam-min-aligned-frames",
+            type=int,
+            default=2,
+            help="Minimum aligned image/pose pairs required by the dry-run gate",
+        )
+        parser.add_argument(
+            "--external-slam-allow-dropped-images",
+            action="store_true",
+            help="Allow image frames without matching poses in the dry-run gate",
+        )
+        parser.add_argument(
+            "--external-slam-require-pointcloud",
+            action="store_true",
+            help="Require a resolved point cloud in the dry-run gate",
+        )
+        parser.add_argument(
+            "--external-slam-min-point-count",
+            type=int,
+            default=0,
+            help="Minimum point count required by the dry-run gate when point count is known",
+        )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1632,10 +1659,23 @@ def _run_external_slam_preprocess_to_colmap(
                 pointcloud_path=getattr(args, "pointcloud", None),
                 pinhole_calib_path=getattr(args, "pinhole_calib", None),
             )
+            gate = external_slam_module.evaluate_external_slam_manifest_gate(
+                manifest,
+                external_slam_module.ExternalSLAMManifestGatePolicy(
+                    min_aligned_frames=getattr(args, "external_slam_min_aligned_frames", 2),
+                    allow_dropped_images=getattr(args, "external_slam_allow_dropped_images", False),
+                    require_pointcloud=getattr(args, "external_slam_require_pointcloud", False),
+                    min_point_count=getattr(args, "external_slam_min_point_count", 0),
+                ),
+            )
+            manifest["gate"] = gate
             if getattr(args, "external_slam_manifest_format", "text") == "json":
                 print(external_slam_module.render_external_slam_artifact_manifest_json(manifest), end="")
             else:
                 print(external_slam_module.render_external_slam_artifact_manifest_text(manifest), end="")
+                print(external_slam_module.render_external_slam_manifest_gate_text(gate), end="")
+            if getattr(args, "external_slam_fail_on_dry_run_gate", False) and not gate["passed"]:
+                raise SystemExit(2)
             return None
         return external_slam_module.import_external_slam(
             image_dir=images_dir,
