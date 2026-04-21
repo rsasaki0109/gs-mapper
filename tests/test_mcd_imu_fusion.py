@@ -10,12 +10,16 @@ import pytest
 
 from gs_sim2real.datasets.mcd import (
     _interp_imu_quaternion,
+    _interp_imu_yaw_quaternion,
+    _load_imu_angular_velocity_yaw_csv,
     _load_imu_orientation_csv,
     _quat_to_rotmat,
 )
 
 
-def _write_imu_csv(path: Path, rows: list[tuple[float, float, float, float, float]]) -> None:
+def _write_imu_csv(
+    path: Path, rows: list[tuple[float, float, float, float, float] | tuple[float, float, float, float, float, float]]
+) -> None:
     with open(path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(
@@ -34,8 +38,10 @@ def _write_imu_csv(path: Path, rows: list[tuple[float, float, float, float, floa
                 "linear_acceleration_z",
             ]
         )
-        for ts, qx, qy, qz, qw in rows:
-            writer.writerow([int(ts * 1e9), ts, qx, qy, qz, qw, 0, 0, 0, 0, 0, 0])
+        for row in rows:
+            ts, qx, qy, qz, qw = row[:5]
+            wz = row[5] if len(row) > 5 else 0.0
+            writer.writerow([int(ts * 1e9), ts, qx, qy, qz, qw, 0, 0, wz, 0, 0, 0])
 
 
 def test_load_imu_orientation_csv_returns_sorted_samples(tmp_path: Path) -> None:
@@ -86,6 +92,37 @@ def test_load_imu_orientation_csv_returns_none_when_missing(tmp_path: Path) -> N
     assert _load_imu_orientation_csv(tmp_path / "does_not_exist.csv") is None
 
 
+def test_load_imu_angular_velocity_yaw_csv_integrates_z_rate(tmp_path: Path) -> None:
+    p = tmp_path / "imu.csv"
+    _write_imu_csv(
+        p,
+        [
+            (0.0, 0.0, 0.0, 0.0, 1.0, np.pi / 2.0),
+            (1.0, 0.0, 0.0, 0.0, 1.0, np.pi / 2.0),
+            (2.0, 0.0, 0.0, 0.0, 1.0, np.pi / 2.0),
+        ],
+    )
+
+    arr = _load_imu_angular_velocity_yaw_csv(p)
+
+    assert arr is not None
+    np.testing.assert_allclose(arr[:, 0], np.array([0.0, 1.0, 2.0]))
+    np.testing.assert_allclose(arr[:, 1], np.array([0.0, np.pi / 2.0, np.pi]))
+
+
+def test_load_imu_angular_velocity_yaw_csv_returns_none_for_zero_rate(tmp_path: Path) -> None:
+    p = tmp_path / "imu.csv"
+    _write_imu_csv(
+        p,
+        [
+            (0.0, 0.0, 0.0, 0.0, 1.0, 0.0),
+            (1.0, 0.0, 0.0, 0.0, 1.0, 0.0),
+        ],
+    )
+
+    assert _load_imu_angular_velocity_yaw_csv(p) is None
+
+
 def test_interp_imu_quaternion_clamps_outside_range() -> None:
     samples = np.array(
         [
@@ -115,6 +152,14 @@ def test_interp_imu_quaternion_blends_and_normalises() -> None:
     assert qx == pytest.approx(0.0, abs=1e-6)
     assert qy == pytest.approx(0.0, abs=1e-6)
     assert qz > 0.5 and qw > 0.5
+
+
+def test_interp_imu_yaw_quaternion_interpolates() -> None:
+    samples = np.array([[0.0, 0.0], [2.0, np.pi]], dtype=np.float64)
+
+    quat = _interp_imu_yaw_quaternion(samples, 1.0)
+
+    assert quat == pytest.approx((0.0, 0.0, 0.7071067811865475, 0.7071067811865476), abs=1e-6)
 
 
 def test_quat_to_rotmat_identity() -> None:

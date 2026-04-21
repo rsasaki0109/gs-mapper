@@ -126,6 +126,74 @@ class TestAntennaOffsetBaseLink:
             encoding="utf-8"
         )
 
+    def test_extract_navsat_trajectory_uses_imu_yaw_rate_when_orientation_is_identity(self, monkeypatch, tmp_path):
+        """Identity IMU orientations should fall back to integrated angular_velocity_z."""
+        bag_path = tmp_path / "gps.bag"
+        bag_path.write_bytes(b"bag")
+        rows = [
+            (0.0, 35.0, 139.0, 5.0),
+            (1.0, 35.0, 139.00001, 5.0),
+        ]
+
+        class FakeReader:
+            def __init__(self, paths, **kwargs):
+                assert paths == [bag_path]
+                self.connection = SimpleNamespace(topic="/vn200/GPS", msgtype="sensor_msgs/msg/NavSatFix")
+                self.topics = {
+                    "/vn200/GPS": SimpleNamespace(connections=[self.connection]),
+                }
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def messages(self, connections):
+                assert connections == [self.connection]
+                for idx, row in enumerate(rows):
+                    yield self.connection, int(row[0] * 1e9), str(idx).encode("ascii")
+
+            def deserialize(self, rawdata, msgtype):
+                _, lat, lon, alt = rows[int(rawdata.decode("ascii"))]
+                return SimpleNamespace(
+                    latitude=lat,
+                    longitude=lon,
+                    altitude=alt,
+                    status=SimpleNamespace(status=0),
+                )
+
+        imu_path = tmp_path / "imu.csv"
+        imu_path.write_text(
+            "\n".join(
+                [
+                    "timestamp_ns,timestamp_sec,orientation_x,orientation_y,orientation_z,orientation_w,"
+                    "angular_velocity_x,angular_velocity_y,angular_velocity_z,"
+                    "linear_acceleration_x,linear_acceleration_y,linear_acceleration_z",
+                    f"0,0.0,0,0,0,1,0,0,{np.pi / 2.0},0,0,0",
+                    f"1000000000,1.0,0,0,0,1,0,0,{np.pi / 2.0},0,0,0",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(MCDLoader, "_get_anyreader", staticmethod(lambda: FakeReader))
+
+        tum_path = Path(
+            MCDLoader(tmp_path).extract_navsat_trajectory(
+                tmp_path / "out",
+                gnss_topic="/vn200/GPS",
+                imu_csv_path=imu_path,
+            )
+        )
+
+        line = tum_path.read_text(encoding="utf-8").splitlines()[1]
+        qx, qy, qz, qw = [float(x) for x in line.split()[4:8]]
+        assert qx == pytest.approx(0.0, abs=1e-6)
+        assert qy == pytest.approx(0.0, abs=1e-6)
+        assert qz == pytest.approx(0.7071067811865475, abs=1e-6)
+        assert qw == pytest.approx(0.7071067811865476, abs=1e-6)
+
 
 class TestFindBagPaths:
     """Tests for rosbag path discovery."""

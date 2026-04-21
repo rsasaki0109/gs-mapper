@@ -851,9 +851,10 @@ class MCDLoader:
 
         ``imu_csv_path`` points at the CSV written by :meth:`extract_imu`. When
         provided, the orientation column is used as each TUM entry's quaternion
-        (linearly interpolated to the GNSS timestamp) instead of the default
-        identity + motion-inferred yaw. This improves robustness for stationary
-        segments and sharp turns.
+        (linearly interpolated to the GNSS timestamp) instead of the default identity.
+        If the orientation column is unavailable or all identity, non-zero
+        ``angular_velocity_z`` is integrated as a yaw-only fallback. This improves
+        robustness for stationary segments and sharp turns.
 
         Some public MCD bags publish placeholder NavSatFix messages at
         latitude=longitude=0. Treat those as missing fixes so pose-seeded
@@ -959,8 +960,16 @@ class MCDLoader:
             east_a, north_a, up_a = _apply_antenna_offset_base_link(east_a, north_a, up_a, antenna_offset_base)
 
         imu_samples = _load_imu_orientation_csv(imu_csv_path) if imu_csv_path else None
+        imu_yaw_samples = None
         if imu_samples is not None:
             logger.info("extract_navsat_trajectory: interpolating %d IMU orientations", imu_samples.shape[0])
+        elif imu_csv_path:
+            imu_yaw_samples = _load_imu_angular_velocity_yaw_csv(imu_csv_path)
+            if imu_yaw_samples is not None:
+                logger.info(
+                    "extract_navsat_trajectory: integrating %d IMU angular-velocity samples",
+                    imu_yaw_samples.shape[0],
+                )
 
         with open(tum_path, "w") as f:
             for i, ts in enumerate(rows_ts):
@@ -968,6 +977,8 @@ class MCDLoader:
                 north = float(north_a[i])
                 up = float(up_a[i])
                 imu_quat = _interp_imu_quaternion(imu_samples, ts) if imu_samples is not None else None
+                if imu_quat is None and imu_yaw_samples is not None:
+                    imu_quat = _interp_imu_yaw_quaternion(imu_yaw_samples, ts)
                 if vehicle_frame_only:
                     if imu_quat is not None:
                         qx, qy, qz, qw = imu_quat
@@ -1535,8 +1546,52 @@ def _load_imu_orientation_csv(path: str | Path) -> np.ndarray | None:
     return arr
 
 
+def _load_imu_angular_velocity_yaw_csv(path: str | Path) -> np.ndarray | None:
+    """Load IMU z-rate samples and integrate them into (timestamp_sec, yaw_rad)."""
+    p = Path(path)
+    if not p.is_file():
+        return None
+    rows: list[tuple[float, float]] = []
+    with open(p, newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            try:
+                ts = float(row["timestamp_sec"])
+                wz = float(row["angular_velocity_z"])
+            except (KeyError, ValueError):
+                continue
+            if not (np.isfinite(ts) and np.isfinite(wz)):
+                continue
+            rows.append((ts, wz))
+    if len(rows) < 2:
+        return None
+
+    times: list[float] = []
+    rates: list[float] = []
+    for ts, wz in sorted(rows, key=lambda r: r[0]):
+        if times and ts == times[-1]:
+            rates[-1] = wz
+        else:
+            times.append(ts)
+            rates.append(wz)
+    if len(times) < 2 or max(abs(wz) for wz in rates) < 1e-9:
+        return None
+
+    times_arr = np.asarray(times, dtype=np.float64)
+    rates_arr = np.asarray(rates, dtype=np.float64)
+    yaw = np.zeros_like(times_arr)
+    for i in range(1, len(times_arr)):
+        dt = float(times_arr[i] - times_arr[i - 1])
+        if dt <= 0.0:
+            yaw[i] = yaw[i - 1]
+        else:
+            yaw[i] = yaw[i - 1] + 0.5 * (rates_arr[i - 1] + rates_arr[i]) * dt
+
+    return np.column_stack([times_arr, yaw])
+
+
 def _interp_imu_quaternion(imu_samples: np.ndarray, ts: float) -> tuple[float, float, float, float] | None:
-    """Nearest-neighbour interpolation of a (qx, qy, qz, qw) quaternion at ``ts``."""
+    """Interpolate a (qx, qy, qz, qw) quaternion at ``ts``."""
     if imu_samples is None or imu_samples.shape[0] == 0:
         return None
     times = imu_samples[:, 0]
@@ -1563,6 +1618,31 @@ def _interp_imu_quaternion(imu_samples: np.ndarray, ts: float) -> tuple[float, f
         return None
     quat = quat / norm
     return float(quat[0]), float(quat[1]), float(quat[2]), float(quat[3])
+
+
+def _interp_imu_yaw_quaternion(yaw_samples: np.ndarray, ts: float) -> tuple[float, float, float, float] | None:
+    """Interpolate yaw samples and return a z-axis quaternion."""
+    if yaw_samples is None or yaw_samples.shape[0] == 0:
+        return None
+    times = yaw_samples[:, 0]
+    if ts <= times[0]:
+        yaw = float(yaw_samples[0, 1])
+    elif ts >= times[-1]:
+        yaw = float(yaw_samples[-1, 1])
+    else:
+        idx = int(np.searchsorted(times, ts))
+        lo = yaw_samples[idx - 1]
+        hi = yaw_samples[idx]
+        dt = float(hi[0] - lo[0])
+        if dt <= 0.0:
+            yaw = float(lo[1])
+        else:
+            alpha = float((ts - lo[0]) / dt)
+            yaw = float((1.0 - alpha) * lo[1] + alpha * hi[1])
+    if not np.isfinite(yaw):
+        return None
+    half = 0.5 * yaw
+    return 0.0, 0.0, float(np.sin(half)), float(np.cos(half))
 
 
 def _quat_to_rotmat(quat: tuple[float, float, float, float]) -> np.ndarray:
