@@ -1,6 +1,6 @@
 # 屋外 3D Gaussian Splatting 開発計画 / 引継ぎメモ
 
-更新日: 2026-04-21（MCD `tuhh_day_04` supervised 検証の訂正、`ntu_day_02` supervised bundle 追加、zero-GNSS guard、COLMAP images parser 修正、external SLAM artifact import 追加、MASt3R-SLAM smoke 実走）
+更新日: 2026-04-21（MCD `tuhh_day_04` supervised 検証の訂正、`ntu_day_02` supervised bundle 追加、zero-GNSS guard、COLMAP images parser 修正、external SLAM artifact import 追加、MASt3R-SLAM smoke / 20-frame bundle 実走、binary PLY loader 修正）
 
 この文書は、`GS Mapper` リポジトリにおける屋外 3D Gaussian Splatting 対応の現在地を、**Claude / Codex / Copilot / その他のコーディングエージェント**がそのまま引き継げる粒度でまとめた handoff 文書です。リポジトリ直下の `CLAUDE.md` は開発コマンド早見、本書は **屋外パイプラインの文脈・判断・失敗の履歴**に重きを置きます。
 
@@ -481,6 +481,44 @@ PYTHONPATH=src python3 -m gs_sim2real.cli train \
   --data outputs/mast3r_slam_smoke_e1_stride5/imported_colmap \
   --output outputs/mast3r_slam_smoke_e1_stride5/train_smoke \
   --method gsplat --iterations 10
+```
+
+20-frame bundle も同じ隔離 MASt3R-SLAM 環境で実走した。`outputs/autoware_bag6_e1_sequential/images` から stride 2 の `[0, 2, ..., 38]` を `outputs/mast3r_slam_20/images` に PNG 化し、`--save-as bag6-e1-stride2-20` で処理。bag6 の既存 `outputs/bag6_colored/...` から stride 5 を切る試行は 2 keyframes で relocalize が多く、bundle には使わなかった。成功 run は `logs/bag6-e1-stride2-20/images.txt` に 10 keyframes、9/9 non-zero steps、trajectory extent `[2.039, 0.782, 2.162]` を保存し、`images.ply` は 877,519 vertices。
+
+この 20-frame import の途中で repo 側の binary PLY reader のバグを潰した。MASt3R-SLAM の PLY は `float x/y/z` の後ろに `uchar red/green/blue` を持つが、旧 `_load_ply_points()` は `property float` 数だけから `stride = prop_count * 4` を作っていたため、2点目以降の vertex offset がずれて `1e38` 級の壊れた座標を COLMAP `points3D.txt` に書いていた。修正後は PLY header の scalar property 型順に沿って binary / ASCII を読むため、RGB 付き PLY は `(N, 6)` の xyzrgb として返る。`tests/test_depth_from_lidar.py` に binary little-endian `float xyz + uchar rgb` と ASCII xyzrgb の単体テストを追加。
+
+修正後の re-import は 10 images / 100,000 points を生成し、全点 finite、座標 absmax の p50/p95/p99/max は `[3.856, 8.878, 10.171, 11.511]`。`gsplat --iterations 10` smoke も通過し、15k training は 459.9 s、Final Gaussians 1,337,626 で完了した。`gs-mapper export --format splat --max-points 400000 --splat-normalize-extent 17.0 --splat-min-opacity 0.02 --splat-max-scale 2.0` は warning なしで 400,000 splats / 12.8 MB の `outputs/mast3r_slam_20/mast3r-slam-20-15k.splat` を生成。`docs/assets/outdoor-demo/bag6-mast3r-slam-20-15k.splat` として bundle し、MASt3R-SLAM は VGGT-SLAM と同じく **comparison-quality** の external-SLAM scene として扱う。
+
+```bash
+cd /tmp/ext_slam_probe/MASt3R-SLAM
+PYTHONUNBUFFERED=1 CUDA_VISIBLE_DEVICES=0 /tmp/mast3r-slam-venv/bin/python main.py \
+  --dataset "$GS_MAPPER_ROOT/outputs/mast3r_slam_20/images" \
+  --no-viz \
+  --save-as bag6-e1-stride2-20 \
+  --config config/smoke_no_calib.yaml
+
+cd "$GS_MAPPER_ROOT"
+PYTHONPATH=src python3 -m gs_sim2real.cli preprocess \
+  --images outputs/mast3r_slam_20/images \
+  --output outputs/mast3r_slam_20/imported_colmap \
+  --method external-slam \
+  --external-slam-system mast3r-slam \
+  --external-slam-output /tmp/ext_slam_probe/MASt3R-SLAM/logs/bag6-e1-stride2-20
+
+PYTHONPATH=src python3 -m gs_sim2real.cli train \
+  --data outputs/mast3r_slam_20/imported_colmap \
+  --output outputs/mast3r_slam_20/train_15k \
+  --method gsplat \
+  --iterations 15000
+
+PYTHONPATH=src python3 -m gs_sim2real.cli export \
+  --model outputs/mast3r_slam_20/train_15k/point_cloud.ply \
+  --format splat \
+  --output outputs/mast3r_slam_20/mast3r-slam-20-15k.splat \
+  --max-points 400000 \
+  --splat-normalize-extent 17.0 \
+  --splat-min-opacity 0.02 \
+  --splat-max-scale 2.0
 ```
 
 VGGT-SLAM 2.0 smoke も同日実走済み。`/tmp/ext_slam_probe/VGGT-SLAM` を Python 3.11 の隔離 venv (`/tmp/vggt-slam-venv`) に入れ、`requirements.txt` + `third_party/salad` + `MIT-SPARK/VGGT_SPARK` + `vggt-slam` editable install で import まで通った。上流 `main.py` は `--max_loops 0` でも SALAD checkpoint と Viewer を初期化するため、ローカルclone側だけ `VGGT_SLAM_NO_RETRIEVAL=1` / `VGGT_SLAM_NO_VIEWER=1` で無効化する薄いパッチを当てた。

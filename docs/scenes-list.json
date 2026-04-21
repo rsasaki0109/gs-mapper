@@ -28,6 +28,11 @@
       "summary": "Autoware bag6 cam0, 20 VGGT-SLAM 2.0 frames, external artifact import \u2014 comparison-quality"
     },
     {
+      "url": "assets/outdoor-demo/bag6-mast3r-slam-20-15k.splat",
+      "label": "bag6 cam0 \u2014 MASt3R-SLAM (15k)",
+      "summary": "Autoware bag6 cam0, 20 MASt3R-SLAM candidates, external artifact import \u2014 comparison-quality"
+    },
+    {
       "url": "assets/outdoor-demo/mcd-tuhh-day04-mast3r.splat",
       "label": "MCD tuhh_day_04 \u2014 MAST3R pose-free (metric)",
       "summary": "MCD tuhh_day_04 handheld day session, 20 MAST3R frames \u2014 metric-aware pose-free"

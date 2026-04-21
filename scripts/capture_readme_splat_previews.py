@@ -34,6 +34,8 @@ SCENES: list[tuple[str, str]] = [
     ("03_mcd-tuhh-day04", "assets/outdoor-demo/mcd-tuhh-day04.splat"),
     ("05_mcd-tuhh-day04-mast3r", "assets/outdoor-demo/mcd-tuhh-day04-mast3r.splat"),
     ("06_mcd-ntu-day02-supervised", "assets/outdoor-demo/mcd-ntu-day02-supervised.splat"),
+    ("07_bag6-vggt-slam", "assets/outdoor-demo/bag6-vggt-slam-20-15k.splat"),
+    ("08_bag6-mast3r-slam", "assets/outdoor-demo/bag6-mast3r-slam-20-15k.splat"),
 ]
 
 

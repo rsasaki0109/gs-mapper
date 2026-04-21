@@ -26,7 +26,7 @@ def project_lidar_to_image(
     """Project a 3D LiDAR point cloud onto a camera image plane.
 
     Args:
-        points_3d: (N, 3) array of 3D points in LiDAR frame.
+        points_3d: (N, 3+) array of 3D points in LiDAR frame. Extra channels are ignored.
         extrinsic: (4, 4) LiDAR-to-camera extrinsic matrix.
         intrinsic: (3, 3) camera intrinsic matrix.
         height: Image height in pixels.
@@ -35,6 +35,7 @@ def project_lidar_to_image(
     Returns:
         (H, W) sparse depth map with zero for pixels without LiDAR hits.
     """
+    points_3d = points_3d[:, :3]
     N = points_3d.shape[0]
     if N == 0:
         return np.zeros((height, width), dtype=np.float32)
@@ -111,7 +112,7 @@ def load_pointcloud(path: Path | str) -> np.ndarray:
         path: Path to point cloud file (.npy, .ply, or .pcd).
 
     Returns:
-        (N, 3) array of 3D points.
+        (N, 3) xyz points, or (N, 6) xyz + rgb when color is present.
     """
     path = Path(path)
     if path.suffix == ".npy":
@@ -134,9 +135,35 @@ def load_pointcloud(path: Path | str) -> np.ndarray:
     raise ValueError(f"Unsupported point cloud format: {path.suffix}")
 
 
+_PLY_SCALAR_DTYPES = {
+    "char": "i1",
+    "int8": "i1",
+    "uchar": "u1",
+    "uint8": "u1",
+    "short": "i2",
+    "int16": "i2",
+    "ushort": "u2",
+    "uint16": "u2",
+    "int": "i4",
+    "int32": "i4",
+    "uint": "u4",
+    "uint32": "u4",
+    "float": "f4",
+    "float32": "f4",
+    "double": "f8",
+    "float64": "f8",
+}
+
+
+def _ply_numpy_dtype(type_name: str, endian: str) -> np.dtype:
+    dtype = _PLY_SCALAR_DTYPES.get(type_name)
+    if dtype is None:
+        raise ValueError(f"Unsupported PLY scalar type: {type_name}")
+    return np.dtype(dtype if dtype.endswith("1") else f"{endian}{dtype}")
+
+
 def _load_ply_points(path: Path) -> np.ndarray:
-    """Load xyz from a PLY file (ASCII or binary_little_endian)."""
-    import struct
+    """Load xyz or xyzrgb from a PLY file (ASCII or binary)."""
 
     with open(path, "rb") as f:
         header_lines = []
@@ -147,36 +174,71 @@ def _load_ply_points(path: Path) -> np.ndarray:
                 break
 
         # Parse header
+        fmt = "ascii"
         num_vertices = 0
-        is_binary = False
+        vertex_properties: list[tuple[str, str]] = []
+        in_vertex_element = False
         for line in header_lines:
-            if line.startswith("element vertex"):
-                num_vertices = int(line.split()[-1])
-            if "binary_little_endian" in line:
-                is_binary = True
+            parts = line.split()
+            if not parts:
+                continue
+            if parts[0] == "format":
+                fmt = parts[1]
+                continue
+            if parts[0] == "element":
+                in_vertex_element = len(parts) >= 3 and parts[1] == "vertex"
+                if in_vertex_element:
+                    num_vertices = int(parts[2])
+                continue
+            if in_vertex_element and parts[0] == "property":
+                if len(parts) >= 2 and parts[1] == "list":
+                    raise ValueError("PLY vertex list properties are not supported")
+                if len(parts) >= 3:
+                    vertex_properties.append((parts[2], parts[1]))
 
         if num_vertices == 0:
             return np.zeros((0, 3), dtype=np.float64)
 
-        # Count float properties to determine stride
-        prop_count = sum(1 for line in header_lines if line.startswith("property float"))
+        prop_names = [name for name, _ in vertex_properties]
+        try:
+            xyz_indices = [prop_names.index(axis) for axis in ("x", "y", "z")]
+        except ValueError as exc:
+            raise ValueError("PLY vertex element must include x, y, z properties") from exc
+        rgb_indices = [prop_names.index(axis) for axis in ("red", "green", "blue") if axis in prop_names]
+        has_rgb = len(rgb_indices) == 3
 
-        if is_binary:
-            stride = prop_count * 4
-            data = f.read(num_vertices * stride)
-            points = np.zeros((num_vertices, 3), dtype=np.float64)
-            for i in range(num_vertices):
-                offset = i * stride
-                x, y, z = struct.unpack_from("<3f", data, offset)
-                points[i] = [x, y, z]
+        if fmt in {"binary_little_endian", "binary_big_endian"}:
+            endian = "<" if fmt == "binary_little_endian" else ">"
+            vertex_dtype = np.dtype(
+                [(name, _ply_numpy_dtype(type_name, endian)) for name, type_name in vertex_properties]
+            )
+            data = f.read(num_vertices * vertex_dtype.itemsize)
+            if len(data) < num_vertices * vertex_dtype.itemsize:
+                raise ValueError(f"PLY vertex payload ended early: expected {num_vertices} records")
+            records = np.frombuffer(data, dtype=vertex_dtype, count=num_vertices)
+            points = np.zeros((num_vertices, 6 if has_rgb else 3), dtype=np.float64)
+            for out_idx, name in enumerate(("x", "y", "z")):
+                points[:, out_idx] = records[name].astype(np.float64)
+            if has_rgb:
+                for out_idx, name in enumerate(("red", "green", "blue"), start=3):
+                    points[:, out_idx] = records[name].astype(np.float64)
             return points
-        else:
-            points = []
-            for _ in range(num_vertices):
-                line = f.readline().decode("ascii").strip()
-                vals = line.split()
-                points.append([float(vals[0]), float(vals[1]), float(vals[2])])
-            return np.array(points, dtype=np.float64)
+
+        if fmt != "ascii":
+            raise ValueError(f"Unsupported PLY format: {fmt}")
+
+        points = np.zeros((num_vertices, 6 if has_rgb else 3), dtype=np.float64)
+        for row in range(num_vertices):
+            line = f.readline().decode("ascii").strip()
+            vals = line.split()
+            if len(vals) < len(vertex_properties):
+                raise ValueError(f"PLY vertex row {row} has too few values")
+            for out_idx, prop_idx in enumerate(xyz_indices):
+                points[row, out_idx] = float(vals[prop_idx])
+            if has_rgb:
+                for out_idx, prop_idx in enumerate(rgb_indices, start=3):
+                    points[row, out_idx] = float(vals[prop_idx])
+        return points
 
 
 def _load_pcd_points(path: Path) -> np.ndarray:
