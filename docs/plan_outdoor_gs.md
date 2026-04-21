@@ -465,6 +465,35 @@ PYTHONPATH=src python3 -m gs_sim2real.cli train \
   --iterations 10
 ```
 
+20-frame run も同じ経路で成功。`outputs/bag6_mast3r/images` 全20枚を `outputs/vggt_slam_20/images` にコピーし、`--submap_size 8 --overlapping_window_size 1` で3 submapsとして処理した。VGGT-SLAMの `poses.txt` はoverlap frameを含むため22 rowsだが、unique timestampは20件。unique trajectory の extent は `[3.232, 0.768, 1.759]`、19/19 steps が非ゼロ。`external-slam` 取り込み後は 20 images / 1000 points の COLMAP sparse、`gsplat --iterations 10` も成功して `outputs/vggt_slam_20/train_smoke/point_cloud.ply` を生成した。
+
+```bash
+VGGT_SLAM_NO_RETRIEVAL=1 VGGT_SLAM_NO_VIEWER=1 \
+  /tmp/vggt-slam-venv/bin/python main.py \
+  --image_folder "$GS_MAPPER_ROOT/outputs/vggt_slam_20/images" \
+  --max_loops 0 \
+  --submap_size 8 \
+  --overlapping_window_size 1 \
+  --min_disparity 0 \
+  --log_results \
+  --skip_dense_log \
+  --log_path "$GS_MAPPER_ROOT/outputs/vggt_slam_20/poses.txt"
+
+PYTHONPATH=src python3 -m gs_sim2real.cli preprocess \
+  --images outputs/vggt_slam_20/images \
+  --output outputs/vggt_slam_20/imported_colmap \
+  --method external-slam \
+  --external-slam-system vggt-slam \
+  --external-slam-output outputs/vggt_slam_20 \
+  --trajectory poses.txt
+
+PYTHONPATH=src python3 -m gs_sim2real.cli train \
+  --data outputs/vggt_slam_20/imported_colmap \
+  --output outputs/vggt_slam_20/train_smoke \
+  --method gsplat \
+  --iterations 10
+```
+
 ### 9.4 PLY → .splat → Pages デプロイ
 
 ```python
