@@ -8,6 +8,7 @@ import random
 from typing import Any, Mapping, Sequence
 
 from .contract import AxisAlignedBounds, SceneEnvironment, SimulationCatalog, Vec3
+from .costmap import summarize_collision_queries
 from .interfaces import (
     AgentAction,
     CollisionQuery,
@@ -123,6 +124,9 @@ class HeadlessPhysicalAIEnvironment(PhysicalAIEnvironment):
 
     def query_collision(self, pose: Pose3D) -> CollisionQuery:
         scene = self.catalog.scene_by_id(self.state.scene_id)
+        return self._query_collision_for_scene(scene, pose)
+
+    def _query_collision_for_scene(self, scene: SceneEnvironment, pose: Pose3D) -> CollisionQuery:
         point = Vec3.from_sequence(pose.position)
         if not scene.bounds.contains(point):
             return CollisionQuery(
@@ -183,18 +187,35 @@ class HeadlessPhysicalAIEnvironment(PhysicalAIEnvironment):
     def score_trajectory(self, scene_id: str, trajectory: Sequence[Pose3D]) -> TrajectoryScore:
         scene = self.catalog.scene_by_id(scene_id)
         if not trajectory:
-            return TrajectoryScore(metrics={"inside-bounds-rate": 0.0, "path-length": 0.0}, passed=False)
+            return TrajectoryScore(
+                metrics={
+                    "inside-bounds-rate": 0.0,
+                    "path-length": 0.0,
+                    "collision-rate": 0.0,
+                    "collision-count": 0.0,
+                },
+                passed=False,
+                notes=("empty-trajectory",),
+            )
 
         inside = sum(scene.bounds.contains(Vec3.from_sequence(pose.position)) for pose in trajectory)
         inside_rate = inside / len(trajectory)
         path_length = _path_length(trajectory)
+        collision_summary = summarize_collision_queries(
+            tuple(self._query_collision_for_scene(scene, pose) for pose in trajectory)
+        )
+        metrics = {
+            "inside-bounds-rate": inside_rate,
+            "path-length": path_length,
+            **collision_summary.metric_payload(),
+        }
+        notes = collision_summary.notes()
+        if self.occupancy_grid is None:
+            notes = ("bounds-only score", *notes)
         return TrajectoryScore(
-            metrics={
-                "inside-bounds-rate": inside_rate,
-                "path-length": path_length,
-            },
-            passed=inside_rate == 1.0,
-            notes=("bounds-only score",),
+            metrics=metrics,
+            passed=inside_rate == 1.0 and collision_summary.collision_count == 0,
+            notes=notes,
         )
 
     def _initial_pose(self, scene: SceneEnvironment, *, seed: int | None) -> Pose3D:

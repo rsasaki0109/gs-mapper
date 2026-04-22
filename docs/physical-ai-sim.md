@@ -159,8 +159,8 @@ Supported actions:
 - `twist`: `linearX`, `linearY`, `linearZ` or `vx`, `vy`, `vz`
 - `teleport`: absolute `x`, `y`, `z` plus optional `qx`, `qy`, `qz`, `qw`
 
-The backend always blocks poses outside `SceneEnvironment.bounds`. When a `VoxelOccupancyGrid` is set, in-bounds collision checks also reject poses that fall into occupied voxels. When a `RobotFootprint` is set, the occupancy query checks every voxel touched by the circular body radius and height instead of only the pose point.
+The backend always blocks poses outside `SceneEnvironment.bounds`. When a `VoxelOccupancyGrid` is set, in-bounds collision checks also reject poses that fall into occupied voxels. When a `RobotFootprint` is set, the occupancy query checks every voxel touched by the circular body radius and height instead of only the pose point. `score_trajectory()` uses the same collision path and reports `collision-rate`, `collision-count`, clearance metrics, and per-reason notes.
 
 ## Next Implementation Layer
 
-The next useful layer is costmap-aware planning: cache occupancy per scene and viewpoint, add clearance/costmap summaries to trajectory scoring, and keep repeated collision causes visible to policy evaluation.
+The next useful layer is cached planning context: cache occupancy per scene and viewpoint, expose reusable costmap snapshots, and add route-level planners that consume the same collision and clearance summaries.

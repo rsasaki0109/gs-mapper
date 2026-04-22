@@ -140,9 +140,24 @@ def test_score_trajectory_reports_bounds_rate_and_path_length() -> None:
     assert inside_score.passed is True
     assert inside_score.metrics["inside-bounds-rate"] == 1.0
     assert inside_score.metrics["path-length"] == pytest.approx(1.0)
+    assert inside_score.metrics["collision-rate"] == 0.0
     assert mixed_score.passed is False
     assert mixed_score.metrics["inside-bounds-rate"] == 0.5
+    assert mixed_score.metrics["collision-rate"] == 0.5
+    assert mixed_score.metrics["collision-count"] == 1.0
     assert math.isfinite(mixed_score.metrics["path-length"])
+
+
+def test_score_trajectory_reports_empty_path_as_failed() -> None:
+    env = build_env()
+
+    score = env.score_trajectory("outdoor-demo", [])
+
+    assert score.passed is False
+    assert score.metrics["inside-bounds-rate"] == 0.0
+    assert score.metrics["collision-rate"] == 0.0
+    assert score.metrics["collision-count"] == 0.0
+    assert score.notes == ("empty-trajectory",)
 
 
 def tuple_to_vec3(position: tuple[float, float, float]) -> Vec3:

@@ -16,6 +16,7 @@ from .contract import (
     load_simulation_catalog_from_scene_picker,
     render_simulation_catalog_json,
 )
+from .costmap import TrajectoryCollisionSummary, summarize_collision_queries
 from .footprint import RobotFootprint
 from .headless import (
     HeadlessEnvironmentState,
@@ -71,6 +72,7 @@ __all__ = [
     "SplatRenderConfig",
     "SimulationCatalog",
     "TrajectoryEpisode",
+    "TrajectoryCollisionSummary",
     "TrajectoryScore",
     "Vec3",
     "VoxelOccupancyGrid",
@@ -84,4 +86,5 @@ __all__ = [
     "render_simulation_catalog_json",
     "point_to_voxel_cell",
     "resolve_scene_asset_path",
+    "summarize_collision_queries",
 ]
