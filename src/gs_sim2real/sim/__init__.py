@@ -51,6 +51,12 @@ from .rendering import (
     render_splat_point_cloud,
     resolve_scene_asset_path,
 )
+from .route_planning import (
+    RouteCandidate,
+    RouteEvaluation,
+    RoutePlan,
+    select_best_route,
+)
 
 __all__ = [
     "DEFAULT_SITE_URL",
@@ -70,6 +76,9 @@ __all__ = [
     "Pose3D",
     "PlanningViewpointKey",
     "RobotFootprint",
+    "RouteCandidate",
+    "RouteEvaluation",
+    "RoutePlan",
     "SceneEnvironment",
     "SensorModel",
     "SensorRig",
@@ -92,5 +101,6 @@ __all__ = [
     "render_simulation_catalog_json",
     "point_to_voxel_cell",
     "resolve_scene_asset_path",
+    "select_best_route",
     "summarize_collision_queries",
 ]

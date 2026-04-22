@@ -144,7 +144,9 @@ To turn those ray points into lightweight collision geometry, build an occupancy
 from gs_sim2real.sim import (
     OccupancyPlanningContext,
     RobotFootprint,
+    RouteCandidate,
     build_occupancy_grid_from_lidar_observation,
+    select_best_route,
 )
 
 occupancy = build_occupancy_grid_from_lidar_observation(
@@ -166,6 +168,21 @@ occupancy = planning.set_environment_occupancy(env, scene_id="outdoor-demo", pos
 cache_info = planning.cache_info()
 ```
 
+For route-level planning, pass candidate trajectories through the same scoring path. The selected route is ranked by pass/fail, collision rate, collision count, clearance, and path length.
+
+```python
+plan = select_best_route(
+    env,
+    scene_id="outdoor-demo",
+    candidates=(
+        RouteCandidate("nominal", (env.state.pose, goal)),
+        RouteCandidate("detour", (env.state.pose, waypoint, goal)),
+    ),
+    planning_context=planning,
+)
+best_route = plan.selected.candidate
+```
+
 Supported actions:
 
 - `twist`: `linearX`, `linearY`, `linearZ` or `vx`, `vy`, `vz`
@@ -175,4 +192,4 @@ The backend always blocks poses outside `SceneEnvironment.bounds`. When a `Voxel
 
 ## Next Implementation Layer
 
-The next useful layer is route-level planning: expose reusable costmap snapshots and add simple planners that consume the same collision and clearance summaries.
+The next useful layer is route execution: add simple action rollout helpers that convert a selected route into `twist` or `teleport` steps and record per-step collision outcomes.
