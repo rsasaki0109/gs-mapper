@@ -16,6 +16,10 @@ from .contract import (
     load_simulation_catalog_from_scene_picker,
     render_simulation_catalog_json,
 )
+from .headless import (
+    HeadlessEnvironmentState,
+    HeadlessPhysicalAIEnvironment,
+)
 from .interfaces import (
     AgentAction,
     CollisionQuery,
@@ -33,6 +37,8 @@ __all__ = [
     "CollisionQuery",
     "CoordinateFrame",
     "EvaluationTask",
+    "HeadlessEnvironmentState",
+    "HeadlessPhysicalAIEnvironment",
     "Observation",
     "ObservationRequest",
     "PhysicalAIEnvironment",

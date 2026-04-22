@@ -68,6 +68,37 @@ Payload dataclasses are available for stable integration:
 - `CollisionQuery`
 - `TrajectoryScore`
 
+## Headless Backend
+
+`HeadlessPhysicalAIEnvironment` is the first executable backend. It does not render pixels or simulate dynamics yet; it gives agents a deterministic bounds-based environment that can reset scenes, sample goals, apply simple actions, reject out-of-bounds poses, and return metadata-only observations.
+
+```python
+from pathlib import Path
+
+from gs_sim2real.sim import (
+    AgentAction,
+    HeadlessPhysicalAIEnvironment,
+    ObservationRequest,
+    load_simulation_catalog_from_scene_picker,
+)
+
+catalog = load_simulation_catalog_from_scene_picker(Path("docs/scenes-list.json"))
+env = HeadlessPhysicalAIEnvironment(catalog)
+
+reset = env.reset("outdoor-demo")
+goal = env.sample_goal("outdoor-demo", seed=42)
+transition = env.step(AgentAction("twist", {"linearX": 0.5}, duration_seconds=1.0))
+collision = env.query_collision(env.state.pose)
+observation = env.render_observation(ObservationRequest(pose=env.state.pose, sensor_id="rgb-forward"))
+```
+
+Supported actions:
+
+- `twist`: `linearX`, `linearY`, `linearZ` or `vx`, `vy`, `vz`
+- `teleport`: absolute `x`, `y`, `z` plus optional `qx`, `qy`, `qz`, `qw`
+
+The backend blocks poses outside `SceneEnvironment.bounds`. This is not a replacement for collision geometry; it is the minimal runtime needed to let agent code exercise the same `reset/step/render/query/score` loop before renderer-backed RGB, depth, and ray queries are added.
+
 ## Next Implementation Layer
 
-The next useful layer is a headless environment adapter that can answer RGB observation requests from the current splat assets and return bounds-based collision checks. After that, depth and LiDAR ray proxies can be backed by renderer depth buffers or splat ray marching.
+The next useful layer is renderer-backed observation. `rgb-forward` should move from metadata-only responses to real offscreen splat renders, then `depth-proxy` and `lidar-ray-proxy` can be backed by renderer depth buffers or splat ray marching.
