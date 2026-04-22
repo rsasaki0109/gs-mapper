@@ -38,7 +38,7 @@ print([task.task_id for task in scene.evaluation_tasks])
 
 ## Current Readiness
 
-`rgb-forward` is ready through the existing splat viewers and the local `.splat` observation renderer. `depth-proxy` is backed by the same local rasterizer and returns float32 depth plus a validity mask. `lidar-ray-proxy` is still a contract-only placeholder so agents, robotics bridges, and future ray backends can agree on names and payload shapes before ray marching lands.
+`rgb-forward` is ready through the existing splat viewers and the local `.splat` observation renderer. `depth-proxy` is backed by the same local rasterizer and returns float32 depth plus a validity mask. `lidar-ray-proxy` samples that depth image into LiDAR-like ranges and world-frame points.
 
 Metric and estimated-metric scenes expose navigation and mapping tasks. Relative-scale scenes expose localization and viewpoint-planning tasks, but avoid waypoint-navigation scoring until a metric alignment is provided.
 
@@ -92,7 +92,7 @@ collision = env.query_collision(env.state.pose)
 observation = env.render_observation(ObservationRequest(pose=env.state.pose, sensor_id="rgb-forward"))
 ```
 
-For local renderer-backed RGB and depth, inject `SplatAssetObservationRenderer`. It reads the same bundled `.splat` assets as the public viewer and returns JPEG-backed `rgb-forward` observations or float32 `depth-proxy` observations with camera metadata and validity masks.
+For local renderer-backed RGB, depth, and ray proxies, inject `SplatAssetObservationRenderer`. It reads the same bundled `.splat` assets as the public viewer and returns JPEG-backed `rgb-forward` observations, float32 `depth-proxy` observations with validity masks, or LiDAR-like `lidar-ray-proxy` ranges and points.
 
 ```python
 from pathlib import Path
@@ -126,6 +126,16 @@ depth = env.render_observation(
 )
 depth_base64 = depth.outputs["depth"]["depthBase64"]
 mask_base64 = depth.outputs["validityMask"]["maskBase64"]
+
+lidar = env.render_observation(
+    ObservationRequest(
+        pose=env.state.pose,
+        sensor_id="lidar-ray-proxy",
+        outputs=("ranges", "points"),
+    )
+)
+ranges_base64 = lidar.outputs["ranges"]["rangesBase64"]
+points_base64 = lidar.outputs["points"]["pointsBase64"]
 ```
 
 Supported actions:
@@ -137,4 +147,4 @@ The backend blocks poses outside `SceneEnvironment.bounds`. This is not a replac
 
 ## Next Implementation Layer
 
-The next useful layer is ray-query backing. `lidar-ray-proxy` can be backed by splat ray marching or an acceleration structure over splat centers, then collision checks can move from scene bounds to geometry-aware occupancy.
+The next useful layer is geometry-aware occupancy. Collision checks can move from scene bounds to occupancy built from the generated ray points or from an acceleration structure over splat centers.

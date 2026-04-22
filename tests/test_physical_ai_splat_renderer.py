@@ -174,6 +174,62 @@ def test_splat_asset_renderer_returns_depth_proxy_payload(tmp_path: Path) -> Non
     assert mask[24, 32] == 1
 
 
+def test_splat_asset_renderer_returns_lidar_ray_proxy_payload(tmp_path: Path) -> None:
+    asset_path = tmp_path / "assets" / "scene-one" / "scene-one.splat"
+    write_test_splat(
+        asset_path,
+        [
+            ((0.0, 0.0, 3.0), (0, 0, 255, 255)),
+            ((0.0, 0.0, 5.0), (255, 0, 0, 255)),
+            ((1.0, 0.0, 5.0), (0, 255, 0, 255)),
+        ],
+    )
+    catalog = build_simulation_catalog(
+        {
+            "scenes": [
+                {
+                    "url": "assets/scene-one/scene-one.splat",
+                    "label": "Scene One",
+                    "summary": "Tiny LiDAR integration fixture",
+                }
+            ]
+        },
+        docs_root=tmp_path,
+        site_url="https://example.test/gs/",
+    )
+    env = HeadlessPhysicalAIEnvironment(
+        catalog,
+        observation_renderer=SplatAssetObservationRenderer(
+            tmp_path,
+            config=SplatRenderConfig(width=64, height=48, far_clip=20.0, point_radius=1, ray_stride_pixels=1),
+        ),
+    )
+    env.reset("scene-one")
+
+    observation = env.render_observation(
+        ObservationRequest(
+            pose=Pose3D(
+                position=(0.0, 0.0, 0.0),
+                orientation_xyzw=(0.0, 0.0, 0.0, 1.0),
+                frame_id=env.state.pose.frame_id,
+            ),
+            sensor_id="lidar-ray-proxy",
+            outputs=("ranges", "points"),
+        )
+    )
+
+    outputs = observation.outputs
+    ranges = np.frombuffer(base64.b64decode(outputs["ranges"]["rangesBase64"]), dtype="<f4")
+    points = np.frombuffer(base64.b64decode(outputs["points"]["pointsBase64"]), dtype="<f4").reshape(-1, 3)
+    assert outputs["mode"] == "splat-raster-lidar"
+    assert outputs["ranges"]["encoding"] == "float32-le"
+    assert outputs["points"]["encoding"] == "float32-le-xyz"
+    assert outputs["points"]["coordinateFrame"] == env.state.pose.frame_id
+    assert outputs["rayStats"]["rayCount"] == ranges.shape[0] == points.shape[0]
+    assert np.any(np.isclose(ranges, 3.0))
+    assert np.any(np.isclose(points[:, 0], 0.0) & np.isclose(points[:, 1], 0.0) & np.isclose(points[:, 2], 3.0))
+
+
 def test_resolve_scene_asset_path_rejects_escape(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="escapes docs root"):
         resolve_scene_asset_path(tmp_path, "../outside.splat")

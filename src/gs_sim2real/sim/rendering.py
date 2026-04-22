@@ -28,6 +28,8 @@ class SplatRenderConfig:
     point_radius: int = 1
     jpeg_quality: int = 85
     max_gaussians: int | None = 120_000
+    ray_stride_pixels: int = 8
+    max_ray_count: int | None = 4096
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +53,16 @@ class SplatRenderFrame:
     depth: np.ndarray
 
 
+@dataclass(frozen=True, slots=True)
+class SplatRaySamples:
+    """LiDAR-like ray samples derived from a depth render."""
+
+    ranges: np.ndarray
+    camera_points: np.ndarray
+    world_points: np.ndarray
+    pixel_coordinates: np.ndarray
+
+
 class ObservationRenderer(Protocol):
     """Renderer adapter used by concrete Physical AI environments."""
 
@@ -62,9 +74,10 @@ class ObservationRenderer(Protocol):
 
 
 class SplatAssetObservationRenderer:
-    """Render RGB and depth observations from bundled `.splat` assets."""
+    """Render RGB, depth, and LiDAR-like observations from bundled `.splat` assets."""
 
     _DEPTH_OUTPUTS = frozenset({"depth", "validity-mask"})
+    _LIDAR_OUTPUTS = frozenset({"ranges", "points"})
 
     def __init__(self, docs_root: str | Path, *, config: SplatRenderConfig | None = None):
         self.docs_root = Path(docs_root)
@@ -79,6 +92,9 @@ class SplatAssetObservationRenderer:
         if request.sensor_id == "depth-proxy":
             requested_outputs = set(request.outputs)
             return bool(requested_outputs) and requested_outputs.issubset(self._DEPTH_OUTPUTS)
+        if request.sensor_id == "lidar-ray-proxy":
+            requested_outputs = set(request.outputs)
+            return bool(requested_outputs) and requested_outputs.issubset(self._LIDAR_OUTPUTS)
         return False
 
     def render_observation(self, scene: SceneEnvironment, request: ObservationRequest) -> Observation:
@@ -88,6 +104,8 @@ class SplatAssetObservationRenderer:
         frame = self._render_frame(scene, request)
         if request.sensor_id == "depth-proxy":
             return self._render_depth_observation(scene, request, frame)
+        if request.sensor_id == "lidar-ray-proxy":
+            return self._render_lidar_observation(scene, request, frame)
         return self._render_rgb_observation(scene, request, frame)
 
     def _render_rgb_observation(
@@ -144,6 +162,42 @@ class SplatAssetObservationRenderer:
                 "byteLength": len(mask_bytes),
             }
         outputs["depthStats"] = build_depth_stats(frame.depth, far_clip=self.config.far_clip)
+        return Observation(sensor_id=request.sensor_id, pose=request.pose, outputs=outputs)
+
+    def _render_lidar_observation(
+        self,
+        scene: SceneEnvironment,
+        request: ObservationRequest,
+        frame: SplatRenderFrame,
+    ) -> Observation:
+        samples = build_lidar_ray_samples(frame.depth, request.pose, self.config)
+        outputs = self._base_outputs(scene, request, frame)
+        outputs["mode"] = "splat-raster-lidar"
+        outputs["rayStats"] = {
+            "rayCount": int(samples.ranges.shape[0]),
+            "stridePixels": max(int(self.config.ray_stride_pixels), 1),
+            "maxRayCount": self.config.max_ray_count,
+            "farClipMeters": float(self.config.far_clip),
+        }
+        if "ranges" in request.outputs:
+            range_bytes = encode_float32_array(samples.ranges)
+            outputs["ranges"] = {
+                "encoding": "float32-le",
+                "unit": "meter",
+                "count": int(samples.ranges.shape[0]),
+                "rangesBase64": base64.b64encode(range_bytes).decode("ascii"),
+                "byteLength": len(range_bytes),
+            }
+        if "points" in request.outputs:
+            point_bytes = encode_float32_array(samples.world_points)
+            outputs["points"] = {
+                "encoding": "float32-le-xyz",
+                "coordinateFrame": request.pose.frame_id,
+                "components": ["x", "y", "z"],
+                "count": int(samples.world_points.shape[0]),
+                "pointsBase64": base64.b64encode(point_bytes).decode("ascii"),
+                "byteLength": len(point_bytes),
+            }
         return Observation(sensor_id=request.sensor_id, pose=request.pose, outputs=outputs)
 
     def _render_frame(self, scene: SceneEnvironment, request: ObservationRequest) -> SplatRenderFrame:
@@ -351,7 +405,59 @@ def build_depth_stats(depth: np.ndarray, *, far_clip: float) -> dict[str, object
 def encode_depth_float32(depth: np.ndarray) -> bytes:
     """Encode a depth image as little-endian float32 bytes."""
 
-    return np.asarray(depth, dtype="<f4").tobytes()
+    return encode_float32_array(depth)
+
+
+def encode_float32_array(values: np.ndarray) -> bytes:
+    """Encode an array as little-endian float32 bytes."""
+
+    return np.asarray(values, dtype="<f4").tobytes()
+
+
+def build_lidar_ray_samples(depth: np.ndarray, pose: Pose3D, config: SplatRenderConfig) -> SplatRaySamples:
+    """Build LiDAR-like ranges and world points from a depth image."""
+
+    depth_array = np.asarray(depth, dtype=np.float32)
+    height, width = depth_array.shape
+    stride = max(int(config.ray_stride_pixels), 1)
+    valid = build_validity_mask(depth_array, far_clip=config.far_clip).astype(bool)
+    sampled = np.zeros_like(valid, dtype=bool)
+    sampled[::stride, ::stride] = True
+    sample_mask = valid & sampled
+    pixel_y, pixel_x = np.nonzero(sample_mask)
+
+    if config.max_ray_count is not None and config.max_ray_count > 0 and pixel_x.size > config.max_ray_count:
+        indices = np.linspace(0, pixel_x.size - 1, num=int(config.max_ray_count), dtype=np.int64)
+        pixel_x = pixel_x[indices]
+        pixel_y = pixel_y[indices]
+
+    if pixel_x.size == 0:
+        empty_float = np.empty((0,), dtype=np.float32)
+        empty_points = np.empty((0, 3), dtype=np.float32)
+        empty_pixels = np.empty((0, 2), dtype=np.int32)
+        return SplatRaySamples(
+            ranges=empty_float,
+            camera_points=empty_points,
+            world_points=empty_points,
+            pixel_coordinates=empty_pixels,
+        )
+
+    fx, fy, cx, cy = compute_camera_intrinsics(width, height, config.fov_degrees)
+    z = depth_array[pixel_y, pixel_x].astype(np.float32)
+    x = ((pixel_x.astype(np.float32) - cx) / fx) * z
+    y = ((cy - pixel_y.astype(np.float32)) / fy) * z
+    camera_points = np.column_stack([x, y, z]).astype(np.float32)
+    ranges = np.linalg.norm(camera_points, axis=1).astype(np.float32)
+    rotation_camera_to_world = quaternion_to_rotation_matrix(pose.orientation_xyzw)
+    position = np.asarray(pose.position, dtype=np.float32)
+    world_points = (camera_points @ rotation_camera_to_world.T + position).astype(np.float32)
+    pixel_coordinates = np.column_stack([pixel_x, pixel_y]).astype(np.int32)
+    return SplatRaySamples(
+        ranges=ranges,
+        camera_points=camera_points,
+        world_points=world_points,
+        pixel_coordinates=pixel_coordinates,
+    )
 
 
 def world_to_camera_transform(pose: Pose3D) -> tuple[np.ndarray, np.ndarray]:

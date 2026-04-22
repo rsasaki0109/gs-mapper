@@ -450,9 +450,9 @@ def _default_sensor_rig() -> SensorRig:
             SensorModel(
                 sensor_id="lidar-ray-proxy",
                 modality="lidar",
-                status="contract-only",
+                status="ready-via-depth-rays",
                 outputs=("ranges", "points"),
-                description="LiDAR-like ray query contract for navigation and mapping agents.",
+                description="LiDAR-like range and point proxy sampled from the local splat raster depth image.",
             ),
         ),
     )
