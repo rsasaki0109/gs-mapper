@@ -112,7 +112,12 @@ def test_collect_external_slam_import_preflight_results_reads_saved_manifests(tm
             {
                 "type": "external-slam-artifact-manifest",
                 "system": "mast3r-slam",
-                "images": {"imageCount": 3},
+                "images": {
+                    "path": "/tmp/images",
+                    "exists": True,
+                    "isDirectory": True,
+                    "imageCount": 3,
+                },
                 "trajectory": {"poseCount": 3},
                 "resolution": {
                     "trajectory": {
@@ -144,6 +149,10 @@ def test_collect_external_slam_import_preflight_results_reads_saved_manifests(tm
     assert report["passedCount"] == 1
     assert report["missingCount"] == 3
     assert first["gatePassed"] is True
+    assert first["imagePath"] == "/tmp/images"
+    assert first["imageExists"] is True
+    assert first["imageIsDirectory"] is True
+    assert first["imageStatus"] == "ok"
     assert first["imageCount"] == 3
     assert first["poseCount"] == 3
     assert first["alignedFrameCount"] == 3
@@ -154,6 +163,7 @@ def test_collect_external_slam_import_preflight_results_reads_saved_manifests(tm
     assert first["missing"] == []
     assert "# External SLAM Import Preflight Results" in markdown
     assert "1/4 gates passed" in markdown
+    assert "| Bag6 MASt3R-SLAM | mast3r-slam | pass | ok | 3 |" in markdown
     assert "camera_poses.npz" in markdown
     assert "pointcloud.npz" in markdown
     assert "/tmp/artifacts/mast3r/camera_poses.npz" not in markdown
@@ -171,7 +181,12 @@ def test_collect_external_slam_import_preflight_results_reads_error_manifests(tm
                 "type": "external-slam-artifact-manifest",
                 "system": "mast3r-slam",
                 "displayName": "MASt3R-SLAM",
-                "images": {"imageCount": 2},
+                "images": {
+                    "path": "data/outdoor/bag6/images",
+                    "exists": False,
+                    "isDirectory": False,
+                    "imageCount": None,
+                },
                 "resolution": {
                     "trajectory": {
                         "selectedPath": None,
@@ -202,12 +217,15 @@ def test_collect_external_slam_import_preflight_results_reads_error_manifests(tm
     assert report["manifestCount"] == 1
     assert report["passedCount"] == 0
     assert report["errorCount"] == 1
+    assert report["imageMissingCount"] == 1
     assert first["ready"] is False
+    assert first["imagePath"] == "data/outdoor/bag6/images"
+    assert first["imageStatus"] == "missing"
     assert first["errorType"] == "FileNotFoundError"
     assert first["errorMessage"] == "Could not find MASt3R-SLAM trajectory"
     assert first["trajectoryResolutionReason"] == "no_candidate_match"
     assert first["missing"] == ["error"]
-    assert "| Bag6 MASt3R-SLAM | mast3r-slam | error |" in markdown
+    assert "| Bag6 MASt3R-SLAM | mast3r-slam | error | missing | n/a |" in markdown
     assert "no_candidate_match" in markdown
     assert "Could not find MASt3R-SLAM trajectory" in markdown
 

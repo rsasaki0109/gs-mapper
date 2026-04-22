@@ -18,6 +18,7 @@ def collect_external_slam_import_preflight_results(plan: ExternalSLAMImportPlan)
     failed_count = sum(1 for run in run_reports if run["gatePassed"] is False)
     invalid_count = sum(1 for run in run_reports if run["manifestExists"] and not run["manifestValid"])
     error_count = sum(1 for run in run_reports if run["errorMessage"] is not None)
+    image_missing_count = sum(1 for run in run_reports if run["imageStatus"] in {"missing", "not_directory"})
     return {
         "type": "external-slam-import-preflight-report",
         "context": plan.context.__dict__,
@@ -28,6 +29,7 @@ def collect_external_slam_import_preflight_results(plan: ExternalSLAMImportPlan)
         "missingCount": len(run_reports) - manifest_count,
         "invalidCount": invalid_count,
         "errorCount": error_count,
+        "imageMissingCount": image_missing_count,
         "runs": run_reports,
     }
 
@@ -68,6 +70,10 @@ def collect_external_slam_import_preflight_run_result(run: ExternalSLAMImportRun
         "trajectoryResolutionReason": _optional_string(trajectory_resolution.get("reason")),
         "pointcloudResolutionReason": _optional_string(pointcloud_resolution.get("reason")),
         "gatePassed": _optional_bool(gate.get("passed")),
+        "imagePath": _optional_string(images.get("path")),
+        "imageExists": _optional_bool(images.get("exists")),
+        "imageIsDirectory": _optional_bool(images.get("isDirectory")),
+        "imageStatus": _image_status(images),
         "imageCount": _optional_int(images.get("imageCount")),
         "poseCount": _optional_int(trajectory.get("poseCount")),
         "alignedFrameCount": _optional_int(alignment.get("alignedFrameCount")),
@@ -96,10 +102,10 @@ def render_external_slam_import_report_markdown(report: dict[str, Any]) -> str:
         ),
         "",
         (
-            "| Run | System | Gate | Images | Poses | Aligned | Points | Trajectory | "
+            "| Run | System | Gate | Image Dir | Images | Poses | Aligned | Points | Trajectory | "
             "Pointcloud | Reason | Missing | Error |"
         ),
-        "| --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- |",
+        "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- |",
     ]
     for run in report["runs"]:
         missing = ", ".join(run["missing"]) or "none"
@@ -110,6 +116,7 @@ def render_external_slam_import_report_markdown(report: dict[str, Any]) -> str:
                     run["label"],
                     run["system"],
                     _format_gate_status(run),
+                    _format_image_status(run["imageStatus"]),
                     _format_optional_int(run["imageCount"]),
                     _format_optional_int(run["poseCount"]),
                     _format_optional_int(run["alignedFrameCount"]),
@@ -180,6 +187,20 @@ def _optional_int(value: Any) -> int | None:
     return None
 
 
+def _image_status(images: dict[str, Any]) -> str:
+    if not images:
+        return "n/a"
+    exists = _optional_bool(images.get("exists"))
+    is_directory = _optional_bool(images.get("isDirectory"))
+    if exists is False:
+        return "missing"
+    if is_directory is False:
+        return "not_directory"
+    if exists is True and is_directory is True:
+        return "ok"
+    return "n/a"
+
+
 def _format_gate_status(run: dict[str, Any]) -> str:
     if not run["manifestExists"]:
         return "n/a"
@@ -196,6 +217,10 @@ def _format_gate_status(run: dict[str, Any]) -> str:
 
 def _format_optional_int(value: int | None) -> str:
     return "n/a" if value is None else str(value)
+
+
+def _format_image_status(value: str | None) -> str:
+    return value or "n/a"
 
 
 def _format_path_basename(value: str | None) -> str:
