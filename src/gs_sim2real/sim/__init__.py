@@ -38,6 +38,10 @@ from .occupancy import (
     decode_lidar_points_observation,
     point_to_voxel_cell,
 )
+from .planning import (
+    OccupancyPlanningContext,
+    PlanningViewpointKey,
+)
 from .rendering import (
     ObservationRenderer,
     SplatAssetObservationRenderer,
@@ -61,8 +65,10 @@ __all__ = [
     "ObservationRenderer",
     "ObservationRequest",
     "OccupancyQuery",
+    "OccupancyPlanningContext",
     "PhysicalAIEnvironment",
     "Pose3D",
+    "PlanningViewpointKey",
     "RobotFootprint",
     "SceneEnvironment",
     "SensorModel",

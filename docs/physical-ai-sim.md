@@ -141,7 +141,11 @@ points_base64 = lidar.outputs["points"]["pointsBase64"]
 To turn those ray points into lightweight collision geometry, build an occupancy grid and inject it into the headless environment. The backend can query either the pose point or a conservative circular robot footprint.
 
 ```python
-from gs_sim2real.sim import RobotFootprint, build_occupancy_grid_from_lidar_observation
+from gs_sim2real.sim import (
+    OccupancyPlanningContext,
+    RobotFootprint,
+    build_occupancy_grid_from_lidar_observation,
+)
 
 occupancy = build_occupancy_grid_from_lidar_observation(
     lidar,
@@ -154,6 +158,14 @@ env.set_robot_footprint(RobotFootprint(radius_meters=0.45, height_meters=1.2))
 collision = env.query_collision(env.state.pose)
 ```
 
+For repeated route checks, use `OccupancyPlanningContext` to cache the LiDAR-to-occupancy result by scene, viewpoint, and voxel settings:
+
+```python
+planning = OccupancyPlanningContext(voxel_size_meters=0.5, inflation_radius_meters=0.5)
+occupancy = planning.set_environment_occupancy(env, scene_id="outdoor-demo", pose=env.state.pose)
+cache_info = planning.cache_info()
+```
+
 Supported actions:
 
 - `twist`: `linearX`, `linearY`, `linearZ` or `vx`, `vy`, `vz`
@@ -163,4 +175,4 @@ The backend always blocks poses outside `SceneEnvironment.bounds`. When a `Voxel
 
 ## Next Implementation Layer
 
-The next useful layer is cached planning context: cache occupancy per scene and viewpoint, expose reusable costmap snapshots, and add route-level planners that consume the same collision and clearance summaries.
+The next useful layer is route-level planning: expose reusable costmap snapshots and add simple planners that consume the same collision and clearance summaries.
