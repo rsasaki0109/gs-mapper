@@ -92,6 +92,34 @@ def test_resolve_pi3_camera_pose_tensor_from_output_directory(tmp_path: Path) ->
     assert artifacts.pointcloud_path == artifact_dir / "result.ply"
 
 
+def test_resolve_pi3_prediction_npz_and_pointcloud_npz_from_output_directory(tmp_path: Path) -> None:
+    artifact_dir = tmp_path / "pi3_out"
+    artifact_dir.mkdir()
+    poses = np.repeat(np.eye(4)[None, ...], 2, axis=0)
+    np.savez(artifact_dir / "prediction.npz", camera_poses=poses)
+    np.savez(artifact_dir / "pointcloud.npz", points=np.zeros((2, 2, 3), dtype=np.float32))
+
+    artifacts = resolve_external_slam_artifacts(system="pi3", artifact_dir=artifact_dir)
+
+    assert artifacts.trajectory_path == artifact_dir / "prediction.npz"
+    assert artifacts.pointcloud_path == artifact_dir / "pointcloud.npz"
+
+
+def test_resolve_loger_prefers_named_results_pt_before_generic_pt(tmp_path: Path) -> None:
+    torch = pytest.importorskip("torch")
+    artifact_dir = tmp_path / "loger_out"
+    artifact_dir.mkdir()
+    poses = torch.eye(4).repeat(2, 1, 1)
+    torch.save({"camera_poses": poses}, artifact_dir / "z_generic.pt")
+    torch.save({"camera_poses": poses}, artifact_dir / "results.pt")
+    np.save(artifact_dir / "points3d.npy", np.zeros((2, 3), dtype=np.float32))
+
+    artifacts = resolve_external_slam_artifacts(system="loger", artifact_dir=artifact_dir)
+
+    assert artifacts.trajectory_path == artifact_dir / "results.pt"
+    assert artifacts.pointcloud_path == artifact_dir / "points3d.npy"
+
+
 def test_build_external_slam_manifest_marks_tensor_materialization(tmp_path: Path) -> None:
     image_dir = tmp_path / "images"
     _write_dummy_images(image_dir, count=2)
@@ -207,6 +235,33 @@ def test_external_slam_manifest_resolution_trace_records_selected_pattern(tmp_pa
     assert selected["matchCount"] == 1
     assert selected["selectedPath"].endswith("sequence_a/camera_poses.npz")
     assert manifest["trajectory"]["poseCount"] == 2
+
+
+def test_external_slam_manifest_trace_records_expanded_pi3_prediction_candidate(tmp_path: Path) -> None:
+    image_dir = tmp_path / "images"
+    _write_dummy_images(image_dir, count=2)
+    artifact_dir = tmp_path / "pi3_out"
+    artifact_dir.mkdir()
+    poses = np.repeat(np.eye(4)[None, ...], 2, axis=0)
+    np.savez(artifact_dir / "prediction.npz", camera_poses=poses)
+    np.savez(artifact_dir / "pointcloud.npz", points=np.zeros((2, 2, 3), dtype=np.float32))
+
+    manifest = build_external_slam_artifact_manifest(
+        image_dir=image_dir,
+        system="pi3",
+        artifact_dir=artifact_dir,
+    )
+    trajectory_selected = next(
+        item for item in manifest["resolution"]["trajectory"]["trace"] if item["reason"] == "selected"
+    )
+    pointcloud_selected = next(
+        item for item in manifest["resolution"]["pointcloud"]["trace"] if item["reason"] == "selected"
+    )
+
+    assert trajectory_selected["pattern"] == "prediction.npz"
+    assert trajectory_selected["selectedPath"].endswith("prediction.npz")
+    assert pointcloud_selected["pattern"] == "pointcloud.npz"
+    assert pointcloud_selected["selectedPath"].endswith("pointcloud.npz")
 
 
 def test_external_slam_error_manifest_trace_records_all_missed_patterns(tmp_path: Path) -> None:
