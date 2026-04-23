@@ -147,14 +147,21 @@ from gs_sim2real.sim import (
     RouteCandidate,
     RoutePolicyEnvConfig,
     RoutePolicyGymAdapter,
+    RoutePolicyImitationFitConfig,
+    RoutePolicyQualityThresholds,
     build_occupancy_grid_from_lidar_observation,
     build_route_policy_replay_batch,
     build_route_policy_replay_schema,
     build_route_policy_sample,
     collect_route_policy_dataset,
+    evaluate_route_policy_baselines,
+    evaluate_route_policy_dataset_quality,
+    evaluate_route_policy_imitation_model,
+    fit_route_policy_imitation_model,
     iter_route_policy_replay_batches,
     load_route_policy_transitions_jsonl,
     replan_after_blocked_rollout,
+    render_route_policy_quality_markdown,
     rollout_route,
     rollout_route_with_replanning,
     select_best_route,
@@ -326,6 +333,26 @@ for batch in iter_route_policy_replay_batches(transition_table, batch_size=32, s
 full_batch = build_route_policy_replay_batch(transition_table, schema=schema)
 ```
 
+For a dependency-free reference baseline, fit the built-in k-nearest-neighbor imitation model from the same batch. It decodes the predicted action vector back into an adapter-compatible route action and can be evaluated through the same baseline gate as hand-written policies.
+
+```python
+imitation_model = fit_route_policy_imitation_model(
+    full_batch,
+    config=RoutePolicyImitationFitConfig(neighbor_count=3),
+    metadata={"source": "outdoor-demo-policy-rollouts"},
+)
+
+imitation_eval = evaluate_route_policy_imitation_model(
+    (policy_env,),
+    imitation_model,
+    episode_count=16,
+    evaluation_id="outdoor-demo-imitation",
+    seed_start=100,
+    thresholds=RoutePolicyQualityThresholds(min_success_rate=0.8),
+)
+print(imitation_eval.best_policy_name)
+```
+
 Supported actions:
 
 - `twist`: `linearX`, `linearY`, `linearZ` or `vx`, `vy`, `vz`
@@ -335,4 +362,4 @@ The backend always blocks poses outside `SceneEnvironment.bounds`. When a `Voxel
 
 ## Next Implementation Layer
 
-The next useful layer is a reference imitation policy and evaluator adapter: train a small baseline from replay batches, decode predicted route actions, and run the trained policy back through the same baseline evaluator.
+The next useful layer is policy persistence plus a CLI benchmark runner: write/read fitted policy summaries, evaluate one or more policies against fixed goal suites, and emit comparable JSON/Markdown reports for CI.
