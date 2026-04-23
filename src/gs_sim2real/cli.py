@@ -1448,6 +1448,34 @@ def build_parser() -> argparse.ArgumentParser:
         help="Exit with status 2 when workflow activation is blocked",
     )
 
+    # route policy scenario CI review artifact
+    rpsrev = subparsers.add_parser(
+        "route-policy-scenario-ci-review",
+        help="Publish a review artifact for route policy scenario CI workflow changes",
+    )
+    rpsrev.add_argument("--shard-merge", required=True, help="Scenario shard merge report JSON")
+    rpsrev.add_argument("--validation-report", required=True, help="Workflow validation report JSON")
+    rpsrev.add_argument("--activation-report", required=True, help="Workflow activation report JSON")
+    rpsrev.add_argument("--review-id", default=None, help="Optional CI review artifact id")
+    rpsrev.add_argument("--pages-base-url", default=None, help="Optional Pages base URL stored in review metadata")
+    rpsrev.add_argument(
+        "--output",
+        default="outputs/route_policy_scenarios/scenario_ci_review.json",
+        help="Scenario CI review JSON path",
+    )
+    rpsrev.add_argument("--markdown-output", default=None, help="Optional scenario CI review Markdown path")
+    rpsrev.add_argument("--html-output", default=None, help="Optional scenario CI review HTML path")
+    rpsrev.add_argument(
+        "--bundle-dir",
+        default=None,
+        help="Optional directory that receives review.json, review.md, and index.html",
+    )
+    rpsrev.add_argument(
+        "--fail-on-review",
+        action="store_true",
+        help="Exit with status 2 when the scenario CI review does not pass",
+    )
+
     # experiment labs — specs drive a nested `experiment` subparser plus
     # hidden top-level aliases for back-compat.
     experiment_specs: list[tuple[str, str, str]] = [
@@ -2407,6 +2435,13 @@ def cmd_route_policy_scenario_ci_workflow_activate(args: argparse.Namespace) -> 
     run_activation_cli(args)
 
 
+def cmd_route_policy_scenario_ci_review(args: argparse.Namespace) -> None:
+    """Handle the route-policy-scenario-ci-review subcommand."""
+    from gs_sim2real.sim.policy_scenario_ci_review import run_review_cli
+
+    run_review_cli(args)
+
+
 def cmd_experiment(args: argparse.Namespace) -> None:
     """Handle the nested `experiment` subcommand by deferring to the legacy handler."""
     handler_map = {
@@ -2586,6 +2621,7 @@ def main(argv: list[str] | None = None) -> None:
         "route-policy-benchmark": cmd_route_policy_benchmark,
         "route-policy-benchmark-history": cmd_route_policy_benchmark_history,
         "route-policy-scenario-ci-manifest": cmd_route_policy_scenario_ci_manifest,
+        "route-policy-scenario-ci-review": cmd_route_policy_scenario_ci_review,
         "route-policy-scenario-ci-workflow-activate": cmd_route_policy_scenario_ci_workflow_activate,
         "route-policy-scenario-ci-workflow": cmd_route_policy_scenario_ci_workflow,
         "route-policy-scenario-ci-workflow-validate": cmd_route_policy_scenario_ci_workflow_validate,

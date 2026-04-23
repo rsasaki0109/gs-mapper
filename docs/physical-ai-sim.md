@@ -161,11 +161,13 @@ from gs_sim2real.sim import (
     RoutePolicyScenarioMatrix,
     RoutePolicyScenarioSet,
     RoutePolicyScenarioSpec,
+    RoutePolicyScenarioCIReviewArtifact,
     RoutePolicyScenarioCIWorkflowConfig,
     RoutePolicyScenarioCIWorkflowActivationReport,
     RoutePolicyScenarioCIWorkflowValidationReport,
     activate_route_policy_scenario_ci_workflow,
     build_route_policy_scenario_ci_manifest,
+    build_route_policy_scenario_ci_review_artifact,
     build_route_policy_scenario_shard_plan,
     build_route_policy_benchmark_history,
     build_occupancy_grid_from_lidar_observation,
@@ -183,6 +185,7 @@ from gs_sim2real.sim import (
     load_route_policy_imitation_model_json,
     load_route_policy_registry_json,
     load_route_policy_scenario_ci_manifest_json,
+    load_route_policy_scenario_ci_review_json,
     load_route_policy_scenario_ci_workflow_activation_json,
     load_route_policy_scenario_ci_workflow_json,
     load_route_policy_scenario_ci_workflow_validation_json,
@@ -199,6 +202,8 @@ from gs_sim2real.sim import (
     render_route_policy_benchmark_markdown,
     render_route_policy_quality_markdown,
     render_route_policy_scenario_ci_manifest_markdown,
+    render_route_policy_scenario_ci_review_html,
+    render_route_policy_scenario_ci_review_markdown,
     render_route_policy_scenario_ci_workflow_activation_markdown,
     render_route_policy_scenario_ci_workflow_markdown,
     render_route_policy_scenario_ci_workflow_validation_markdown,
@@ -219,6 +224,8 @@ from gs_sim2real.sim import (
     write_route_policy_imitation_model_json,
     write_route_policy_registry_json,
     write_route_policy_scenario_ci_manifest_json,
+    write_route_policy_scenario_ci_review_bundle,
+    write_route_policy_scenario_ci_review_json,
     write_route_policy_scenario_ci_workflow_activation_json,
     write_route_policy_scenario_ci_workflow_json,
     write_route_policy_scenario_ci_workflow_validation_json,
@@ -811,6 +818,34 @@ gs-mapper route-policy-scenario-ci-workflow-activate \
   --fail-on-activation
 ```
 
+Publish a review bundle for GitHub Pages once shard runs have been merged. The bundle contains `review.json`, `review.md`, and an `index.html` page that summarizes shard status, workflow validation, workflow activation, and the active workflow path.
+
+```python
+review = build_route_policy_scenario_ci_review_artifact(
+    shard_merge,
+    validation,
+    activation,
+    review_id="outdoor-demo-policy-review",
+    pages_base_url="https://example.github.io/gs-mapper/reviews/outdoor-demo-policy/",
+)
+write_route_policy_scenario_ci_review_bundle(
+    "docs/reviews/outdoor-demo-policy",
+    review,
+)
+print(render_route_policy_scenario_ci_review_markdown(review))
+```
+
+```bash
+gs-mapper route-policy-scenario-ci-review \
+  --shard-merge runs/scenarios/ci/shard-merge.json \
+  --validation-report runs/scenarios/ci-workflow-validation.json \
+  --activation-report runs/scenarios/ci-workflow-activation.json \
+  --review-id outdoor-demo-policy-review \
+  --pages-base-url https://example.github.io/gs-mapper/reviews/outdoor-demo-policy/ \
+  --bundle-dir docs/reviews/outdoor-demo-policy \
+  --fail-on-review
+```
+
 Supported actions:
 
 - `twist`: `linearX`, `linearY`, `linearZ` or `vx`, `vy`, `vz`
@@ -820,4 +855,4 @@ The backend always blocks poses outside `SceneEnvironment.bounds`. When a `Voxel
 
 ## Next Implementation Layer
 
-The next useful layer is shard summary publishing: turn scenario shard run outputs and activation reports into a compact review artifact for GitHub Pages, so generated workflow changes can be inspected with their expected benchmark surface before broadening triggers.
+The next useful layer is workflow trigger promotion: move from manual-only dispatch to controlled pull-request or branch triggers only after the review bundle passes, while keeping the review artifact URL attached to the generated workflow change.

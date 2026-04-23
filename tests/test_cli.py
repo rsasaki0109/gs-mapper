@@ -194,6 +194,12 @@ class TestCLIHelp:
             main(["route-policy-scenario-ci-workflow-activate", "--help"])
         assert exc_info.value.code == 0
 
+    def test_cli_route_policy_scenario_ci_review_help(self) -> None:
+        """Running route-policy-scenario-ci-review --help raises SystemExit(0)."""
+        with pytest.raises(SystemExit) as exc_info:
+            main(["route-policy-scenario-ci-review", "--help"])
+        assert exc_info.value.code == 0
+
     def test_cli_experiment_localization_alignment_help(self) -> None:
         """Running experiment-localization-alignment --help raises SystemExit(0)."""
         with pytest.raises(SystemExit) as exc_info:
@@ -2215,6 +2221,43 @@ class TestCLIHelp:
         assert args.markdown_output == "activation.md"
         assert args.overwrite is True
         assert args.fail_on_activation is True
+
+    def test_cli_route_policy_scenario_ci_review_flags(self) -> None:
+        """route-policy-scenario-ci-review parser accepts review publishing settings."""
+        args = build_parser().parse_args(
+            [
+                "route-policy-scenario-ci-review",
+                "--shard-merge",
+                "shard-merge.json",
+                "--validation-report",
+                "validation.json",
+                "--activation-report",
+                "activation.json",
+                "--review-id",
+                "unit-review",
+                "--pages-base-url",
+                "https://example.test/reviews/unit/",
+                "--output",
+                "review.json",
+                "--markdown-output",
+                "review.md",
+                "--html-output",
+                "index.html",
+                "--bundle-dir",
+                "pages/review",
+                "--fail-on-review",
+            ]
+        )
+        assert args.shard_merge == "shard-merge.json"
+        assert args.validation_report == "validation.json"
+        assert args.activation_report == "activation.json"
+        assert args.review_id == "unit-review"
+        assert args.pages_base_url == "https://example.test/reviews/unit/"
+        assert args.output == "review.json"
+        assert args.markdown_output == "review.md"
+        assert args.html_output == "index.html"
+        assert args.bundle_dir == "pages/review"
+        assert args.fail_on_review is True
 
     def test_cli_experiment_localization_alignment_flags(self) -> None:
         """experiment-localization-alignment parser accepts evaluation settings."""

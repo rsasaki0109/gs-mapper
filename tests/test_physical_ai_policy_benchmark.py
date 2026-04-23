@@ -12,7 +12,10 @@ from gs_sim2real.cli import build_parser
 from gs_sim2real.sim import (
     HeadlessPhysicalAIEnvironment,
     Pose3D,
+    RoutePolicyBenchmarkHistoryReport,
+    RoutePolicyBenchmarkPolicySnapshot,
     RoutePolicyBenchmarkRegressionThresholds,
+    RoutePolicyBenchmarkSnapshot,
     RoutePolicyGoalSpec,
     RoutePolicyGoalSuite,
     RoutePolicyEnvConfig,
@@ -29,11 +32,14 @@ from gs_sim2real.sim import (
     RoutePolicyScenarioMatrix,
     RoutePolicyScenarioSet,
     RoutePolicyScenarioCIWorkflowConfig,
+    RoutePolicyScenarioShardMergeReport,
+    RoutePolicyScenarioShardRunSummary,
     RoutePolicyScenarioSpec,
     RouteRewardWeights,
     activate_route_policy_scenario_ci_workflow,
     build_route_policy_benchmark_history,
     build_route_policy_scenario_ci_manifest,
+    build_route_policy_scenario_ci_review_artifact,
     build_simulation_catalog,
     collect_route_policy_dataset,
     expand_route_policy_scenario_matrix,
@@ -43,6 +49,7 @@ from gs_sim2real.sim import (
     load_route_policy_imitation_model_json,
     load_route_policy_registry_json,
     load_route_policy_scenario_ci_manifest_json,
+    load_route_policy_scenario_ci_review_json,
     load_route_policy_scenario_ci_workflow_activation_json,
     load_route_policy_scenario_ci_workflow_json,
     load_route_policy_scenario_ci_workflow_validation_json,
@@ -55,6 +62,8 @@ from gs_sim2real.sim import (
     render_route_policy_benchmark_history_markdown,
     render_route_policy_benchmark_markdown,
     render_route_policy_scenario_ci_manifest_markdown,
+    render_route_policy_scenario_ci_review_html,
+    render_route_policy_scenario_ci_review_markdown,
     render_route_policy_scenario_ci_workflow_activation_markdown,
     render_route_policy_scenario_ci_workflow_markdown,
     render_route_policy_scenario_ci_workflow_validation_markdown,
@@ -72,6 +81,8 @@ from gs_sim2real.sim import (
     write_route_policy_imitation_model_json,
     write_route_policy_registry_json,
     write_route_policy_scenario_ci_manifest_json,
+    write_route_policy_scenario_ci_review_bundle,
+    write_route_policy_scenario_ci_review_json,
     write_route_policy_scenario_ci_workflow_activation_json,
     write_route_policy_scenario_ci_workflow_json,
     write_route_policy_scenario_ci_workflow_validation_json,
@@ -1646,6 +1657,110 @@ def test_route_policy_scenario_ci_workflow_activation_cli_writes_report(tmp_path
     )
 
 
+def test_route_policy_scenario_ci_review_artifact_writes_pages_outputs(tmp_path: Path) -> None:
+    manifest = build_unit_ci_workflow_manifest("unit-review-manifest")
+    materialization = materialize_route_policy_scenario_ci_workflow(
+        manifest,
+        config=RoutePolicyScenarioCIWorkflowConfig(workflow_id="unit-review-workflow", artifact_root="ci"),
+    )
+    source_path = write_route_policy_scenario_ci_workflow_yaml(tmp_path / "workflow.generated.yml", materialization)
+    validation = validate_route_policy_scenario_ci_workflow(
+        manifest,
+        materialization,
+        validation_id="unit-review-validation",
+        workflow_path=source_path,
+    )
+    active_path = tmp_path / ".github" / "workflows" / "unit-review.yml"
+    activation = activate_route_policy_scenario_ci_workflow(
+        materialization,
+        validation,
+        source_workflow_path=source_path,
+        active_workflow_path=active_path,
+        activation_id="unit-review-activation",
+    )
+    review = build_route_policy_scenario_ci_review_artifact(
+        build_unit_ci_shard_merge_report(),
+        validation,
+        activation,
+        review_id="unit-review",
+        pages_base_url="https://example.test/reviews/unit-review/",
+    )
+    review_path = write_route_policy_scenario_ci_review_json(tmp_path / "review.json", review)
+    loaded = load_route_policy_scenario_ci_review_json(review_path)
+    bundle_paths = write_route_policy_scenario_ci_review_bundle(tmp_path / "pages" / "unit-review", loaded)
+
+    assert loaded.passed is True
+    assert loaded.shard_count == 1
+    assert loaded.scenario_count == 1
+    assert loaded.report_count == 1
+    assert loaded.metadata["pagesBaseUrl"] == "https://example.test/reviews/unit-review/"
+    assert "Route Policy Scenario CI Review: unit-review" in render_route_policy_scenario_ci_review_markdown(loaded)
+    assert "<title>unit-review CI Review</title>" in render_route_policy_scenario_ci_review_html(loaded)
+    assert Path(bundle_paths["json"]).exists()
+    assert Path(bundle_paths["markdown"]).exists()
+    assert Path(bundle_paths["html"]).read_text(encoding="utf-8").startswith("<!doctype html>")
+
+
+def test_route_policy_scenario_ci_review_cli_writes_bundle(tmp_path: Path) -> None:
+    manifest = build_unit_ci_workflow_manifest("unit-cli-review-manifest")
+    materialization = materialize_route_policy_scenario_ci_workflow(
+        manifest,
+        config=RoutePolicyScenarioCIWorkflowConfig(workflow_id="unit-cli-review-workflow", artifact_root="ci"),
+    )
+    source_path = write_route_policy_scenario_ci_workflow_yaml(tmp_path / "workflow.generated.yml", materialization)
+    validation = validate_route_policy_scenario_ci_workflow(
+        manifest,
+        materialization,
+        validation_id="unit-cli-review-validation",
+        workflow_path=source_path,
+    )
+    activation = activate_route_policy_scenario_ci_workflow(
+        materialization,
+        validation,
+        source_workflow_path=source_path,
+        active_workflow_path=tmp_path / ".github" / "workflows" / "unit-cli-review.yml",
+        activation_id="unit-cli-review-activation",
+    )
+    merge_path = write_route_policy_scenario_shard_merge_json(
+        tmp_path / "shard-merge.json", build_unit_ci_shard_merge_report()
+    )
+    validation_path = write_route_policy_scenario_ci_workflow_validation_json(
+        tmp_path / "workflow-validation.json",
+        validation,
+    )
+    activation_path = write_route_policy_scenario_ci_workflow_activation_json(
+        tmp_path / "workflow-activation.json",
+        activation,
+    )
+    bundle_dir = tmp_path / "pages" / "unit-cli-review"
+    args = build_parser().parse_args(
+        [
+            "route-policy-scenario-ci-review",
+            "--shard-merge",
+            str(merge_path),
+            "--validation-report",
+            str(validation_path),
+            "--activation-report",
+            str(activation_path),
+            "--review-id",
+            "unit-cli-review",
+            "--pages-base-url",
+            "https://example.test/reviews/unit-cli-review/",
+            "--bundle-dir",
+            str(bundle_dir),
+            "--fail-on-review",
+        ]
+    )
+
+    cli.cmd_route_policy_scenario_ci_review(args)
+    review = load_route_policy_scenario_ci_review_json(bundle_dir / "review.json")
+
+    assert review.review_id == "unit-cli-review"
+    assert review.passed is True
+    assert (bundle_dir / "review.md").exists()
+    assert "Route Policy Scenario CI Review" in (bundle_dir / "index.html").read_text(encoding="utf-8")
+
+
 def build_unit_ci_workflow_manifest(manifest_id: str) -> RoutePolicyScenarioCIManifest:
     shard_command = (
         "gs-mapper",
@@ -1697,6 +1812,44 @@ def build_unit_ci_workflow_manifest(manifest_id: str) -> RoutePolicyScenarioCIMa
             depends_on=("scenario-unit-shard",),
             command=merge_command,
         ),
+    )
+
+
+def build_unit_ci_shard_merge_report() -> RoutePolicyScenarioShardMergeReport:
+    history = RoutePolicyBenchmarkHistoryReport(
+        history_id="unit-ci-review-history",
+        reports=(
+            RoutePolicyBenchmarkSnapshot(
+                benchmark_id="unit-scenario",
+                passed=True,
+                best_policy_name="direct",
+                policies=(
+                    RoutePolicyBenchmarkPolicySnapshot(
+                        policy_name="direct",
+                        passed=True,
+                        metrics={"successRate": 1.0, "collisionRate": 0.0},
+                    ),
+                ),
+                source_path="ci/reports/unit-shard/unit-scenario.json",
+            ),
+        ),
+    )
+    return RoutePolicyScenarioShardMergeReport(
+        merge_id="unit-ci-review-merge",
+        shard_runs=(
+            RoutePolicyScenarioShardRunSummary(
+                shard_id="unit-shard",
+                scenario_set_id="unit-shard",
+                passed=True,
+                scenario_count=1,
+                report_paths=("ci/reports/unit-shard/unit-scenario.json",),
+                run_path="ci/runs/unit-shard.json",
+                history_path="ci/histories/unit-shard.json",
+            ),
+        ),
+        history=history,
+        history_path="ci/history.json",
+        history_markdown_path="ci/history.md",
     )
 
 
