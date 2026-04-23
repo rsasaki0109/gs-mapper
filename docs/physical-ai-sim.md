@@ -146,7 +146,9 @@ from gs_sim2real.sim import (
     RobotFootprint,
     RouteCandidate,
     build_occupancy_grid_from_lidar_observation,
+    replan_after_blocked_rollout,
     rollout_route,
+    rollout_route_with_replanning,
     select_best_route,
 )
 
@@ -197,6 +199,29 @@ route_passed = rollout.passed
 rollout_metrics = rollout.metrics()
 ```
 
+For closed-loop recovery, feed a blocked rollout into replanning. Candidate continuations are automatically anchored at the last applied pose before being scored and optionally executed.
+
+```python
+replan = replan_after_blocked_rollout(
+    env,
+    scene_id="outdoor-demo",
+    rollout=rollout,
+    candidates=(
+        RouteCandidate("recover-left", (left_waypoint, goal)),
+        RouteCandidate("recover-right", (right_waypoint, goal)),
+    ),
+    planning_context=planning,
+    execute=True,
+)
+
+closed_loop = rollout_route_with_replanning(
+    env,
+    scene_id="outdoor-demo",
+    initial_route=plan.selected,
+    replan_candidate_batches=((RouteCandidate("detour", (waypoint, goal)),),),
+)
+```
+
 Supported actions:
 
 - `twist`: `linearX`, `linearY`, `linearZ` or `vx`, `vy`, `vz`
@@ -206,4 +231,4 @@ The backend always blocks poses outside `SceneEnvironment.bounds`. When a `Voxel
 
 ## Next Implementation Layer
 
-The next useful layer is closed-loop replanning: feed blocked rollout steps back into route candidate generation and re-score alternatives from the last applied pose.
+The next useful layer is learned policy integration: expose these planning, rollout, and replanning records as compact observations/rewards for Physical AI agents.

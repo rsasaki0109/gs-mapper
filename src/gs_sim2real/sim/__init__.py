@@ -64,6 +64,14 @@ from .route_planning import (
     RoutePlan,
     select_best_route,
 )
+from .route_replanning import (
+    ClosedLoopRouteRollout,
+    RouteReplanResult,
+    last_applied_route_pose,
+    reanchor_route_candidates,
+    replan_after_blocked_rollout,
+    rollout_route_with_replanning,
+)
 
 __all__ = [
     "DEFAULT_SITE_URL",
@@ -71,6 +79,7 @@ __all__ = [
     "AxisAlignedBounds",
     "CollisionQuery",
     "CoordinateFrame",
+    "ClosedLoopRouteRollout",
     "EvaluationTask",
     "HeadlessEnvironmentState",
     "HeadlessPhysicalAIEnvironment",
@@ -87,6 +96,7 @@ __all__ = [
     "RouteCandidate",
     "RouteEvaluation",
     "RoutePlan",
+    "RouteReplanResult",
     "RouteRollout",
     "RouteStepOutcome",
     "SceneEnvironment",
@@ -105,14 +115,18 @@ __all__ = [
     "build_occupancy_grid_from_lidar_observation",
     "build_simulation_catalog",
     "decode_lidar_points_observation",
+    "last_applied_route_pose",
     "load_scene_picker_catalog",
     "load_splat_point_cloud",
     "load_simulation_catalog_from_scene_picker",
     "render_splat_point_cloud",
     "render_simulation_catalog_json",
     "point_to_voxel_cell",
+    "reanchor_route_candidates",
+    "replan_after_blocked_rollout",
     "resolve_scene_asset_path",
     "rollout_route",
+    "rollout_route_with_replanning",
     "select_best_route",
     "summarize_collision_queries",
 ]
