@@ -25,6 +25,7 @@ from gs_sim2real.sim import (
     RoutePolicyRegistryEntry,
     RoutePolicyScenarioMatrix,
     RoutePolicyScenarioSet,
+    RoutePolicyScenarioCIWorkflowConfig,
     RoutePolicyScenarioSpec,
     RouteRewardWeights,
     build_route_policy_benchmark_history,
@@ -38,6 +39,7 @@ from gs_sim2real.sim import (
     load_route_policy_imitation_model_json,
     load_route_policy_registry_json,
     load_route_policy_scenario_ci_manifest_json,
+    load_route_policy_scenario_ci_workflow_json,
     load_route_policy_scenario_matrix_expansion_json,
     load_route_policy_scenario_matrix_json,
     load_route_policy_scenario_set_run_json,
@@ -47,6 +49,7 @@ from gs_sim2real.sim import (
     render_route_policy_benchmark_history_markdown,
     render_route_policy_benchmark_markdown,
     render_route_policy_scenario_ci_manifest_markdown,
+    render_route_policy_scenario_ci_workflow_markdown,
     render_route_policy_scenario_matrix_markdown,
     render_route_policy_scenario_set_markdown,
     render_route_policy_scenario_shard_merge_markdown,
@@ -54,11 +57,14 @@ from gs_sim2real.sim import (
     run_route_policy_imitation_benchmark,
     run_route_policy_registry_benchmark,
     run_route_policy_scenario_set,
+    materialize_route_policy_scenario_ci_workflow,
     write_route_policy_benchmark_history_json,
     write_route_policy_goal_suite_json,
     write_route_policy_imitation_model_json,
     write_route_policy_registry_json,
     write_route_policy_scenario_ci_manifest_json,
+    write_route_policy_scenario_ci_workflow_json,
+    write_route_policy_scenario_ci_workflow_yaml,
     write_route_policy_scenario_matrix_expansion_json,
     write_route_policy_scenario_matrix_json,
     write_route_policy_scenario_set_json,
@@ -1134,6 +1140,187 @@ def test_route_policy_scenario_ci_manifest_cli_writes_manifest(tmp_path: Path) -
     assert manifest["mergeJob"]["dependsOn"] == [manifest["shardJobs"][0]["jobId"]]
     assert "--fail-on-regression" in manifest["mergeJob"]["command"]
     assert "Route Policy Scenario CI Manifest: unit-cli-ci-manifest" in markdown_path.read_text(encoding="utf-8")
+
+
+def test_route_policy_scenario_ci_workflow_materializes_github_actions_yaml(tmp_path: Path) -> None:
+    catalog_path = write_unit_scene_catalog(tmp_path / "scenes.json")
+    write_route_policy_registry_json(
+        tmp_path / "registry.json",
+        RoutePolicyRegistry(
+            registry_id="unit-workflow-registry",
+            policies=(RoutePolicyRegistryEntry(policy_name="direct", policy_type="direct-goal"),),
+        ),
+    )
+    write_route_policy_goal_suite_json(
+        tmp_path / "near-goals.json",
+        RoutePolicyGoalSuite(
+            suite_id="near-goals",
+            scene_id="unit-scene",
+            frame_id="generic_world",
+            goals=(RoutePolicyGoalSpec("near", (0.25, 0.0, 0.0)),),
+        ),
+    )
+    expansion = expand_route_policy_scenario_matrix_to_directory(
+        RoutePolicyScenarioMatrix(
+            matrix_id="unit-workflow-matrix",
+            registries=(RoutePolicyMatrixRegistrySpec("direct", "registry.json"),),
+            scenes=(RoutePolicyMatrixSceneSpec("unit", catalog_path.name, scene_id="unit-scene"),),
+            goal_suites=(RoutePolicyMatrixGoalSuiteSpec("near", "near-goals.json"),),
+            configs=(RoutePolicyMatrixConfigSpec("short", episode_count=1, seed_start=0, max_steps=4),),
+        ),
+        tmp_path / "generated",
+        matrix_base_path=tmp_path,
+    )
+    plan = write_route_policy_scenario_shards_from_expansion(
+        expansion,
+        tmp_path / "shards",
+        max_scenarios_per_shard=1,
+        shard_plan_id="unit-workflow-shards",
+    )
+    manifest = build_route_policy_scenario_ci_manifest(
+        plan,
+        manifest_id="unit-workflow-manifest",
+        report_dir="ci/reports",
+        run_output_dir="ci/runs",
+        history_output_dir="ci/histories",
+        merge_id="unit-workflow-merge",
+        merge_output="ci/merge.json",
+        merge_history_output="ci/history.json",
+        cache_key_prefix="unit-cache",
+        fail_on_regression=True,
+    )
+
+    materialization = materialize_route_policy_scenario_ci_workflow(
+        manifest,
+        config=RoutePolicyScenarioCIWorkflowConfig(
+            workflow_id="unit-workflow",
+            workflow_name="Unit Scenario Workflow",
+            artifact_root="ci",
+            push_branches=("main",),
+            pull_request_branches=("main",),
+            artifact_retention_days=3,
+        ),
+    )
+    workflow_path = write_route_policy_scenario_ci_workflow_yaml(tmp_path / "workflow.yml", materialization)
+    materialization_path = write_route_policy_scenario_ci_workflow_json(tmp_path / "workflow.json", materialization)
+    loaded = load_route_policy_scenario_ci_workflow_json(materialization_path)
+    workflow = workflow_path.read_text(encoding="utf-8")
+
+    assert loaded.workflow_id == "unit-workflow"
+    assert loaded.config.artifact_root == "ci"
+    assert "name: 'Unit Scenario Workflow'" in workflow
+    assert "workflow_dispatch: {}" in workflow
+    assert "push:" in workflow
+    assert "pull_request:" in workflow
+    assert "route-policy-scenario-shards:" in workflow
+    assert "matrix:" in workflow
+    assert "shardId: 'unit-workflow-matrix-direct-shard-001'" in workflow
+    assert "run: |" in workflow
+    assert "route-policy-scenario-set" in workflow
+    assert "actions/upload-artifact@v4" in workflow
+    assert "path: 'ci'" in workflow
+    assert "actions/download-artifact@v4" in workflow
+    assert "route-policy-scenario-shard-merge" in workflow
+    assert "Route Policy Scenario CI Workflow: unit-workflow" in render_route_policy_scenario_ci_workflow_markdown(
+        loaded
+    )
+
+
+def test_route_policy_scenario_ci_workflow_cli_writes_yaml_and_index(tmp_path: Path) -> None:
+    catalog_path = write_unit_scene_catalog(tmp_path / "scenes.json")
+    write_route_policy_registry_json(
+        tmp_path / "registry.json",
+        RoutePolicyRegistry(
+            registry_id="unit-cli-workflow-registry",
+            policies=(RoutePolicyRegistryEntry(policy_name="direct", policy_type="direct-goal"),),
+        ),
+    )
+    write_route_policy_goal_suite_json(
+        tmp_path / "near-goals.json",
+        RoutePolicyGoalSuite(
+            suite_id="near-goals",
+            scene_id="unit-scene",
+            frame_id="generic_world",
+            goals=(RoutePolicyGoalSpec("near", (0.25, 0.0, 0.0)),),
+        ),
+    )
+    expansion = expand_route_policy_scenario_matrix_to_directory(
+        RoutePolicyScenarioMatrix(
+            matrix_id="unit-cli-workflow-matrix",
+            registries=(RoutePolicyMatrixRegistrySpec("direct", "registry.json"),),
+            scenes=(RoutePolicyMatrixSceneSpec("unit", catalog_path.name, scene_id="unit-scene"),),
+            goal_suites=(RoutePolicyMatrixGoalSuiteSpec("near", "near-goals.json"),),
+            configs=(RoutePolicyMatrixConfigSpec("short", episode_count=1, seed_start=0, max_steps=4),),
+        ),
+        tmp_path / "generated",
+        matrix_base_path=tmp_path,
+    )
+    plan = write_route_policy_scenario_shards_from_expansion(
+        expansion,
+        tmp_path / "shards",
+        max_scenarios_per_shard=1,
+        shard_plan_id="unit-cli-workflow-shards",
+    )
+    manifest = build_route_policy_scenario_ci_manifest(
+        plan,
+        manifest_id="unit-cli-workflow-manifest",
+        report_dir="ci/reports",
+        run_output_dir="ci/runs",
+        history_output_dir="ci/histories",
+        merge_id="unit-cli-workflow-merge",
+        merge_output="ci/merge.json",
+        merge_history_output="ci/history.json",
+    )
+    manifest_path = write_route_policy_scenario_ci_manifest_json(tmp_path / "ci-manifest.json", manifest)
+    workflow_path = tmp_path / "workflow.yml"
+    index_path = tmp_path / "workflow.json"
+    markdown_path = tmp_path / "workflow.md"
+    args = build_parser().parse_args(
+        [
+            "route-policy-scenario-ci-workflow",
+            "--manifest",
+            str(manifest_path),
+            "--workflow-id",
+            "unit-cli-workflow",
+            "--workflow-name",
+            "Unit CLI Scenario Workflow",
+            "--runs-on",
+            "ubuntu-latest",
+            "--python-version",
+            "3.12",
+            "--install-command",
+            "pip install -e .",
+            "--artifact-root",
+            "ci",
+            "--artifact-retention-days",
+            "5",
+            "--push-branch",
+            "main",
+            "--pull-request-branch",
+            "main",
+            "--fail-fast",
+            "--workflow-output",
+            str(workflow_path),
+            "--index-output",
+            str(index_path),
+            "--markdown-output",
+            str(markdown_path),
+        ]
+    )
+
+    cli.cmd_route_policy_scenario_ci_workflow(args)
+    workflow = workflow_path.read_text(encoding="utf-8")
+    index = json.loads(index_path.read_text(encoding="utf-8"))
+
+    assert index["recordType"] == "route-policy-scenario-ci-workflow"
+    assert index["workflowId"] == "unit-cli-workflow"
+    assert index["workflowPath"] == workflow_path.as_posix()
+    assert index["config"]["pythonVersion"] == "3.12"
+    assert index["config"]["failFast"] is True
+    assert "name: 'Unit CLI Scenario Workflow'" in workflow
+    assert "fail-fast: true" in workflow
+    assert "pip install -e ." in workflow
+    assert "Route Policy Scenario CI Workflow: unit-cli-workflow" in markdown_path.read_text(encoding="utf-8")
 
 
 def target_position_keys() -> tuple[str, str, str]:

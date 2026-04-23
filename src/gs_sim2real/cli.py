@@ -1358,6 +1358,48 @@ def build_parser() -> argparse.ArgumentParser:
     )
     rpsci.add_argument("--markdown-output", default=None, help="Optional scenario CI manifest Markdown path")
 
+    # route policy scenario CI workflow
+    rpswf = subparsers.add_parser(
+        "route-policy-scenario-ci-workflow",
+        help="Materialize a GitHub Actions workflow from a route policy scenario CI manifest",
+    )
+    rpswf.add_argument("--manifest", required=True, help="Route policy scenario CI manifest JSON")
+    rpswf.add_argument("--workflow-id", default="route-policy-scenario-shards", help="Workflow materialization id")
+    rpswf.add_argument("--workflow-name", default="Route Policy Scenario Shards", help="GitHub Actions workflow name")
+    rpswf.add_argument("--runs-on", default="ubuntu-latest", help="GitHub Actions runner label")
+    rpswf.add_argument("--python-version", default="3.11", help="Python version used by generated jobs")
+    rpswf.add_argument("--install-command", default='pip install -e ".[dev]"', help="Dependency install shell command")
+    rpswf.add_argument(
+        "--artifact-root",
+        default=None,
+        help="Artifact root path to upload/download; defaults to the common shard output root",
+    )
+    rpswf.add_argument("--artifact-retention-days", type=int, default=7, help="Shard artifact retention in days")
+    rpswf.add_argument(
+        "--no-workflow-dispatch",
+        action="store_true",
+        help="Do not include the workflow_dispatch trigger",
+    )
+    rpswf.add_argument("--push-branch", action="append", default=None, help="Add a push trigger branch")
+    rpswf.add_argument(
+        "--pull-request-branch",
+        action="append",
+        default=None,
+        help="Add a pull_request trigger branch",
+    )
+    rpswf.add_argument("--fail-fast", action="store_true", help="Enable strategy fail-fast for shard jobs")
+    rpswf.add_argument(
+        "--workflow-output",
+        default="outputs/route_policy_scenarios/scenario_ci_workflow.yml",
+        help="Generated GitHub Actions workflow YAML path",
+    )
+    rpswf.add_argument(
+        "--index-output",
+        default="outputs/route_policy_scenarios/scenario_ci_workflow.json",
+        help="Workflow materialization metadata JSON path",
+    )
+    rpswf.add_argument("--markdown-output", default=None, help="Optional workflow materialization Markdown path")
+
     # experiment labs — specs drive a nested `experiment` subparser plus
     # hidden top-level aliases for back-compat.
     experiment_specs: list[tuple[str, str, str]] = [
@@ -2296,6 +2338,13 @@ def cmd_route_policy_scenario_ci_manifest(args: argparse.Namespace) -> None:
     run_cli(args)
 
 
+def cmd_route_policy_scenario_ci_workflow(args: argparse.Namespace) -> None:
+    """Handle the route-policy-scenario-ci-workflow subcommand."""
+    from gs_sim2real.sim.policy_scenario_ci_workflow import run_cli
+
+    run_cli(args)
+
+
 def cmd_experiment(args: argparse.Namespace) -> None:
     """Handle the nested `experiment` subcommand by deferring to the legacy handler."""
     handler_map = {
@@ -2475,6 +2524,7 @@ def main(argv: list[str] | None = None) -> None:
         "route-policy-benchmark": cmd_route_policy_benchmark,
         "route-policy-benchmark-history": cmd_route_policy_benchmark_history,
         "route-policy-scenario-ci-manifest": cmd_route_policy_scenario_ci_manifest,
+        "route-policy-scenario-ci-workflow": cmd_route_policy_scenario_ci_workflow,
         "route-policy-scenario-matrix": cmd_route_policy_scenario_matrix,
         "route-policy-scenario-shard-merge": cmd_route_policy_scenario_shard_merge,
         "route-policy-scenario-shards": cmd_route_policy_scenario_shards,

@@ -176,6 +176,12 @@ class TestCLIHelp:
             main(["route-policy-scenario-ci-manifest", "--help"])
         assert exc_info.value.code == 0
 
+    def test_cli_route_policy_scenario_ci_workflow_help(self) -> None:
+        """Running route-policy-scenario-ci-workflow --help raises SystemExit(0)."""
+        with pytest.raises(SystemExit) as exc_info:
+            main(["route-policy-scenario-ci-workflow", "--help"])
+        assert exc_info.value.code == 0
+
     def test_cli_experiment_localization_alignment_help(self) -> None:
         """Running experiment-localization-alignment --help raises SystemExit(0)."""
         with pytest.raises(SystemExit) as exc_info:
@@ -2085,6 +2091,57 @@ class TestCLIHelp:
         assert args.fail_on_regression is True
         assert args.output == "manifest.json"
         assert args.markdown_output == "manifest.md"
+
+    def test_cli_route_policy_scenario_ci_workflow_flags(self) -> None:
+        """route-policy-scenario-ci-workflow parser accepts workflow materialization settings."""
+        args = build_parser().parse_args(
+            [
+                "route-policy-scenario-ci-workflow",
+                "--manifest",
+                "manifest.json",
+                "--workflow-id",
+                "unit-workflow",
+                "--workflow-name",
+                "Unit Workflow",
+                "--runs-on",
+                "ubuntu-24.04",
+                "--python-version",
+                "3.12",
+                "--install-command",
+                "pip install -e .",
+                "--artifact-root",
+                "ci",
+                "--artifact-retention-days",
+                "5",
+                "--no-workflow-dispatch",
+                "--push-branch",
+                "main",
+                "--pull-request-branch",
+                "main",
+                "--fail-fast",
+                "--workflow-output",
+                "workflow.yml",
+                "--index-output",
+                "workflow.json",
+                "--markdown-output",
+                "workflow.md",
+            ]
+        )
+        assert args.manifest == "manifest.json"
+        assert args.workflow_id == "unit-workflow"
+        assert args.workflow_name == "Unit Workflow"
+        assert args.runs_on == "ubuntu-24.04"
+        assert args.python_version == "3.12"
+        assert args.install_command == "pip install -e ."
+        assert args.artifact_root == "ci"
+        assert args.artifact_retention_days == 5
+        assert args.no_workflow_dispatch is True
+        assert args.push_branch == ["main"]
+        assert args.pull_request_branch == ["main"]
+        assert args.fail_fast is True
+        assert args.workflow_output == "workflow.yml"
+        assert args.index_output == "workflow.json"
+        assert args.markdown_output == "workflow.md"
 
     def test_cli_experiment_localization_alignment_flags(self) -> None:
         """experiment-localization-alignment parser accepts evaluation settings."""

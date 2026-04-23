@@ -161,6 +161,7 @@ from gs_sim2real.sim import (
     RoutePolicyScenarioMatrix,
     RoutePolicyScenarioSet,
     RoutePolicyScenarioSpec,
+    RoutePolicyScenarioCIWorkflowConfig,
     build_route_policy_scenario_ci_manifest,
     build_route_policy_scenario_shard_plan,
     build_route_policy_benchmark_history,
@@ -179,18 +180,21 @@ from gs_sim2real.sim import (
     load_route_policy_imitation_model_json,
     load_route_policy_registry_json,
     load_route_policy_scenario_ci_manifest_json,
+    load_route_policy_scenario_ci_workflow_json,
     load_route_policy_scenario_matrix_json,
     load_route_policy_scenario_set_json,
     load_route_policy_scenario_set_run_json,
     load_route_policy_scenario_shard_plan_json,
     iter_route_policy_replay_batches,
     load_route_policy_transitions_jsonl,
+    materialize_route_policy_scenario_ci_workflow,
     merge_route_policy_scenario_shard_run_jsons,
     replan_after_blocked_rollout,
     render_route_policy_benchmark_history_markdown,
     render_route_policy_benchmark_markdown,
     render_route_policy_quality_markdown,
     render_route_policy_scenario_ci_manifest_markdown,
+    render_route_policy_scenario_ci_workflow_markdown,
     render_route_policy_scenario_matrix_markdown,
     render_route_policy_scenario_set_markdown,
     render_route_policy_scenario_shard_merge_markdown,
@@ -207,6 +211,8 @@ from gs_sim2real.sim import (
     write_route_policy_imitation_model_json,
     write_route_policy_registry_json,
     write_route_policy_scenario_ci_manifest_json,
+    write_route_policy_scenario_ci_workflow_json,
+    write_route_policy_scenario_ci_workflow_yaml,
     write_route_policy_scenario_matrix_expansion_json,
     write_route_policy_scenario_matrix_json,
     write_route_policy_scenario_set_json,
@@ -709,6 +715,40 @@ gs-mapper route-policy-scenario-ci-manifest \
   --markdown-output runs/scenarios/ci-manifest.md
 ```
 
+The manifest can also materialize a GitHub Actions workflow. By default the workflow is manual-only (`workflow_dispatch`) so generated YAML can be reviewed before enabling push or pull-request triggers.
+
+```python
+workflow = materialize_route_policy_scenario_ci_workflow(
+    ci_manifest,
+    config=RoutePolicyScenarioCIWorkflowConfig(
+        workflow_id="outdoor-demo-policy-shards",
+        workflow_name="Outdoor Demo Policy Shards",
+        artifact_root="runs/scenarios/ci",
+        push_branches=("main",),
+        pull_request_branches=("main",),
+    ),
+)
+write_route_policy_scenario_ci_workflow_yaml(
+    ".github/workflows/outdoor-demo-policy-shards.generated.yml",
+    workflow,
+)
+write_route_policy_scenario_ci_workflow_json("runs/scenarios/ci-workflow.json", workflow)
+print(render_route_policy_scenario_ci_workflow_markdown(workflow))
+```
+
+```bash
+gs-mapper route-policy-scenario-ci-workflow \
+  --manifest runs/scenarios/ci-manifest.json \
+  --workflow-id outdoor-demo-policy-shards \
+  --workflow-name "Outdoor Demo Policy Shards" \
+  --artifact-root runs/scenarios/ci \
+  --push-branch main \
+  --pull-request-branch main \
+  --workflow-output .github/workflows/outdoor-demo-policy-shards.generated.yml \
+  --index-output runs/scenarios/ci-workflow.json \
+  --markdown-output runs/scenarios/ci-workflow.md
+```
+
 Supported actions:
 
 - `twist`: `linearX`, `linearY`, `linearZ` or `vx`, `vy`, `vz`
@@ -718,4 +758,4 @@ The backend always blocks poses outside `SceneEnvironment.bounds`. When a `Voxel
 
 ## Next Implementation Layer
 
-The next useful layer is CI workflow materialization: convert the CI manifest into a generated GitHub Actions workflow or reusable workflow input bundle, so shard fan-out and merge fan-in can run without hand-written YAML drift.
+The next useful layer is generated workflow validation: lint the materialized YAML, dry-run command paths against the manifest, and check that every shard artifact path can be reconstructed before the workflow is committed.
