@@ -35,6 +35,7 @@ class QuerySourceIdentityFixture:
 
 
 EXPERIMENT_QUERY_SOURCE_IDENTITY_POLICIES: tuple[QuerySourceIdentityPolicy, ...] = CORE_QUERY_SOURCE_IDENTITY_POLICIES
+_RUNTIME_BATCH_SIZE = 128
 
 
 def build_query_source_identity_fixtures() -> list[QuerySourceIdentityFixture]:
@@ -124,16 +125,30 @@ def benchmark_query_source_identity_policy_runtime(
     *,
     repetitions: int,
 ) -> dict[str, float | int | None]:
-    """Measure source-identity policy runtime on shared fixtures."""
+    """Measure source-identity policy runtime on complete shared-fixture batches."""
     samples_ms: list[float] = []
+    fixture_count = len(fixtures)
+    calls_per_sample = _RUNTIME_BATCH_SIZE * fixture_count
+    if calls_per_sample <= 0:
+        return {
+            "repetitions": int(repetitions),
+            "sampleCount": 0,
+            "callsPerSample": 0,
+            "callCount": 0,
+            "meanMs": None,
+            "medianMs": None,
+        }
     for _ in range(max(1, int(repetitions))):
-        for fixture in fixtures:
-            started_at = perf_counter()
-            resolve_query_source_identity(fixture.request, policy=policy)
-            samples_ms.append(float((perf_counter() - started_at) * 1000.0))
+        started_at = perf_counter()
+        for _ in range(_RUNTIME_BATCH_SIZE):
+            for fixture in fixtures:
+                resolve_query_source_identity(fixture.request, policy=policy)
+        samples_ms.append(float((perf_counter() - started_at) * 1000.0 / calls_per_sample))
     return {
         "repetitions": int(repetitions),
         "sampleCount": len(samples_ms),
+        "callsPerSample": calls_per_sample,
+        "callCount": len(samples_ms) * calls_per_sample,
         "meanMs": float(mean(samples_ms)),
         "medianMs": float(median(samples_ms)),
     }
