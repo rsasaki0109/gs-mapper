@@ -39,10 +39,15 @@ from gs_sim2real.sim import (
     load_route_policy_scenario_matrix_expansion_json,
     load_route_policy_scenario_matrix_json,
     load_route_policy_scenario_set_run_json,
+    load_route_policy_scenario_shard_merge_json,
+    load_route_policy_scenario_shard_plan_json,
+    merge_route_policy_scenario_shard_run_jsons,
     render_route_policy_benchmark_history_markdown,
     render_route_policy_benchmark_markdown,
     render_route_policy_scenario_matrix_markdown,
     render_route_policy_scenario_set_markdown,
+    render_route_policy_scenario_shard_merge_markdown,
+    render_route_policy_scenario_shard_plan_markdown,
     run_route_policy_imitation_benchmark,
     run_route_policy_registry_benchmark,
     run_route_policy_scenario_set,
@@ -54,6 +59,9 @@ from gs_sim2real.sim import (
     write_route_policy_scenario_matrix_json,
     write_route_policy_scenario_set_json,
     write_route_policy_scenario_set_run_json,
+    write_route_policy_scenario_shard_merge_json,
+    write_route_policy_scenario_shard_plan_json,
+    write_route_policy_scenario_shards_from_expansion,
     write_route_policy_transitions_jsonl,
 )
 
@@ -762,6 +770,199 @@ def test_route_policy_scenario_matrix_cli_writes_generated_sets(tmp_path: Path) 
     assert expansion["scenarioCount"] == 1
     assert Path(expansion["outputs"][0]["scenarioSetPath"]).exists()
     assert "Route Policy Scenario Matrix: unit-cli-matrix" in markdown_path.read_text(encoding="utf-8")
+
+
+def test_route_policy_scenario_shards_split_and_merge_runs(tmp_path: Path) -> None:
+    catalog_path = write_unit_scene_catalog(tmp_path / "scenes.json")
+    registry_path = write_route_policy_registry_json(
+        tmp_path / "registry.json",
+        RoutePolicyRegistry(
+            registry_id="unit-shard-registry",
+            policies=(RoutePolicyRegistryEntry(policy_name="direct", policy_type="direct-goal"),),
+        ),
+    )
+    write_route_policy_goal_suite_json(
+        tmp_path / "near-goals.json",
+        RoutePolicyGoalSuite(
+            suite_id="near-goals",
+            scene_id="unit-scene",
+            frame_id="generic_world",
+            goals=(RoutePolicyGoalSpec("near", (0.25, 0.0, 0.0)),),
+        ),
+    )
+    write_route_policy_goal_suite_json(
+        tmp_path / "far-goals.json",
+        RoutePolicyGoalSuite(
+            suite_id="far-goals",
+            scene_id="unit-scene",
+            frame_id="generic_world",
+            goals=(RoutePolicyGoalSpec("far", (0.5, 0.0, 0.0)),),
+        ),
+    )
+    matrix = RoutePolicyScenarioMatrix(
+        matrix_id="unit-shard-matrix",
+        registries=(RoutePolicyMatrixRegistrySpec("direct", "registry.json"),),
+        scenes=(RoutePolicyMatrixSceneSpec("unit", catalog_path.name, scene_id="unit-scene"),),
+        goal_suites=(
+            RoutePolicyMatrixGoalSuiteSpec("near", "near-goals.json"),
+            RoutePolicyMatrixGoalSuiteSpec("far", "far-goals.json"),
+        ),
+        configs=(RoutePolicyMatrixConfigSpec("short", episode_count=1, seed_start=0, max_steps=4),),
+    )
+    expansion = expand_route_policy_scenario_matrix_to_directory(
+        matrix,
+        tmp_path / "generated",
+        matrix_base_path=tmp_path,
+    )
+    plan = write_route_policy_scenario_shards_from_expansion(
+        expansion,
+        tmp_path / "shards",
+        max_scenarios_per_shard=1,
+        shard_plan_id="unit-shards",
+    )
+    plan_path = write_route_policy_scenario_shard_plan_json(tmp_path / "shard-plan.json", plan)
+    loaded_plan = load_route_policy_scenario_shard_plan_json(plan_path)
+
+    assert loaded_plan.shard_count == 2
+    assert loaded_plan.scenario_count == 2
+    assert [shard.scenario_count for shard in loaded_plan.shards] == [1, 1]
+    assert all(shard.scenario_set_path is not None for shard in loaded_plan.shards)
+    assert all(Path(shard.scenario_set_path or "").exists() for shard in loaded_plan.shards)
+    assert loaded_plan.scenario_sets[0].policy_registry_path == "../registry.json"
+    assert "Route Policy Scenario Shards: unit-shards" in render_route_policy_scenario_shard_plan_markdown(loaded_plan)
+
+    registry = load_route_policy_registry_json(registry_path)
+    run_paths: list[Path] = []
+    for scenario_set in loaded_plan.scenario_sets:
+        run = run_route_policy_scenario_set(
+            scenario_set,
+            registry,
+            report_dir=tmp_path / "reports" / scenario_set.scenario_set_id,
+            scenario_set_base_path=tmp_path / "shards",
+            registry_base_path=tmp_path,
+            policy_registry_path=registry_path,
+            history_output=tmp_path / "histories" / f"{scenario_set.scenario_set_id}.json",
+            history_markdown_output=tmp_path / "histories" / f"{scenario_set.scenario_set_id}.md",
+        )
+        run_paths.append(
+            write_route_policy_scenario_set_run_json(tmp_path / "runs" / f"{scenario_set.scenario_set_id}.json", run)
+        )
+
+    merge = merge_route_policy_scenario_shard_run_jsons(
+        tuple(run_paths),
+        merge_id="unit-shard-merge",
+        history_output=tmp_path / "merged-history.json",
+        history_markdown_output=tmp_path / "merged-history.md",
+    )
+    merge_path = write_route_policy_scenario_shard_merge_json(tmp_path / "shard-merge.json", merge)
+    loaded_merge = load_route_policy_scenario_shard_merge_json(merge_path)
+
+    assert loaded_merge.passed
+    assert loaded_merge.shard_count == 2
+    assert loaded_merge.scenario_count == 2
+    assert loaded_merge.history.to_dict()["reportCount"] == 2
+    assert (tmp_path / "merged-history.json").exists()
+    assert "Route Policy Scenario Shard Merge: unit-shard-merge" in render_route_policy_scenario_shard_merge_markdown(
+        loaded_merge
+    )
+
+
+def test_route_policy_scenario_shards_cli_writes_plan_and_merge(tmp_path: Path) -> None:
+    catalog_path = write_unit_scene_catalog(tmp_path / "scenes.json")
+    registry_path = write_route_policy_registry_json(
+        tmp_path / "registry.json",
+        RoutePolicyRegistry(
+            registry_id="unit-cli-shard-registry",
+            policies=(RoutePolicyRegistryEntry(policy_name="direct", policy_type="direct-goal"),),
+        ),
+    )
+    write_route_policy_goal_suite_json(
+        tmp_path / "near-goals.json",
+        RoutePolicyGoalSuite(
+            suite_id="near-goals",
+            scene_id="unit-scene",
+            frame_id="generic_world",
+            goals=(RoutePolicyGoalSpec("near", (0.25, 0.0, 0.0)),),
+        ),
+    )
+    expansion = expand_route_policy_scenario_matrix_to_directory(
+        RoutePolicyScenarioMatrix(
+            matrix_id="unit-cli-shard-matrix",
+            registries=(RoutePolicyMatrixRegistrySpec("direct", "registry.json"),),
+            scenes=(RoutePolicyMatrixSceneSpec("unit", catalog_path.name, scene_id="unit-scene"),),
+            goal_suites=(RoutePolicyMatrixGoalSuiteSpec("near", "near-goals.json"),),
+            configs=(RoutePolicyMatrixConfigSpec("short", episode_count=1, seed_start=0, max_steps=4),),
+        ),
+        tmp_path / "generated",
+        matrix_base_path=tmp_path,
+    )
+    expansion_path = write_route_policy_scenario_matrix_expansion_json(tmp_path / "expansion.json", expansion)
+    plan_path = tmp_path / "shard-plan.json"
+    plan_markdown_path = tmp_path / "shard-plan.md"
+    plan_args = build_parser().parse_args(
+        [
+            "route-policy-scenario-shards",
+            "--expansion",
+            str(expansion_path),
+            "--max-scenarios-per-shard",
+            "1",
+            "--shard-plan-id",
+            "unit-cli-shards",
+            "--output-dir",
+            str(tmp_path / "shards"),
+            "--index-output",
+            str(plan_path),
+            "--markdown-output",
+            str(plan_markdown_path),
+        ]
+    )
+
+    cli.cmd_route_policy_scenario_shards(plan_args)
+    plan = load_route_policy_scenario_shard_plan_json(plan_path)
+
+    assert plan.shard_plan_id == "unit-cli-shards"
+    assert plan.shard_count == 1
+    assert "Route Policy Scenario Shards: unit-cli-shards" in plan_markdown_path.read_text(encoding="utf-8")
+
+    registry = load_route_policy_registry_json(registry_path)
+    run = run_route_policy_scenario_set(
+        plan.scenario_sets[0],
+        registry,
+        report_dir=tmp_path / "reports",
+        scenario_set_base_path=tmp_path / "shards",
+        registry_base_path=tmp_path,
+        policy_registry_path=registry_path,
+        history_output=tmp_path / "shard-history.json",
+    )
+    run_path = write_route_policy_scenario_set_run_json(tmp_path / "shard-run.json", run)
+    merge_path = tmp_path / "merge.json"
+    merge_markdown_path = tmp_path / "merge.md"
+    merged_history_path = tmp_path / "merged-history.json"
+    merge_args = build_parser().parse_args(
+        [
+            "route-policy-scenario-shard-merge",
+            "--run",
+            str(run_path),
+            "--merge-id",
+            "unit-cli-shard-merge",
+            "--history-output",
+            str(merged_history_path),
+            "--output",
+            str(merge_path),
+            "--markdown-output",
+            str(merge_markdown_path),
+        ]
+    )
+
+    cli.cmd_route_policy_scenario_shard_merge(merge_args)
+    merge = json.loads(merge_path.read_text(encoding="utf-8"))
+
+    assert merge["recordType"] == "route-policy-scenario-shard-merge"
+    assert merge["mergeId"] == "unit-cli-shard-merge"
+    assert merge["passed"] is True
+    assert merge["shardCount"] == 1
+    assert merged_history_path.exists()
+    assert "Route Policy Scenario Shard Merge: unit-cli-shard-merge" in merge_markdown_path.read_text(encoding="utf-8")
 
 
 def target_position_keys() -> tuple[str, str, str]:

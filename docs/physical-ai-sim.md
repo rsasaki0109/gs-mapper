@@ -161,6 +161,7 @@ from gs_sim2real.sim import (
     RoutePolicyScenarioMatrix,
     RoutePolicyScenarioSet,
     RoutePolicyScenarioSpec,
+    build_route_policy_scenario_shard_plan,
     build_route_policy_benchmark_history,
     build_occupancy_grid_from_lidar_observation,
     build_route_policy_replay_batch,
@@ -179,14 +180,18 @@ from gs_sim2real.sim import (
     load_route_policy_scenario_matrix_json,
     load_route_policy_scenario_set_json,
     load_route_policy_scenario_set_run_json,
+    load_route_policy_scenario_shard_plan_json,
     iter_route_policy_replay_batches,
     load_route_policy_transitions_jsonl,
+    merge_route_policy_scenario_shard_run_jsons,
     replan_after_blocked_rollout,
     render_route_policy_benchmark_history_markdown,
     render_route_policy_benchmark_markdown,
     render_route_policy_quality_markdown,
     render_route_policy_scenario_matrix_markdown,
     render_route_policy_scenario_set_markdown,
+    render_route_policy_scenario_shard_merge_markdown,
+    render_route_policy_scenario_shard_plan_markdown,
     run_route_policy_imitation_benchmark,
     run_route_policy_scenario_set,
     rollout_route,
@@ -202,6 +207,9 @@ from gs_sim2real.sim import (
     write_route_policy_scenario_matrix_json,
     write_route_policy_scenario_set_json,
     write_route_policy_scenario_set_run_json,
+    write_route_policy_scenario_shard_merge_json,
+    write_route_policy_scenario_shard_plan_json,
+    write_route_policy_scenario_shards_from_expansion,
     write_route_policy_transitions_jsonl,
 )
 
@@ -609,6 +617,59 @@ gs-mapper route-policy-scenario-matrix \
   --markdown-output runs/scenarios/matrix-expansion.md
 ```
 
+For CI-sized execution, split the generated scenario sets into shard scenario-set files. Each shard is still a normal `RoutePolicyScenarioSet`, so CI jobs can run shards with the existing `route-policy-scenario-set` command. The final merge step reads the shard run JSON files, collects every per-scenario benchmark report, and rebuilds one global history gate.
+
+```python
+shard_plan = write_route_policy_scenario_shards_from_expansion(
+    expansion,
+    "runs/scenarios/shards",
+    max_scenarios_per_shard=4,
+    shard_plan_id="outdoor-demo-shards",
+)
+write_route_policy_scenario_shard_plan_json("runs/scenarios/shard-plan.json", shard_plan)
+print(render_route_policy_scenario_shard_plan_markdown(shard_plan))
+
+# Run each shard independently with run_route_policy_scenario_set(...) or the CLI below.
+# Then merge all shard run JSON files:
+merge = merge_route_policy_scenario_shard_run_jsons(
+    (
+        "runs/scenarios/shard-runs/outdoor-matrix-direct-shard-001.json",
+        "runs/scenarios/shard-runs/outdoor-matrix-direct-shard-002.json",
+    ),
+    merge_id="outdoor-demo-shard-merge",
+    history_output="runs/scenarios/shard-history.json",
+    history_markdown_output="runs/scenarios/shard-history.md",
+)
+write_route_policy_scenario_shard_merge_json("runs/scenarios/shard-merge.json", merge)
+print(render_route_policy_scenario_shard_merge_markdown(merge))
+```
+
+```bash
+gs-mapper route-policy-scenario-shards \
+  --expansion runs/scenarios/matrix-expansion.json \
+  --max-scenarios-per-shard 4 \
+  --shard-plan-id outdoor-demo-shards \
+  --output-dir runs/scenarios/shards \
+  --index-output runs/scenarios/shard-plan.json \
+  --markdown-output runs/scenarios/shard-plan.md
+
+gs-mapper route-policy-scenario-set \
+  --scenario-set runs/scenarios/shards/outdoor-matrix-direct-shard-001.json \
+  --report-dir runs/scenarios/shard-reports/001 \
+  --output runs/scenarios/shard-runs/outdoor-matrix-direct-shard-001.json \
+  --history-output runs/scenarios/shard-runs/outdoor-matrix-direct-shard-001-history.json
+
+gs-mapper route-policy-scenario-shard-merge \
+  --run runs/scenarios/shard-runs/outdoor-matrix-direct-shard-001.json \
+  --run runs/scenarios/shard-runs/outdoor-matrix-direct-shard-002.json \
+  --merge-id outdoor-demo-shard-merge \
+  --history-output runs/scenarios/shard-history.json \
+  --history-markdown-output runs/scenarios/shard-history.md \
+  --output runs/scenarios/shard-merge.json \
+  --markdown-output runs/scenarios/shard-merge.md \
+  --fail-on-regression
+```
+
 Supported actions:
 
 - `twist`: `linearX`, `linearY`, `linearZ` or `vx`, `vy`, `vz`
@@ -618,4 +679,4 @@ The backend always blocks poses outside `SceneEnvironment.bounds`. When a `Voxel
 
 ## Next Implementation Layer
 
-The next useful layer is scenario execution sharding: split generated scenario sets into CI-sized shards, run them independently, and merge their history gates into one release-quality Physical AI benchmark summary.
+The next useful layer is CI matrix manifest generation: emit a compact job manifest from the shard plan, including shard ids, scenario-set paths, report paths, cache keys, and merge dependencies.

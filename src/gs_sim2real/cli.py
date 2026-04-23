@@ -1225,6 +1225,86 @@ def build_parser() -> argparse.ArgumentParser:
     )
     rpm.add_argument("--markdown-output", default=None, help="Optional scenario-matrix Markdown summary path")
 
+    # route policy scenario shards
+    rpsh = subparsers.add_parser(
+        "route-policy-scenario-shards",
+        help="Split generated route policy scenario sets into CI-sized shard JSON files",
+    )
+    rpsh.add_argument("--expansion", required=True, help="Route policy scenario-matrix expansion JSON")
+    rpsh.add_argument(
+        "--max-scenarios-per-shard",
+        type=int,
+        default=4,
+        help="Maximum scenarios to include in each generated shard scenario-set",
+    )
+    rpsh.add_argument("--shard-plan-id", default=None, help="Optional shard plan id")
+    rpsh.add_argument(
+        "--output-dir",
+        default="outputs/route_policy_scenarios/shards",
+        help="Directory for generated shard scenario-set JSON files",
+    )
+    rpsh.add_argument(
+        "--index-output",
+        default="outputs/route_policy_scenarios/scenario_shard_plan.json",
+        help="Scenario shard plan JSON path",
+    )
+    rpsh.add_argument("--markdown-output", default=None, help="Optional scenario shard plan Markdown path")
+
+    # route policy scenario shard merge
+    rpshm = subparsers.add_parser(
+        "route-policy-scenario-shard-merge",
+        help="Merge independently executed route policy scenario shard runs",
+    )
+    rpshm.add_argument("--run", action="append", required=True, help="Scenario-set shard run JSON; repeat per shard")
+    rpshm.add_argument("--merge-id", default="route-policy-scenario-shard-merge", help="Shard merge id")
+    rpshm.add_argument("--baseline-report", default=None, help="Blessed baseline report JSON for history gates")
+    rpshm.add_argument(
+        "--history-output",
+        default="outputs/route_policy_scenarios/shard_history.json",
+        help="Merged benchmark history JSON path",
+    )
+    rpshm.add_argument("--history-markdown-output", default=None, help="Optional merged history Markdown path")
+    rpshm.add_argument(
+        "--output",
+        default="outputs/route_policy_scenarios/scenario_shard_merge.json",
+        help="Scenario shard merge JSON path",
+    )
+    rpshm.add_argument("--markdown-output", default=None, help="Optional scenario shard merge Markdown path")
+    rpshm.add_argument("--max-success-rate-drop", type=float, default=0.0, help="Allowed baseline success-rate drop")
+    rpshm.add_argument(
+        "--max-collision-rate-increase",
+        type=float,
+        default=0.0,
+        help="Allowed baseline collision-rate increase",
+    )
+    rpshm.add_argument(
+        "--max-truncation-rate-increase",
+        type=float,
+        default=0.0,
+        help="Allowed baseline truncation-rate increase",
+    )
+    rpshm.add_argument(
+        "--max-mean-reward-drop",
+        type=float,
+        default=None,
+        help="Optional allowed baseline mean-reward drop",
+    )
+    rpshm.add_argument(
+        "--allow-missing-policies",
+        action="store_true",
+        help="Do not fail the merged history gate when a baseline policy is absent from a shard report",
+    )
+    rpshm.add_argument(
+        "--allow-report-failures",
+        action="store_true",
+        help="Do not fail the merged history gate when a shard benchmark report itself failed",
+    )
+    rpshm.add_argument(
+        "--fail-on-regression",
+        action="store_true",
+        help="Exit with status 2 when a shard or merged history regression gate fails",
+    )
+
     # experiment labs — specs drive a nested `experiment` subparser plus
     # hidden top-level aliases for back-compat.
     experiment_specs: list[tuple[str, str, str]] = [
@@ -2142,6 +2222,20 @@ def cmd_route_policy_scenario_matrix(args: argparse.Namespace) -> None:
     run_cli(args)
 
 
+def cmd_route_policy_scenario_shards(args: argparse.Namespace) -> None:
+    """Handle the route-policy-scenario-shards subcommand."""
+    from gs_sim2real.sim.policy_scenario_sharding import run_shard_plan_cli
+
+    run_shard_plan_cli(args)
+
+
+def cmd_route_policy_scenario_shard_merge(args: argparse.Namespace) -> None:
+    """Handle the route-policy-scenario-shard-merge subcommand."""
+    from gs_sim2real.sim.policy_scenario_sharding import run_shard_merge_cli
+
+    run_shard_merge_cli(args)
+
+
 def cmd_experiment(args: argparse.Namespace) -> None:
     """Handle the nested `experiment` subcommand by deferring to the legacy handler."""
     handler_map = {
@@ -2321,6 +2415,8 @@ def main(argv: list[str] | None = None) -> None:
         "route-policy-benchmark": cmd_route_policy_benchmark,
         "route-policy-benchmark-history": cmd_route_policy_benchmark_history,
         "route-policy-scenario-matrix": cmd_route_policy_scenario_matrix,
+        "route-policy-scenario-shard-merge": cmd_route_policy_scenario_shard_merge,
+        "route-policy-scenario-shards": cmd_route_policy_scenario_shards,
         "route-policy-scenario-set": cmd_route_policy_scenario_set,
         "experiment": cmd_experiment,
     }

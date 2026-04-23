@@ -158,6 +158,18 @@ class TestCLIHelp:
             main(["route-policy-scenario-matrix", "--help"])
         assert exc_info.value.code == 0
 
+    def test_cli_route_policy_scenario_shards_help(self) -> None:
+        """Running route-policy-scenario-shards --help raises SystemExit(0)."""
+        with pytest.raises(SystemExit) as exc_info:
+            main(["route-policy-scenario-shards", "--help"])
+        assert exc_info.value.code == 0
+
+    def test_cli_route_policy_scenario_shard_merge_help(self) -> None:
+        """Running route-policy-scenario-shard-merge --help raises SystemExit(0)."""
+        with pytest.raises(SystemExit) as exc_info:
+            main(["route-policy-scenario-shard-merge", "--help"])
+        assert exc_info.value.code == 0
+
     def test_cli_experiment_localization_alignment_help(self) -> None:
         """Running experiment-localization-alignment --help raises SystemExit(0)."""
         with pytest.raises(SystemExit) as exc_info:
@@ -1941,6 +1953,81 @@ class TestCLIHelp:
         assert args.output_dir == "generated"
         assert args.index_output == "matrix-expansion.json"
         assert args.markdown_output == "matrix-expansion.md"
+
+    def test_cli_route_policy_scenario_shards_flags(self) -> None:
+        """route-policy-scenario-shards parser accepts shard plan settings."""
+        args = build_parser().parse_args(
+            [
+                "route-policy-scenario-shards",
+                "--expansion",
+                "matrix-expansion.json",
+                "--max-scenarios-per-shard",
+                "3",
+                "--shard-plan-id",
+                "unit-shards",
+                "--output-dir",
+                "shards",
+                "--index-output",
+                "shard-plan.json",
+                "--markdown-output",
+                "shard-plan.md",
+            ]
+        )
+        assert args.expansion == "matrix-expansion.json"
+        assert args.max_scenarios_per_shard == 3
+        assert args.shard_plan_id == "unit-shards"
+        assert args.output_dir == "shards"
+        assert args.index_output == "shard-plan.json"
+        assert args.markdown_output == "shard-plan.md"
+
+    def test_cli_route_policy_scenario_shard_merge_flags(self) -> None:
+        """route-policy-scenario-shard-merge parser accepts merge gate settings."""
+        args = build_parser().parse_args(
+            [
+                "route-policy-scenario-shard-merge",
+                "--run",
+                "shard-a.json",
+                "--run",
+                "shard-b.json",
+                "--merge-id",
+                "unit-merge",
+                "--baseline-report",
+                "baseline.json",
+                "--history-output",
+                "history.json",
+                "--history-markdown-output",
+                "history.md",
+                "--output",
+                "merge.json",
+                "--markdown-output",
+                "merge.md",
+                "--max-success-rate-drop",
+                "0.05",
+                "--max-collision-rate-increase",
+                "0.01",
+                "--max-truncation-rate-increase",
+                "0.02",
+                "--max-mean-reward-drop",
+                "0.25",
+                "--allow-missing-policies",
+                "--allow-report-failures",
+                "--fail-on-regression",
+            ]
+        )
+        assert args.run == ["shard-a.json", "shard-b.json"]
+        assert args.merge_id == "unit-merge"
+        assert args.baseline_report == "baseline.json"
+        assert args.history_output == "history.json"
+        assert args.history_markdown_output == "history.md"
+        assert args.output == "merge.json"
+        assert args.markdown_output == "merge.md"
+        assert args.max_success_rate_drop == 0.05
+        assert args.max_collision_rate_increase == 0.01
+        assert args.max_truncation_rate_increase == 0.02
+        assert args.max_mean_reward_drop == 0.25
+        assert args.allow_missing_policies is True
+        assert args.allow_report_failures is True
+        assert args.fail_on_regression is True
 
     def test_cli_experiment_localization_alignment_flags(self) -> None:
         """experiment-localization-alignment parser accepts evaluation settings."""
