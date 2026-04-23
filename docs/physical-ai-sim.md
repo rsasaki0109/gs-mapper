@@ -146,6 +146,7 @@ from gs_sim2real.sim import (
     RobotFootprint,
     RouteCandidate,
     build_occupancy_grid_from_lidar_observation,
+    build_route_policy_sample,
     replan_after_blocked_rollout,
     rollout_route,
     rollout_route_with_replanning,
@@ -222,6 +223,15 @@ closed_loop = rollout_route_with_replanning(
 )
 ```
 
+For policy integration, compact the planning or rollout record into numeric features plus a scalar reward. This keeps agent-facing observations stable while preserving full debug records separately.
+
+```python
+sample = build_route_policy_sample(closed_loop)
+agent_observation = sample.observation.features
+agent_reward = sample.reward.reward
+agent_terminal = sample.reward.terminal
+```
+
 Supported actions:
 
 - `twist`: `linearX`, `linearY`, `linearZ` or `vx`, `vy`, `vz`
@@ -231,4 +241,4 @@ The backend always blocks poses outside `SceneEnvironment.bounds`. When a `Voxel
 
 ## Next Implementation Layer
 
-The next useful layer is learned policy integration: expose these planning, rollout, and replanning records as compact observations/rewards for Physical AI agents.
+The next useful layer is Gymnasium-style environment adapters: wrap reset/step around policy feedback samples so learned agents can consume GS Mapper scenes directly.

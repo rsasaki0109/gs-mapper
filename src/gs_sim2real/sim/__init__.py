@@ -42,6 +42,16 @@ from .planning import (
     OccupancyPlanningContext,
     PlanningViewpointKey,
 )
+from .policy_feedback import (
+    RoutePolicyObservation,
+    RoutePolicyReward,
+    RoutePolicySample,
+    RouteRewardWeights,
+    build_route_policy_batch,
+    build_route_policy_observation,
+    build_route_policy_sample,
+    score_route_policy_reward,
+)
 from .rendering import (
     ObservationRenderer,
     SplatAssetObservationRenderer,
@@ -96,7 +106,11 @@ __all__ = [
     "RouteCandidate",
     "RouteEvaluation",
     "RoutePlan",
+    "RoutePolicyObservation",
+    "RoutePolicyReward",
+    "RoutePolicySample",
     "RouteReplanResult",
+    "RouteRewardWeights",
     "RouteRollout",
     "RouteStepOutcome",
     "SceneEnvironment",
@@ -113,6 +127,9 @@ __all__ = [
     "VoxelOccupancyGrid",
     "build_route_actions",
     "build_occupancy_grid_from_lidar_observation",
+    "build_route_policy_batch",
+    "build_route_policy_observation",
+    "build_route_policy_sample",
     "build_simulation_catalog",
     "decode_lidar_points_observation",
     "last_applied_route_pose",
@@ -127,6 +144,7 @@ __all__ = [
     "resolve_scene_asset_path",
     "rollout_route",
     "rollout_route_with_replanning",
+    "score_route_policy_reward",
     "select_best_route",
     "summarize_collision_queries",
 ]
