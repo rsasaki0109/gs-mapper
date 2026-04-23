@@ -1,6 +1,6 @@
 # 屋外 3D Gaussian Splatting / Physical AI Simulation 開発計画
 
-更新日: 2026-04-23（Physical AI scenario CI / workflow review publishing 反映）
+更新日: 2026-04-23（Physical AI scenario CI / workflow review publishing / trigger promotion gate 反映）
 
 この文書は、GS Mapper の屋外 3DGS パイプラインと、その上に載せる Physical AI simulation / policy benchmark / scenario CI の現行計画をまとめる長めの handoff です。
 
@@ -23,8 +23,8 @@
 - Valid GNSS supervised MCD demo は `ntu_day_02`。production asset は `docs/assets/outdoor-demo/mcd-ntu-day02-supervised.splat`。
 - External SLAM import は VGGT-SLAM 2.0 / MASt3R-SLAM comparison splat まで実走済み。Pi3 / LoGeR profile も artifact resolver 側に候補追加済み。
 - 2026-04-23 時点では、屋外 3DGS だけでなく **Physical AI simulation benchmark environment** を目指す方向へ拡張中。
-- Route policy benchmark 系は、dataset / imitation / registry / benchmark / history / scenario-set / matrix / sharding / CI manifest / workflow materialization / validation / activation / review bundle まで分割済み。
-- 次に自然なのは **workflow trigger promotion**。manual-only workflow から PR / branch trigger へ広げる前に、review bundle PASS を promotion gate にする。
+- Route policy benchmark 系は、dataset / imitation / registry / benchmark / history / scenario-set / matrix / sharding / CI manifest / workflow materialization / validation / activation / review bundle / workflow trigger promotion gate まで分割済み。
+- 次に自然なのは、promotion report PASS 後に trigger-enabled workflow を再 materialize / activate する smoke recipe。matrix から promotion までを tiny fixture で一周できるようにする。
 
 ## 2. 現在の主戦場
 
@@ -36,6 +36,7 @@
 4. Scenario matrix を小さな shard に分け、CI で回す。
 5. CI workflow 自体も生成、検証、activation、review publishing の段階に分ける。
 6. Review bundle を GitHub Pages に出し、workflow trigger を広げる前に人間が inspected artifact を見られるようにする。
+7. Promotion report で PR / branch trigger へ広げてよいかを記録し、trigger-enabled workflow の adoption を分離する。
 
 この構成にした理由は、開発がスケールすると「1 個の巨大 E2E が落ちる」よりも、「小さい scenario / shard / validation / activation / review gate がどこで落ちたか分かる」方が速いからです。ユーザーが求めていた「モジュール分割、関数分割、クラス分割、依存の局所化、テスト単位の分離」「影響範囲を閉じ込め、検証単位を細かく設計する」は、この route policy scenario CI chain の設計方針そのものです。
 
@@ -257,7 +258,7 @@ registry + scenes + goal suites + configs
   -> workflow validation report
   -> workflow activation report
   -> Pages review bundle
-  -> trigger promotion
+  -> trigger promotion report
 ```
 
 ### 9.2 Modules
@@ -273,6 +274,7 @@ registry + scenes + goal suites + configs
 | Workflow validation | `policy_scenario_ci_workflow.py` | `route-policy-scenario-ci-workflow-validate` | validation JSON / Markdown |
 | Workflow activation | `policy_scenario_ci_activation.py` | `route-policy-scenario-ci-workflow-activate` | activation JSON / Markdown / active workflow YAML |
 | Review publishing | `policy_scenario_ci_review.py` | `route-policy-scenario-ci-review` | review JSON / Markdown / HTML bundle |
+| Workflow trigger promotion | `policy_scenario_ci_promotion.py` | `route-policy-scenario-ci-workflow-promote` | promotion JSON / Markdown |
 
 ### 9.3 Important contracts
 
@@ -281,6 +283,7 @@ registry + scenes + goal suites + configs
 - `RoutePolicyScenarioCIWorkflowValidationReport` は YAML parse / text checks / payload checks / manifest consistency を保持する。
 - `RoutePolicyScenarioCIWorkflowActivationReport` は validation PASS、source path、destination path、content equality、overwrite を gate 化する。
 - `RoutePolicyScenarioCIReviewArtifact` は shard merge / validation / activation を Pages 向け review bundle にまとめる。
+- `RoutePolicyScenarioCIWorkflowPromotionReport` は review PASS、history PASS、review URL、trigger mode、allowed branches を gate 化する。
 
 ### 9.4 Example commands
 
@@ -388,53 +391,54 @@ gs-mapper route-policy-scenario-ci-review \
   --fail-on-review
 ```
 
-### 9.5 Current next step: workflow trigger promotion
-
-次の実装単位は `policy_scenario_ci_promotion.py` になる見込み。
-
-目的:
-
-- Review bundle が PASS していることを確認する。
-- manual-only workflow から PR / branch trigger を有効化する判断を report 化する。
-- promotion report に review artifact URL、workflow id、manifest id、allowed branches、trigger mode を記録する。
-- promotion は active workflow YAML を直接 mutation するより、まずは **policy / report** として作る方が安全。
-
-想定 API:
-
-```python
-promotion = build_route_policy_scenario_ci_workflow_promotion(
-    review_artifact,
-    trigger_mode="pull-request",
-    branches=("main",),
-    review_url="https://rsasaki0109.github.io/gs-mapper/reviews/outdoor-demo-policy/",
-)
-write_route_policy_scenario_ci_workflow_promotion_json("runs/scenarios/ci-promotion.json", promotion)
-```
-
-想定 CLI:
+Workflow promotion:
 
 ```bash
 gs-mapper route-policy-scenario-ci-workflow-promote \
   --review runs/scenarios/ci-review.json \
   --review-url https://rsasaki0109.github.io/gs-mapper/reviews/outdoor-demo-policy/ \
   --trigger-mode pull-request \
-  --branch main \
-  --output runs/scenarios/ci-promotion.json \
-  --markdown-output runs/scenarios/ci-promotion.md \
+  --pull-request-branch main \
+  --output runs/scenarios/ci-workflow-promotion.json \
+  --markdown-output runs/scenarios/ci-workflow-promotion.md \
   --fail-on-promotion
 ```
 
-Promotion で見るべき checks:
+### 9.5 Current next step: promotion-backed workflow adoption
+
+目的:
+
+- Promotion report が PASS したあとに、trigger-enabled workflow を再 materialize / validate / activate する手順を固定する。
+- tiny fixture で matrix expansion から promotion までを一周する smoke recipe を追加する。
+- adoption 手順は active workflow YAML を直接 mutation せず、manual-only workflow と trigger-enabled workflow の差分が review できる形にする。
+
+実装済み API:
+
+```python
+promotion = promote_route_policy_scenario_ci_workflow(
+    review_artifact,
+    trigger_mode="pull-request",
+    pull_request_branches=("main",),
+    review_url="https://rsasaki0109.github.io/gs-mapper/reviews/outdoor-demo-policy/",
+)
+write_route_policy_scenario_ci_workflow_promotion_json(
+    "runs/scenarios/ci-workflow-promotion.json",
+    promotion,
+)
+```
+
+Promotion checks:
 
 - review artifact が PASS。
 - validation が PASS。
 - activation が ACTIVE。
 - shard merge が PASS。
 - history gate が PASS。
-- review URL が空ではない。
+- review URL が absolute http(s) URL。
 - trigger mode が allowed set。
-- branches が空でない。
-- workflow id / manifest id が stable。
+- trigger mode に必要な branches が空でない。
+- branches が literal branch name policy を満たす。
+- active workflow path が `.github/workflows/*.yml` / `.yaml` に閉じている。
 
 ## 10. Public / Launch Track
 
@@ -552,7 +556,7 @@ python3 scripts/collect_mcd_quality_runs.py --format gate --fail-on-gate
 
 | Task | Why | Suggested slice |
 | --- | --- | --- |
-| Workflow trigger promotion report | Review bundle までできたので、manual-only から PR/branch trigger へ安全に進める gate が必要 | `policy_scenario_ci_promotion.py` + CLI + tests |
+| Promotion-backed workflow adoption recipe | promotion report PASS 後に trigger-enabled workflow を安全に再 materialize / activate する手順が必要 | docs + tiny smoke fixture |
 | Scenario CI docs tightening | `physical-ai-sim.md` に実装はあるが、README からの導線は薄い | README に Physical AI benchmark section を追加 |
 | Review bundle sample under docs | Synthetic fixture でもよいので Pages の `/reviews/` 例を置くか判断 | まず generated sample は commit しない方針で検討 |
 | Route policy CI smoke recipe | 最小 fixture で matrix→shard→manifest→workflow→review を一周する script | `scripts/smoke_route_policy_scenario_ci.py` |

@@ -164,6 +164,7 @@ from gs_sim2real.sim import (
     RoutePolicyScenarioCIReviewArtifact,
     RoutePolicyScenarioCIWorkflowConfig,
     RoutePolicyScenarioCIWorkflowActivationReport,
+    RoutePolicyScenarioCIWorkflowPromotionReport,
     RoutePolicyScenarioCIWorkflowValidationReport,
     activate_route_policy_scenario_ci_workflow,
     build_route_policy_scenario_ci_manifest,
@@ -188,6 +189,7 @@ from gs_sim2real.sim import (
     load_route_policy_scenario_ci_review_json,
     load_route_policy_scenario_ci_workflow_activation_json,
     load_route_policy_scenario_ci_workflow_json,
+    load_route_policy_scenario_ci_workflow_promotion_json,
     load_route_policy_scenario_ci_workflow_validation_json,
     load_route_policy_scenario_matrix_json,
     load_route_policy_scenario_set_json,
@@ -197,6 +199,7 @@ from gs_sim2real.sim import (
     load_route_policy_transitions_jsonl,
     materialize_route_policy_scenario_ci_workflow,
     merge_route_policy_scenario_shard_run_jsons,
+    promote_route_policy_scenario_ci_workflow,
     replan_after_blocked_rollout,
     render_route_policy_benchmark_history_markdown,
     render_route_policy_benchmark_markdown,
@@ -206,6 +209,7 @@ from gs_sim2real.sim import (
     render_route_policy_scenario_ci_review_markdown,
     render_route_policy_scenario_ci_workflow_activation_markdown,
     render_route_policy_scenario_ci_workflow_markdown,
+    render_route_policy_scenario_ci_workflow_promotion_markdown,
     render_route_policy_scenario_ci_workflow_validation_markdown,
     render_route_policy_scenario_matrix_markdown,
     render_route_policy_scenario_set_markdown,
@@ -228,6 +232,7 @@ from gs_sim2real.sim import (
     write_route_policy_scenario_ci_review_json,
     write_route_policy_scenario_ci_workflow_activation_json,
     write_route_policy_scenario_ci_workflow_json,
+    write_route_policy_scenario_ci_workflow_promotion_json,
     write_route_policy_scenario_ci_workflow_validation_json,
     write_route_policy_scenario_ci_workflow_yaml,
     write_route_policy_scenario_matrix_expansion_json,
@@ -846,6 +851,33 @@ gs-mapper route-policy-scenario-ci-review \
   --fail-on-review
 ```
 
+Before widening from manual dispatch to repository triggers, write a promotion report. The gate requires the review to pass, validation and activation to be green, shard merge and history checks to pass, the active workflow path to stay under `.github/workflows/`, a published review URL, and literal branch names for the requested trigger mode.
+
+```python
+promotion = promote_route_policy_scenario_ci_workflow(
+    review,
+    trigger_mode="pull-request",
+    pull_request_branches=("main",),
+    review_url="https://example.github.io/gs-mapper/reviews/outdoor-demo-policy/",
+)
+write_route_policy_scenario_ci_workflow_promotion_json(
+    "runs/scenarios/ci-workflow-promotion.json",
+    promotion,
+)
+print(render_route_policy_scenario_ci_workflow_promotion_markdown(promotion))
+```
+
+```bash
+gs-mapper route-policy-scenario-ci-workflow-promote \
+  --review runs/scenarios/ci-review.json \
+  --review-url https://example.github.io/gs-mapper/reviews/outdoor-demo-policy/ \
+  --trigger-mode pull-request \
+  --pull-request-branch main \
+  --output runs/scenarios/ci-workflow-promotion.json \
+  --markdown-output runs/scenarios/ci-workflow-promotion.md \
+  --fail-on-promotion
+```
+
 Supported actions:
 
 - `twist`: `linearX`, `linearY`, `linearZ` or `vx`, `vy`, `vz`
@@ -855,4 +887,4 @@ The backend always blocks poses outside `SceneEnvironment.bounds`. When a `Voxel
 
 ## Next Implementation Layer
 
-The next useful layer is workflow trigger promotion: move from manual-only dispatch to controlled pull-request or branch triggers only after the review bundle passes, while keeping the review artifact URL attached to the generated workflow change.
+The next useful layer is a smoke recipe that runs matrix expansion through promotion on tiny fixtures, then documents the exact handoff for re-materializing and activating a trigger-enabled workflow after the promotion report passes.

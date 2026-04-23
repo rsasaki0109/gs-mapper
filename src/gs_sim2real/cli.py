@@ -1476,6 +1476,39 @@ def build_parser() -> argparse.ArgumentParser:
         help="Exit with status 2 when the scenario CI review does not pass",
     )
 
+    # route policy scenario CI workflow trigger promotion
+    rpswfp = subparsers.add_parser(
+        "route-policy-scenario-ci-workflow-promote",
+        help="Gate promotion of scenario CI workflow triggers after review passes",
+    )
+    rpswfp.add_argument("--review", required=True, help="Scenario CI review JSON")
+    rpswfp.add_argument("--review-url", default=None, help="Published review URL attached to the promotion gate")
+    rpswfp.add_argument("--promotion-id", default=None, help="Optional workflow promotion report id")
+    rpswfp.add_argument(
+        "--trigger-mode",
+        choices=("pull-request", "push", "push-and-pull-request"),
+        default="pull-request",
+        help="Repository trigger mode to promote",
+    )
+    rpswfp.add_argument("--push-branch", action="append", default=None, help="Add a literal push trigger branch")
+    rpswfp.add_argument(
+        "--pull-request-branch",
+        action="append",
+        default=None,
+        help="Add a literal pull_request trigger branch",
+    )
+    rpswfp.add_argument(
+        "--output",
+        default="outputs/route_policy_scenarios/scenario_ci_workflow_promotion.json",
+        help="Workflow promotion report JSON path",
+    )
+    rpswfp.add_argument("--markdown-output", default=None, help="Optional workflow promotion Markdown path")
+    rpswfp.add_argument(
+        "--fail-on-promotion",
+        action="store_true",
+        help="Exit with status 2 when workflow trigger promotion is blocked",
+    )
+
     # experiment labs — specs drive a nested `experiment` subparser plus
     # hidden top-level aliases for back-compat.
     experiment_specs: list[tuple[str, str, str]] = [
@@ -2442,6 +2475,13 @@ def cmd_route_policy_scenario_ci_review(args: argparse.Namespace) -> None:
     run_review_cli(args)
 
 
+def cmd_route_policy_scenario_ci_workflow_promote(args: argparse.Namespace) -> None:
+    """Handle the route-policy-scenario-ci-workflow-promote subcommand."""
+    from gs_sim2real.sim.policy_scenario_ci_promotion import run_promotion_cli
+
+    run_promotion_cli(args)
+
+
 def cmd_experiment(args: argparse.Namespace) -> None:
     """Handle the nested `experiment` subcommand by deferring to the legacy handler."""
     handler_map = {
@@ -2624,6 +2664,7 @@ def main(argv: list[str] | None = None) -> None:
         "route-policy-scenario-ci-review": cmd_route_policy_scenario_ci_review,
         "route-policy-scenario-ci-workflow-activate": cmd_route_policy_scenario_ci_workflow_activate,
         "route-policy-scenario-ci-workflow": cmd_route_policy_scenario_ci_workflow,
+        "route-policy-scenario-ci-workflow-promote": cmd_route_policy_scenario_ci_workflow_promote,
         "route-policy-scenario-ci-workflow-validate": cmd_route_policy_scenario_ci_workflow_validate,
         "route-policy-scenario-matrix": cmd_route_policy_scenario_matrix,
         "route-policy-scenario-shard-merge": cmd_route_policy_scenario_shard_merge,

@@ -200,6 +200,12 @@ class TestCLIHelp:
             main(["route-policy-scenario-ci-review", "--help"])
         assert exc_info.value.code == 0
 
+    def test_cli_route_policy_scenario_ci_workflow_promote_help(self) -> None:
+        """Running route-policy-scenario-ci-workflow-promote --help raises SystemExit(0)."""
+        with pytest.raises(SystemExit) as exc_info:
+            main(["route-policy-scenario-ci-workflow-promote", "--help"])
+        assert exc_info.value.code == 0
+
     def test_cli_experiment_localization_alignment_help(self) -> None:
         """Running experiment-localization-alignment --help raises SystemExit(0)."""
         with pytest.raises(SystemExit) as exc_info:
@@ -2258,6 +2264,40 @@ class TestCLIHelp:
         assert args.html_output == "index.html"
         assert args.bundle_dir == "pages/review"
         assert args.fail_on_review is True
+
+    def test_cli_route_policy_scenario_ci_workflow_promote_flags(self) -> None:
+        """route-policy-scenario-ci-workflow-promote parser accepts promotion settings."""
+        args = build_parser().parse_args(
+            [
+                "route-policy-scenario-ci-workflow-promote",
+                "--review",
+                "review.json",
+                "--review-url",
+                "https://example.test/reviews/unit/",
+                "--promotion-id",
+                "unit-promotion",
+                "--trigger-mode",
+                "push-and-pull-request",
+                "--push-branch",
+                "main",
+                "--pull-request-branch",
+                "main",
+                "--output",
+                "promotion.json",
+                "--markdown-output",
+                "promotion.md",
+                "--fail-on-promotion",
+            ]
+        )
+        assert args.review == "review.json"
+        assert args.review_url == "https://example.test/reviews/unit/"
+        assert args.promotion_id == "unit-promotion"
+        assert args.trigger_mode == "push-and-pull-request"
+        assert args.push_branch == ["main"]
+        assert args.pull_request_branch == ["main"]
+        assert args.output == "promotion.json"
+        assert args.markdown_output == "promotion.md"
+        assert args.fail_on_promotion is True
 
     def test_cli_experiment_localization_alignment_flags(self) -> None:
         """experiment-localization-alignment parser accepts evaluation settings."""

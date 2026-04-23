@@ -26,6 +26,7 @@ from gs_sim2real.sim import (
     RoutePolicyMatrixSceneSpec,
     RoutePolicyRegistry,
     RoutePolicyRegistryEntry,
+    RoutePolicyScenarioCIReviewArtifact,
     RoutePolicyScenarioCIManifest,
     RoutePolicyScenarioCIMergeJob,
     RoutePolicyScenarioCIShardJob,
@@ -52,6 +53,7 @@ from gs_sim2real.sim import (
     load_route_policy_scenario_ci_review_json,
     load_route_policy_scenario_ci_workflow_activation_json,
     load_route_policy_scenario_ci_workflow_json,
+    load_route_policy_scenario_ci_workflow_promotion_json,
     load_route_policy_scenario_ci_workflow_validation_json,
     load_route_policy_scenario_matrix_expansion_json,
     load_route_policy_scenario_matrix_json,
@@ -59,6 +61,7 @@ from gs_sim2real.sim import (
     load_route_policy_scenario_shard_merge_json,
     load_route_policy_scenario_shard_plan_json,
     merge_route_policy_scenario_shard_run_jsons,
+    promote_route_policy_scenario_ci_workflow,
     render_route_policy_benchmark_history_markdown,
     render_route_policy_benchmark_markdown,
     render_route_policy_scenario_ci_manifest_markdown,
@@ -66,6 +69,7 @@ from gs_sim2real.sim import (
     render_route_policy_scenario_ci_review_markdown,
     render_route_policy_scenario_ci_workflow_activation_markdown,
     render_route_policy_scenario_ci_workflow_markdown,
+    render_route_policy_scenario_ci_workflow_promotion_markdown,
     render_route_policy_scenario_ci_workflow_validation_markdown,
     render_route_policy_scenario_matrix_markdown,
     render_route_policy_scenario_set_markdown,
@@ -85,6 +89,7 @@ from gs_sim2real.sim import (
     write_route_policy_scenario_ci_review_json,
     write_route_policy_scenario_ci_workflow_activation_json,
     write_route_policy_scenario_ci_workflow_json,
+    write_route_policy_scenario_ci_workflow_promotion_json,
     write_route_policy_scenario_ci_workflow_validation_json,
     write_route_policy_scenario_ci_workflow_yaml,
     write_route_policy_scenario_matrix_expansion_json,
@@ -1759,6 +1764,148 @@ def test_route_policy_scenario_ci_review_cli_writes_bundle(tmp_path: Path) -> No
     assert review.passed is True
     assert (bundle_dir / "review.md").exists()
     assert "Route Policy Scenario CI Review" in (bundle_dir / "index.html").read_text(encoding="utf-8")
+
+
+def test_route_policy_scenario_ci_workflow_promotion_passes_review_gate(tmp_path: Path) -> None:
+    review = build_unit_ci_review_artifact(
+        tmp_path,
+        prefix="unit-promotion",
+        pages_base_url="https://example.test/reviews/unit-promotion/",
+    )
+    promotion = promote_route_policy_scenario_ci_workflow(
+        review,
+        trigger_mode="pull-request",
+        pull_request_branches=("main",),
+        review_url="https://example.test/reviews/unit-promotion/",
+        promotion_id="unit-promotion",
+    )
+    promotion_path = write_route_policy_scenario_ci_workflow_promotion_json(tmp_path / "promotion.json", promotion)
+    loaded = load_route_policy_scenario_ci_workflow_promotion_json(promotion_path)
+    markdown = render_route_policy_scenario_ci_workflow_promotion_markdown(loaded)
+
+    assert loaded.promoted is True
+    assert loaded.passed is True
+    assert loaded.trigger_mode == "pull-request"
+    assert loaded.pull_request_branches == ("main",)
+    assert loaded.review_url == "https://example.test/reviews/unit-promotion/"
+    assert "Route Policy Scenario CI Workflow Promotion: unit-promotion" in markdown
+    assert "PROMOTED" in markdown
+
+
+def test_route_policy_scenario_ci_workflow_promotion_blocks_failed_review(tmp_path: Path) -> None:
+    review = build_unit_ci_review_artifact(
+        tmp_path,
+        prefix="unit-promotion-blocked",
+        pages_base_url="https://example.test/reviews/unit-promotion-blocked/",
+    )
+    failed_review = RoutePolicyScenarioCIReviewArtifact(
+        review_id=review.review_id,
+        merge_id=review.merge_id,
+        workflow_id=review.workflow_id,
+        manifest_id=review.manifest_id,
+        validation_id=review.validation_id,
+        activation_id=review.activation_id,
+        validation_passed=review.validation_passed,
+        activation_activated=review.activation_activated,
+        shard_merge_passed=review.shard_merge_passed,
+        history_passed=False,
+        active_workflow_path=review.active_workflow_path,
+        source_workflow_path=review.source_workflow_path,
+        shards=review.shards,
+        history_failed_checks=("mean_reward_drop",),
+        metadata=review.metadata,
+        version=review.version,
+    )
+    promotion = promote_route_policy_scenario_ci_workflow(
+        failed_review,
+        trigger_mode="pull-request",
+        pull_request_branches=("main",),
+        review_url="https://example.test/reviews/unit-promotion-blocked/",
+    )
+
+    assert promotion.promoted is False
+    assert promotion.passed is False
+    assert "review-passed" in promotion.failed_checks
+    assert "history-passed" in promotion.failed_checks
+
+
+def test_route_policy_scenario_ci_workflow_promotion_cli_writes_report(tmp_path: Path) -> None:
+    review = build_unit_ci_review_artifact(
+        tmp_path,
+        prefix="unit-cli-promotion",
+        pages_base_url="https://example.test/reviews/unit-cli-promotion/",
+    )
+    review_path = write_route_policy_scenario_ci_review_json(tmp_path / "review.json", review)
+    output_path = tmp_path / "workflow-promotion.json"
+    markdown_path = tmp_path / "workflow-promotion.md"
+    args = build_parser().parse_args(
+        [
+            "route-policy-scenario-ci-workflow-promote",
+            "--review",
+            str(review_path),
+            "--review-url",
+            "https://example.test/reviews/unit-cli-promotion/",
+            "--trigger-mode",
+            "push-and-pull-request",
+            "--push-branch",
+            "main",
+            "--pull-request-branch",
+            "main",
+            "--promotion-id",
+            "unit-cli-promotion",
+            "--output",
+            str(output_path),
+            "--markdown-output",
+            str(markdown_path),
+            "--fail-on-promotion",
+        ]
+    )
+
+    cli.cmd_route_policy_scenario_ci_workflow_promote(args)
+    promotion = load_route_policy_scenario_ci_workflow_promotion_json(output_path)
+
+    assert promotion.promotion_id == "unit-cli-promotion"
+    assert promotion.promoted is True
+    assert promotion.push_branches == ("main",)
+    assert promotion.pull_request_branches == ("main",)
+    assert "Route Policy Scenario CI Workflow Promotion" in markdown_path.read_text(encoding="utf-8")
+
+
+def build_unit_ci_review_artifact(
+    tmp_path: Path,
+    *,
+    prefix: str,
+    pages_base_url: str,
+) -> RoutePolicyScenarioCIReviewArtifact:
+    manifest = build_unit_ci_workflow_manifest(f"{prefix}-manifest")
+    materialization = materialize_route_policy_scenario_ci_workflow(
+        manifest,
+        config=RoutePolicyScenarioCIWorkflowConfig(workflow_id=f"{prefix}-workflow", artifact_root="ci"),
+    )
+    source_path = write_route_policy_scenario_ci_workflow_yaml(
+        tmp_path / f"{prefix}.generated.yml",
+        materialization,
+    )
+    validation = validate_route_policy_scenario_ci_workflow(
+        manifest,
+        materialization,
+        validation_id=f"{prefix}-validation",
+        workflow_path=source_path,
+    )
+    activation = activate_route_policy_scenario_ci_workflow(
+        materialization,
+        validation,
+        source_workflow_path=source_path,
+        active_workflow_path=tmp_path / ".github" / "workflows" / f"{prefix}.yml",
+        activation_id=f"{prefix}-activation",
+    )
+    return build_route_policy_scenario_ci_review_artifact(
+        build_unit_ci_shard_merge_report(),
+        validation,
+        activation,
+        review_id=prefix,
+        pages_base_url=pages_base_url,
+    )
 
 
 def build_unit_ci_workflow_manifest(manifest_id: str) -> RoutePolicyScenarioCIManifest:
