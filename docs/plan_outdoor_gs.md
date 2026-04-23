@@ -25,7 +25,7 @@
 - 2026-04-24 時点では、屋外 3DGS だけでなく **Physical AI simulation benchmark environment** を目指す方向へ拡張中。
 - Route policy benchmark 系は、dataset / imitation / registry / benchmark / history / scenario-set / matrix / sharding / CI manifest / workflow materialization / validation / activation / review bundle / workflow trigger promotion gate まで分割済み。
 - 最新の pushed commit は `dc08c2f`。scenario CI workflow promotion gate を追加し、local full pytest / GitHub Actions CI / Pages deploy は green。
-- 次に自然なのは、promotion report PASS 後に trigger-enabled workflow を再 materialize / activate する smoke recipe。matrix から promotion までを tiny fixture で一周できるようにする。
+- matrix から promotion までを一周する smoke recipe は `scripts/smoke_route_policy_scenario_ci.py` として実装済み。次は promotion report PASS 後に trigger-enabled workflow を再 materialize / activate する adoption 手順の固定。
 
 ## 2. 現在の主戦場
 
@@ -462,22 +462,21 @@ Promotion checks:
 - branches が literal branch name policy を満たす。
 - active workflow path が `.github/workflows/*.yml` / `.yaml` に閉じている。
 
-### 9.6 Claude に渡す最初の slice
+### 9.6 Scenario CI smoke recipe
 
-最初の 1 task は `scripts/smoke_route_policy_scenario_ci.py` がよい。
+`scripts/smoke_route_policy_scenario_ci.py` が tiny 1-scene / 1-policy fixture で `scenario matrix -> shard plan -> scenario-set run -> shard merge -> CI manifest -> workflow materialization -> validation -> activation -> review -> promotion` を一周する。各 gate に `[PASS]/[FAIL] <name>` を出し、落ちた gate で `GateFailure` を上げて non-zero exit する。
 
 狙い:
 
-- tiny fixture で `scenario matrix -> shard plan -> CI manifest -> workflow -> validation -> activation -> review -> promotion` を一周させる。
-- workflow activation は repo 本物の `.github/workflows/` を触らず、tmpdir 配下の synthetic path に閉じる。
-- review bundle / promotion report の JSON / Markdown をまとめて出し、chain 全体の integration smoke とする。
-- promotion report PASS 後に trigger-enabled workflow を再 materialize する adoption docs は、その smoke script ができてから書く方が安全。
+- chain 全体の integration smoke を、巨大 E2E ではなく 1 分未満で回せる形にする。
+- workflow activation は `<tmpdir>/.github/workflows/...` に閉じ、repo 本物の `.github/workflows/` には触らない。
+- review bundle / promotion report の JSON / Markdown / HTML を tmpdir に吐き、目視レビューしたいときは `--keep` / `--root <path>` で保持できる。
 
-期待する完成形:
+回帰検出:
 
-1. script 単体で tmpdir に最小 artifact 群を吐ける。
-2. 失敗時にどの gate で止まったかが標準出力で分かる。
-3. targeted test か snapshot assert を 1 本追加して、CI で壊れにくくする。
+- `tests/test_smoke_route_policy_scenario_ci.py` が `run_smoke()` を importlib で叩き、全 gate の PASS ログと artifact path、promotion trigger config を snapshot-assert する。
+
+次の Claude slice は、この smoke の上に「promotion PASS → trigger-enabled workflow を再 materialize / validate / activate」する adoption recipe を docs として固定すること。
 
 ## 10. Public / Launch Track
 
@@ -598,8 +597,7 @@ python3 scripts/collect_mcd_quality_runs.py --format gate --fail-on-gate
 
 | Task | Why | Suggested slice |
 | --- | --- | --- |
-| Route policy CI smoke recipe | matrix→shard→manifest→workflow→review→promotion を tiny fixture で一周させたい | `scripts/smoke_route_policy_scenario_ci.py` |
-| Promotion-backed workflow adoption recipe | promotion report PASS 後に trigger-enabled workflow を安全に再 materialize / activate する手順が必要 | docs + smoke recipe に基づく手順固定 |
+| Promotion-backed workflow adoption recipe | promotion report PASS 後に trigger-enabled workflow を安全に再 materialize / activate する手順が必要 | docs + smoke recipe (`scripts/smoke_route_policy_scenario_ci.py`) に基づく手順固定 |
 | Scenario CI docs tightening | `physical-ai-sim.md` に実装はあるが、README からの導線は薄い | README に Physical AI benchmark section を追加 |
 | Review bundle sample under docs | Synthetic fixture でもよいので Pages の `/reviews/` 例を置くか判断 | まず generated sample は commit しない方針で検討 |
 
