@@ -162,7 +162,9 @@ from gs_sim2real.sim import (
     RoutePolicyScenarioSet,
     RoutePolicyScenarioSpec,
     RoutePolicyScenarioCIWorkflowConfig,
+    RoutePolicyScenarioCIWorkflowActivationReport,
     RoutePolicyScenarioCIWorkflowValidationReport,
+    activate_route_policy_scenario_ci_workflow,
     build_route_policy_scenario_ci_manifest,
     build_route_policy_scenario_shard_plan,
     build_route_policy_benchmark_history,
@@ -181,6 +183,7 @@ from gs_sim2real.sim import (
     load_route_policy_imitation_model_json,
     load_route_policy_registry_json,
     load_route_policy_scenario_ci_manifest_json,
+    load_route_policy_scenario_ci_workflow_activation_json,
     load_route_policy_scenario_ci_workflow_json,
     load_route_policy_scenario_ci_workflow_validation_json,
     load_route_policy_scenario_matrix_json,
@@ -196,6 +199,7 @@ from gs_sim2real.sim import (
     render_route_policy_benchmark_markdown,
     render_route_policy_quality_markdown,
     render_route_policy_scenario_ci_manifest_markdown,
+    render_route_policy_scenario_ci_workflow_activation_markdown,
     render_route_policy_scenario_ci_workflow_markdown,
     render_route_policy_scenario_ci_workflow_validation_markdown,
     render_route_policy_scenario_matrix_markdown,
@@ -215,6 +219,7 @@ from gs_sim2real.sim import (
     write_route_policy_imitation_model_json,
     write_route_policy_registry_json,
     write_route_policy_scenario_ci_manifest_json,
+    write_route_policy_scenario_ci_workflow_activation_json,
     write_route_policy_scenario_ci_workflow_json,
     write_route_policy_scenario_ci_workflow_validation_json,
     write_route_policy_scenario_ci_workflow_yaml,
@@ -779,6 +784,33 @@ gs-mapper route-policy-scenario-ci-workflow-validate \
   --fail-on-validation
 ```
 
+After validation passes, activate the workflow into a real GitHub Actions path. Activation refuses to write unless the validation report passed, the validated source path matches the source file being activated, the source YAML matches the materialization index, and the destination is under `.github/workflows/`.
+
+```python
+activation = activate_route_policy_scenario_ci_workflow(
+    workflow,
+    validation,
+    source_workflow_path=".github/workflows/outdoor-demo-policy-shards.generated.yml",
+    active_workflow_path=".github/workflows/outdoor-demo-policy-shards.yml",
+)
+write_route_policy_scenario_ci_workflow_activation_json(
+    "runs/scenarios/ci-workflow-activation.json",
+    activation,
+)
+print(render_route_policy_scenario_ci_workflow_activation_markdown(activation))
+```
+
+```bash
+gs-mapper route-policy-scenario-ci-workflow-activate \
+  --workflow-index runs/scenarios/ci-workflow.json \
+  --validation-report runs/scenarios/ci-workflow-validation.json \
+  --workflow .github/workflows/outdoor-demo-policy-shards.generated.yml \
+  --active-workflow-output .github/workflows/outdoor-demo-policy-shards.yml \
+  --output runs/scenarios/ci-workflow-activation.json \
+  --markdown-output runs/scenarios/ci-workflow-activation.md \
+  --fail-on-activation
+```
+
 Supported actions:
 
 - `twist`: `linearX`, `linearY`, `linearZ` or `vx`, `vy`, `vz`
@@ -788,4 +820,4 @@ The backend always blocks poses outside `SceneEnvironment.bounds`. When a `Voxel
 
 ## Next Implementation Layer
 
-The next useful layer is workflow activation guardrails: require a passing workflow-validation report before moving generated YAML into active `.github/workflows/` paths, publish shard summaries as review artifacts, and keep push or pull-request triggers opt-in until the generated workflow is reviewable.
+The next useful layer is shard summary publishing: turn scenario shard run outputs and activation reports into a compact review artifact for GitHub Pages, so generated workflow changes can be inspected with their expected benchmark surface before broadening triggers.

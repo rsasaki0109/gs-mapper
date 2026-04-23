@@ -23,11 +23,15 @@ from gs_sim2real.sim import (
     RoutePolicyMatrixSceneSpec,
     RoutePolicyRegistry,
     RoutePolicyRegistryEntry,
+    RoutePolicyScenarioCIManifest,
+    RoutePolicyScenarioCIMergeJob,
+    RoutePolicyScenarioCIShardJob,
     RoutePolicyScenarioMatrix,
     RoutePolicyScenarioSet,
     RoutePolicyScenarioCIWorkflowConfig,
     RoutePolicyScenarioSpec,
     RouteRewardWeights,
+    activate_route_policy_scenario_ci_workflow,
     build_route_policy_benchmark_history,
     build_route_policy_scenario_ci_manifest,
     build_simulation_catalog,
@@ -39,6 +43,7 @@ from gs_sim2real.sim import (
     load_route_policy_imitation_model_json,
     load_route_policy_registry_json,
     load_route_policy_scenario_ci_manifest_json,
+    load_route_policy_scenario_ci_workflow_activation_json,
     load_route_policy_scenario_ci_workflow_json,
     load_route_policy_scenario_ci_workflow_validation_json,
     load_route_policy_scenario_matrix_expansion_json,
@@ -50,6 +55,7 @@ from gs_sim2real.sim import (
     render_route_policy_benchmark_history_markdown,
     render_route_policy_benchmark_markdown,
     render_route_policy_scenario_ci_manifest_markdown,
+    render_route_policy_scenario_ci_workflow_activation_markdown,
     render_route_policy_scenario_ci_workflow_markdown,
     render_route_policy_scenario_ci_workflow_validation_markdown,
     render_route_policy_scenario_matrix_markdown,
@@ -66,6 +72,7 @@ from gs_sim2real.sim import (
     write_route_policy_imitation_model_json,
     write_route_policy_registry_json,
     write_route_policy_scenario_ci_manifest_json,
+    write_route_policy_scenario_ci_workflow_activation_json,
     write_route_policy_scenario_ci_workflow_json,
     write_route_policy_scenario_ci_workflow_validation_json,
     write_route_policy_scenario_ci_workflow_yaml,
@@ -1489,6 +1496,207 @@ def test_route_policy_scenario_ci_workflow_validation_cli_writes_report(tmp_path
     assert report.passed is True
     assert "Route Policy Scenario CI Workflow Validation: unit-cli-validation" in markdown_path.read_text(
         encoding="utf-8"
+    )
+
+
+def test_route_policy_scenario_ci_workflow_activation_writes_active_workflow(tmp_path: Path) -> None:
+    manifest = build_unit_ci_workflow_manifest("unit-activation-manifest")
+    materialization = materialize_route_policy_scenario_ci_workflow(
+        manifest,
+        config=RoutePolicyScenarioCIWorkflowConfig(
+            workflow_id="unit-activation-workflow",
+            workflow_name="Unit Activation Workflow",
+            artifact_root="ci",
+        ),
+    )
+    source_path = write_route_policy_scenario_ci_workflow_yaml(tmp_path / "workflow.generated.yml", materialization)
+    validation = validate_route_policy_scenario_ci_workflow(manifest, materialization, workflow_path=source_path)
+    active_path = tmp_path / ".github" / "workflows" / "unit-activation.yml"
+
+    activation = activate_route_policy_scenario_ci_workflow(
+        materialization,
+        validation,
+        source_workflow_path=source_path,
+        active_workflow_path=active_path,
+    )
+    activation_path = write_route_policy_scenario_ci_workflow_activation_json(
+        tmp_path / "workflow-activation.json",
+        activation,
+    )
+    loaded_activation = load_route_policy_scenario_ci_workflow_activation_json(activation_path)
+
+    assert loaded_activation.activated is True
+    assert loaded_activation.failed_checks == ()
+    assert loaded_activation.metadata["activationState"] == "activated"
+    assert active_path.read_text(encoding="utf-8") == materialization.workflow_yaml
+    assert "Route Policy Scenario CI Workflow Activation: unit-activation-workflow-activation" in (
+        render_route_policy_scenario_ci_workflow_activation_markdown(loaded_activation)
+    )
+
+
+def test_route_policy_scenario_ci_workflow_activation_blocks_failed_validation(tmp_path: Path) -> None:
+    manifest = build_unit_ci_workflow_manifest("unit-blocked-activation-manifest")
+    materialization = materialize_route_policy_scenario_ci_workflow(
+        manifest,
+        config=RoutePolicyScenarioCIWorkflowConfig(workflow_id="unit-blocked-activation-workflow", artifact_root="ci"),
+    )
+    tampered = type(materialization)(
+        workflow_id=materialization.workflow_id,
+        manifest_id=materialization.manifest_id,
+        workflow_name=materialization.workflow_name,
+        workflow_yaml=materialization.workflow_yaml.replace("route-policy-scenario-shard-merge", "broken-merge", 1),
+        config=materialization.config,
+        workflow_path=materialization.workflow_path,
+        metadata=materialization.metadata,
+        version=materialization.version,
+    )
+    source_path = write_route_policy_scenario_ci_workflow_yaml(tmp_path / "workflow.generated.yml", tampered)
+    validation = validate_route_policy_scenario_ci_workflow(manifest, tampered, workflow_path=source_path)
+    active_path = tmp_path / ".github" / "workflows" / "unit-blocked.yml"
+
+    activation = activate_route_policy_scenario_ci_workflow(
+        tampered,
+        validation,
+        source_workflow_path=source_path,
+        active_workflow_path=active_path,
+    )
+
+    assert activation.activated is False
+    assert "validation-passed" in activation.failed_checks
+    assert activation.metadata["activationState"] == "blocked"
+    assert not active_path.exists()
+
+
+def test_route_policy_scenario_ci_workflow_activation_blocks_non_workflow_output(tmp_path: Path) -> None:
+    manifest = build_unit_ci_workflow_manifest("unit-invalid-activation-manifest")
+    materialization = materialize_route_policy_scenario_ci_workflow(
+        manifest,
+        config=RoutePolicyScenarioCIWorkflowConfig(workflow_id="unit-invalid-activation-workflow", artifact_root="ci"),
+    )
+    source_path = write_route_policy_scenario_ci_workflow_yaml(tmp_path / "workflow.generated.yml", materialization)
+    validation = validate_route_policy_scenario_ci_workflow(manifest, materialization, workflow_path=source_path)
+    invalid_active_path = tmp_path / "workflows" / "unit-invalid.yml"
+
+    activation = activate_route_policy_scenario_ci_workflow(
+        materialization,
+        validation,
+        source_workflow_path=source_path,
+        active_workflow_path=invalid_active_path,
+    )
+
+    assert activation.activated is False
+    assert "active-path-root" in activation.failed_checks
+    assert not invalid_active_path.exists()
+
+
+def test_route_policy_scenario_ci_workflow_activation_cli_writes_report(tmp_path: Path) -> None:
+    manifest = build_unit_ci_workflow_manifest("unit-cli-activation-manifest")
+    materialization = materialize_route_policy_scenario_ci_workflow(
+        manifest,
+        config=RoutePolicyScenarioCIWorkflowConfig(
+            workflow_id="unit-cli-activation-workflow",
+            workflow_name="Unit CLI Activation Workflow",
+            artifact_root="ci",
+        ),
+    )
+    source_path = write_route_policy_scenario_ci_workflow_yaml(tmp_path / "workflow.generated.yml", materialization)
+    index_path = write_route_policy_scenario_ci_workflow_json(tmp_path / "workflow.json", materialization)
+    validation = validate_route_policy_scenario_ci_workflow(
+        manifest,
+        materialization,
+        validation_id="unit-cli-activation-validation",
+        workflow_path=source_path,
+    )
+    validation_path = write_route_policy_scenario_ci_workflow_validation_json(
+        tmp_path / "workflow-validation.json",
+        validation,
+    )
+    active_path = tmp_path / ".github" / "workflows" / "unit-cli-activation.yml"
+    output_path = tmp_path / "workflow-activation.json"
+    markdown_path = tmp_path / "workflow-activation.md"
+    args = build_parser().parse_args(
+        [
+            "route-policy-scenario-ci-workflow-activate",
+            "--workflow-index",
+            str(index_path),
+            "--validation-report",
+            str(validation_path),
+            "--workflow",
+            str(source_path),
+            "--active-workflow-output",
+            str(active_path),
+            "--activation-id",
+            "unit-cli-activation",
+            "--output",
+            str(output_path),
+            "--markdown-output",
+            str(markdown_path),
+            "--fail-on-activation",
+        ]
+    )
+
+    cli.cmd_route_policy_scenario_ci_workflow_activate(args)
+    activation = load_route_policy_scenario_ci_workflow_activation_json(output_path)
+
+    assert activation.activation_id == "unit-cli-activation"
+    assert activation.activated is True
+    assert active_path.read_text(encoding="utf-8") == materialization.workflow_yaml
+    assert "Route Policy Scenario CI Workflow Activation: unit-cli-activation" in markdown_path.read_text(
+        encoding="utf-8"
+    )
+
+
+def build_unit_ci_workflow_manifest(manifest_id: str) -> RoutePolicyScenarioCIManifest:
+    shard_command = (
+        "gs-mapper",
+        "route-policy-scenario-set",
+        "--scenario-set",
+        "shards/unit-shard.json",
+        "--report-dir",
+        "ci/reports/unit-shard",
+        "--output",
+        "ci/runs/unit-shard.json",
+        "--history-output",
+        "ci/histories/unit-shard.json",
+    )
+    merge_command = (
+        "gs-mapper",
+        "route-policy-scenario-shard-merge",
+        "--run",
+        "ci/runs/unit-shard.json",
+        "--output",
+        "ci/merge.json",
+        "--history-output",
+        "ci/history.json",
+    )
+    return RoutePolicyScenarioCIManifest(
+        manifest_id=manifest_id,
+        shard_plan_id="unit-shard-plan",
+        shard_jobs=(
+            RoutePolicyScenarioCIShardJob(
+                job_id="scenario-unit-shard",
+                shard_id="unit-shard",
+                source_scenario_set_id="unit-source-scenarios",
+                scenario_set_path="shards/unit-shard.json",
+                scenario_count=1,
+                report_dir="ci/reports/unit-shard",
+                run_output="ci/runs/unit-shard.json",
+                history_output="ci/histories/unit-shard.json",
+                cache_key="unit-cache",
+                expected_report_paths=("ci/reports/unit-shard/unit-scenario.json",),
+                command=shard_command,
+            ),
+        ),
+        merge_job=RoutePolicyScenarioCIMergeJob(
+            job_id="route-policy-scenario-merge",
+            merge_id="unit-merge",
+            run_inputs=("ci/runs/unit-shard.json",),
+            output="ci/merge.json",
+            history_output="ci/history.json",
+            cache_key="unit-cache-merge",
+            depends_on=("scenario-unit-shard",),
+            command=merge_command,
+        ),
     )
 
 

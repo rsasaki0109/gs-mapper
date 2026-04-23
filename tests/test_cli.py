@@ -188,6 +188,12 @@ class TestCLIHelp:
             main(["route-policy-scenario-ci-workflow-validate", "--help"])
         assert exc_info.value.code == 0
 
+    def test_cli_route_policy_scenario_ci_workflow_activate_help(self) -> None:
+        """Running route-policy-scenario-ci-workflow-activate --help raises SystemExit(0)."""
+        with pytest.raises(SystemExit) as exc_info:
+            main(["route-policy-scenario-ci-workflow-activate", "--help"])
+        assert exc_info.value.code == 0
+
     def test_cli_experiment_localization_alignment_help(self) -> None:
         """Running experiment-localization-alignment --help raises SystemExit(0)."""
         with pytest.raises(SystemExit) as exc_info:
@@ -2176,6 +2182,39 @@ class TestCLIHelp:
         assert args.output == "validation.json"
         assert args.markdown_output == "validation.md"
         assert args.fail_on_validation is True
+
+    def test_cli_route_policy_scenario_ci_workflow_activate_flags(self) -> None:
+        """route-policy-scenario-ci-workflow-activate parser accepts activation settings."""
+        args = build_parser().parse_args(
+            [
+                "route-policy-scenario-ci-workflow-activate",
+                "--workflow-index",
+                "workflow.json",
+                "--validation-report",
+                "validation.json",
+                "--workflow",
+                "workflow.generated.yml",
+                "--active-workflow-output",
+                ".github/workflows/unit.yml",
+                "--activation-id",
+                "unit-activation",
+                "--output",
+                "activation.json",
+                "--markdown-output",
+                "activation.md",
+                "--overwrite",
+                "--fail-on-activation",
+            ]
+        )
+        assert args.workflow_index == "workflow.json"
+        assert args.validation_report == "validation.json"
+        assert args.workflow == "workflow.generated.yml"
+        assert args.active_workflow_output == ".github/workflows/unit.yml"
+        assert args.activation_id == "unit-activation"
+        assert args.output == "activation.json"
+        assert args.markdown_output == "activation.md"
+        assert args.overwrite is True
+        assert args.fail_on_activation is True
 
     def test_cli_experiment_localization_alignment_flags(self) -> None:
         """experiment-localization-alignment parser accepts evaluation settings."""

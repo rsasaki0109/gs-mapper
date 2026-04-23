@@ -1421,6 +1421,33 @@ def build_parser() -> argparse.ArgumentParser:
         help="Exit with status 2 when workflow validation fails",
     )
 
+    # route policy scenario CI workflow activation
+    rpswfa = subparsers.add_parser(
+        "route-policy-scenario-ci-workflow-activate",
+        help="Activate a generated route policy scenario CI workflow after validation passes",
+    )
+    rpswfa.add_argument("--workflow-index", required=True, help="Workflow materialization metadata JSON")
+    rpswfa.add_argument("--validation-report", required=True, help="Workflow validation report JSON")
+    rpswfa.add_argument("--workflow", default=None, help="Generated GitHub Actions workflow YAML to activate")
+    rpswfa.add_argument(
+        "--active-workflow-output",
+        required=True,
+        help="Active GitHub Actions workflow path under .github/workflows",
+    )
+    rpswfa.add_argument("--activation-id", default=None, help="Optional activation report id")
+    rpswfa.add_argument(
+        "--output",
+        default="outputs/route_policy_scenarios/scenario_ci_workflow_activation.json",
+        help="Workflow activation report JSON path",
+    )
+    rpswfa.add_argument("--markdown-output", default=None, help="Optional workflow activation Markdown path")
+    rpswfa.add_argument("--overwrite", action="store_true", help="Overwrite an existing active workflow file")
+    rpswfa.add_argument(
+        "--fail-on-activation",
+        action="store_true",
+        help="Exit with status 2 when workflow activation is blocked",
+    )
+
     # experiment labs — specs drive a nested `experiment` subparser plus
     # hidden top-level aliases for back-compat.
     experiment_specs: list[tuple[str, str, str]] = [
@@ -2373,6 +2400,13 @@ def cmd_route_policy_scenario_ci_workflow_validate(args: argparse.Namespace) -> 
     run_validation_cli(args)
 
 
+def cmd_route_policy_scenario_ci_workflow_activate(args: argparse.Namespace) -> None:
+    """Handle the route-policy-scenario-ci-workflow-activate subcommand."""
+    from gs_sim2real.sim.policy_scenario_ci_activation import run_activation_cli
+
+    run_activation_cli(args)
+
+
 def cmd_experiment(args: argparse.Namespace) -> None:
     """Handle the nested `experiment` subcommand by deferring to the legacy handler."""
     handler_map = {
@@ -2552,6 +2586,7 @@ def main(argv: list[str] | None = None) -> None:
         "route-policy-benchmark": cmd_route_policy_benchmark,
         "route-policy-benchmark-history": cmd_route_policy_benchmark_history,
         "route-policy-scenario-ci-manifest": cmd_route_policy_scenario_ci_manifest,
+        "route-policy-scenario-ci-workflow-activate": cmd_route_policy_scenario_ci_workflow_activate,
         "route-policy-scenario-ci-workflow": cmd_route_policy_scenario_ci_workflow,
         "route-policy-scenario-ci-workflow-validate": cmd_route_policy_scenario_ci_workflow_validate,
         "route-policy-scenario-matrix": cmd_route_policy_scenario_matrix,
