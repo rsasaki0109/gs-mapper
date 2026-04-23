@@ -1783,6 +1783,32 @@ class TestCLIHelp:
         assert args.output == "report.json"
         assert args.model_output == "model.json"
 
+    def test_cli_route_policy_benchmark_registry_flags(self) -> None:
+        """route-policy-benchmark parser accepts registry and goal-suite artifacts."""
+        args = build_parser().parse_args(
+            [
+                "route-policy-benchmark",
+                "--policy-registry",
+                "policies.json",
+                "--goal-suite",
+                "goals.json",
+                "--scene-catalog",
+                "scenes.json",
+                "--benchmark-id",
+                "registry-benchmark",
+                "--episode-count",
+                "8",
+                "--output",
+                "report.json",
+            ]
+        )
+        assert args.policy_registry == "policies.json"
+        assert args.goal_suite == "goals.json"
+        assert args.scene_catalog == "scenes.json"
+        assert args.benchmark_id == "registry-benchmark"
+        assert args.episode_count == 8
+        assert args.output == "report.json"
+
     def test_cli_experiment_localization_alignment_flags(self) -> None:
         """experiment-localization-alignment parser accepts evaluation settings."""
         args = build_parser().parse_args(

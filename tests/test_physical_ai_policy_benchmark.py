@@ -10,14 +10,24 @@ from gs_sim2real.cli import build_parser
 from gs_sim2real.sim import (
     HeadlessPhysicalAIEnvironment,
     Pose3D,
+    RoutePolicyGoalSpec,
+    RoutePolicyGoalSuite,
     RoutePolicyEnvConfig,
     RoutePolicyGymAdapter,
+    RoutePolicyRegistry,
+    RoutePolicyRegistryEntry,
     RouteRewardWeights,
     build_simulation_catalog,
     collect_route_policy_dataset,
+    load_route_policy_goal_suite_json,
     load_route_policy_imitation_model_json,
+    load_route_policy_registry_json,
     render_route_policy_benchmark_markdown,
     run_route_policy_imitation_benchmark,
+    run_route_policy_registry_benchmark,
+    write_route_policy_goal_suite_json,
+    write_route_policy_imitation_model_json,
+    write_route_policy_registry_json,
     write_route_policy_transitions_jsonl,
 )
 
@@ -128,6 +138,142 @@ def test_route_policy_benchmark_cli_fits_saves_and_writes_reports(tmp_path: Path
     assert report["modelSummary"]["sampleCount"] == 2
     assert model.sample_count == 2
     assert "| Policy | Pass | Success |" in markdown
+
+
+def test_route_policy_registry_benchmark_loads_named_policies_and_goal_suite(tmp_path: Path) -> None:
+    from gs_sim2real.sim import build_route_policy_replay_batch, build_route_policy_replay_schema
+    from gs_sim2real.sim import fit_route_policy_imitation_model
+
+    goals = (unit_pose((0.25, 0.0, 0.0)), unit_pose((0.5, 0.0, 0.0)))
+    dataset = collect_route_policy_dataset(
+        (build_adapter(),),
+        direct_goal_policy,
+        episode_count=2,
+        dataset_id="unit-policy-registry-train",
+        goals=goals,
+    )
+    schema = build_route_policy_replay_schema(dataset, action_keys=target_position_keys())
+    model = fit_route_policy_imitation_model(build_route_policy_replay_batch(dataset, schema=schema))
+    model_path = write_route_policy_imitation_model_json(tmp_path / "imitation.json", model)
+    registry_path = write_route_policy_registry_json(
+        tmp_path / "policies.json",
+        RoutePolicyRegistry(
+            registry_id="unit-policies",
+            policies=(
+                RoutePolicyRegistryEntry(policy_name="direct", policy_type="direct-goal"),
+                RoutePolicyRegistryEntry(
+                    policy_name="imitation-k1",
+                    policy_type="imitation-model",
+                    model_path=model_path.name,
+                ),
+            ),
+        ),
+    )
+    suite_path = write_route_policy_goal_suite_json(
+        tmp_path / "goals.json",
+        RoutePolicyGoalSuite(
+            suite_id="unit-goals",
+            scene_id="unit-scene",
+            frame_id="generic_world",
+            goals=(
+                RoutePolicyGoalSpec("near", (0.25, 0.0, 0.0)),
+                RoutePolicyGoalSpec("far", (0.5, 0.0, 0.0)),
+            ),
+        ),
+    )
+
+    registry = load_route_policy_registry_json(registry_path)
+    suite = load_route_policy_goal_suite_json(suite_path)
+    report = run_route_policy_registry_benchmark(
+        (build_adapter(),),
+        registry,
+        episode_count=2,
+        benchmark_id="unit-registry-benchmark",
+        registry_base_path=tmp_path,
+        goals=suite.to_goals(frame_id="generic_world"),
+        max_steps=4,
+    )
+
+    assert report.passed
+    assert [result.policy_name for result in report.evaluation.results] == ["direct", "imitation-k1"]
+    assert report.to_dict()["modelSummary"]["registry"]["registryId"] == "unit-policies"
+    assert report.to_dict()["modelSummary"]["policies"][1]["sampleCount"] == 2
+
+
+def test_route_policy_benchmark_cli_uses_registry_and_goal_suite(tmp_path: Path) -> None:
+    from gs_sim2real.sim import build_route_policy_replay_batch, build_route_policy_replay_schema
+    from gs_sim2real.sim import fit_route_policy_imitation_model
+
+    goals = (unit_pose((0.25, 0.0, 0.0)), unit_pose((0.5, 0.0, 0.0)))
+    dataset = collect_route_policy_dataset(
+        (build_adapter(),),
+        direct_goal_policy,
+        episode_count=2,
+        dataset_id="unit-policy-registry-cli-train",
+        goals=goals,
+    )
+    schema = build_route_policy_replay_schema(dataset, action_keys=target_position_keys())
+    model = fit_route_policy_imitation_model(build_route_policy_replay_batch(dataset, schema=schema))
+    write_route_policy_imitation_model_json(tmp_path / "model.json", model)
+    registry_path = write_route_policy_registry_json(
+        tmp_path / "registry.json",
+        RoutePolicyRegistry(
+            registry_id="unit-cli-registry",
+            policies=(
+                RoutePolicyRegistryEntry(policy_name="direct", policy_type="direct-goal"),
+                RoutePolicyRegistryEntry(
+                    policy_name="imitation",
+                    policy_type="imitation-model",
+                    model_path="model.json",
+                ),
+            ),
+        ),
+    )
+    suite_path = write_route_policy_goal_suite_json(
+        tmp_path / "goal-suite.json",
+        RoutePolicyGoalSuite(
+            suite_id="unit-cli-goals",
+            scene_id="unit-scene",
+            frame_id="generic_world",
+            goals=(
+                RoutePolicyGoalSpec("near", (0.25, 0.0, 0.0)),
+                RoutePolicyGoalSpec("far", (0.5, 0.0, 0.0)),
+            ),
+        ),
+    )
+    catalog_path = write_unit_scene_catalog(tmp_path / "scenes.json")
+    output_path = tmp_path / "registry-report.json"
+
+    args = build_parser().parse_args(
+        [
+            "route-policy-benchmark",
+            "--policy-registry",
+            str(registry_path),
+            "--goal-suite",
+            str(suite_path),
+            "--scene-catalog",
+            str(catalog_path),
+            "--benchmark-id",
+            "unit-cli-registry-benchmark",
+            "--episode-count",
+            "2",
+            "--max-steps",
+            "4",
+            "--output",
+            str(output_path),
+        ]
+    )
+
+    cli.cmd_route_policy_benchmark(args)
+
+    report = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert report["benchmarkId"] == "unit-cli-registry-benchmark"
+    assert report["passed"] is True
+    assert report["summary"]["policyCount"] == 2
+    assert [policy["policyName"] for policy in report["summary"]["policies"]] == ["direct", "imitation"]
+    assert report["modelSummary"]["registry"]["registryId"] == "unit-cli-registry"
+    assert report["metadata"]["goalSuite"] == str(suite_path)
 
 
 def target_position_keys() -> tuple[str, str, str]:

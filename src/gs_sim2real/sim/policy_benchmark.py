@@ -35,6 +35,140 @@ from .policy_replay import (
 
 
 ROUTE_POLICY_BENCHMARK_VERSION = "gs-mapper-route-policy-benchmark/v1"
+ROUTE_POLICY_GOAL_SUITE_VERSION = "gs-mapper-route-policy-goal-suite/v1"
+ROUTE_POLICY_REGISTRY_VERSION = "gs-mapper-route-policy-registry/v1"
+
+
+@dataclass(frozen=True, slots=True)
+class RoutePolicyGoalSpec:
+    """One named target pose in a reusable route policy goal suite."""
+
+    goal_id: str
+    position: tuple[float, float, float]
+    frame_id: str | None = None
+    metadata: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not str(self.goal_id):
+            raise ValueError("goal_id must not be empty")
+        object.__setattr__(self, "position", _position_tuple(self.position))
+
+    def to_pose(self, *, frame_id: str) -> Pose3D:
+        return Pose3D(
+            position=self.position,
+            orientation_xyzw=(0.0, 0.0, 0.0, 1.0),
+            frame_id=self.frame_id or frame_id,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "goalId": self.goal_id,
+            "position": list(self.position),
+            "frameId": self.frame_id,
+            "metadata": _json_mapping(self.metadata),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class RoutePolicyGoalSuite:
+    """Versioned goal suite shared by route policy benchmark runs."""
+
+    suite_id: str
+    goals: tuple[RoutePolicyGoalSpec, ...]
+    scene_id: str | None = None
+    frame_id: str | None = None
+    metadata: Mapping[str, Any] = field(default_factory=dict)
+    version: str = ROUTE_POLICY_GOAL_SUITE_VERSION
+
+    def __post_init__(self) -> None:
+        if not str(self.suite_id):
+            raise ValueError("suite_id must not be empty")
+        if not self.goals:
+            raise ValueError("goal suite must contain at least one goal")
+        goal_ids = tuple(goal.goal_id for goal in self.goals)
+        if len(set(goal_ids)) != len(goal_ids):
+            raise ValueError("goal suite must not contain duplicate goal ids")
+
+    @property
+    def goal_count(self) -> int:
+        return len(self.goals)
+
+    def to_goals(self, *, frame_id: str) -> tuple[Pose3D, ...]:
+        resolved_frame_id = self.frame_id or frame_id
+        return tuple(goal.to_pose(frame_id=resolved_frame_id) for goal in self.goals)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "recordType": "route-policy-goal-suite",
+            "version": self.version,
+            "suiteId": self.suite_id,
+            "sceneId": self.scene_id,
+            "frameId": self.frame_id,
+            "goalCount": self.goal_count,
+            "goals": [goal.to_dict() for goal in self.goals],
+            "metadata": _json_mapping(self.metadata),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class RoutePolicyRegistryEntry:
+    """One named policy entry in a benchmark registry."""
+
+    policy_name: str
+    policy_type: str
+    model_path: str | None = None
+    metadata: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not str(self.policy_name):
+            raise ValueError("policy_name must not be empty")
+        normalized_type = str(self.policy_type).strip().lower()
+        object.__setattr__(self, "policy_type", normalized_type)
+        if normalized_type == "imitation-model" and not self.model_path:
+            raise ValueError("imitation-model registry entries require model_path")
+        if normalized_type not in {"imitation-model", "direct-goal"}:
+            raise ValueError("policy_type must be 'imitation-model' or 'direct-goal'")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "policyName": self.policy_name,
+            "policyType": self.policy_type,
+            "modelPath": self.model_path,
+            "metadata": _json_mapping(self.metadata),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class RoutePolicyRegistry:
+    """Versioned list of policies to evaluate under the same route policy benchmark."""
+
+    registry_id: str
+    policies: tuple[RoutePolicyRegistryEntry, ...]
+    metadata: Mapping[str, Any] = field(default_factory=dict)
+    version: str = ROUTE_POLICY_REGISTRY_VERSION
+
+    def __post_init__(self) -> None:
+        if not str(self.registry_id):
+            raise ValueError("registry_id must not be empty")
+        if not self.policies:
+            raise ValueError("policy registry must contain at least one policy")
+        policy_names = tuple(policy.policy_name for policy in self.policies)
+        if len(set(policy_names)) != len(policy_names):
+            raise ValueError("policy registry must not contain duplicate policy names")
+
+    @property
+    def policy_count(self) -> int:
+        return len(self.policies)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "recordType": "route-policy-registry",
+            "version": self.version,
+            "registryId": self.registry_id,
+            "policyCount": self.policy_count,
+            "policies": [policy.to_dict() for policy in self.policies],
+            "metadata": _json_mapping(self.metadata),
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,6 +251,60 @@ def run_route_policy_imitation_benchmark(
     )
 
 
+def run_route_policy_registry_benchmark(
+    adapters: Sequence[RoutePolicyGymAdapter],
+    registry: RoutePolicyRegistry,
+    *,
+    episode_count: int,
+    benchmark_id: str = "route-policy-benchmark",
+    registry_base_path: str | Path | None = None,
+    include_direct_baseline: bool = False,
+    seed_start: int = 0,
+    goals: Sequence[RoutePolicyGoal] | None = None,
+    max_steps: int | None = None,
+    thresholds: RoutePolicyQualityThresholds | None = None,
+    metadata: Mapping[str, Any] | None = None,
+) -> RoutePolicyBenchmarkReport:
+    """Evaluate every policy in a registry under one fixed route policy task."""
+
+    policies, policy_summaries = _resolve_registry_policies(registry, registry_base_path=registry_base_path)
+    if include_direct_baseline and "direct" not in policies:
+        policies = {"direct": _direct_goal_policy, **policies}
+        policy_summaries = (
+            {"policyName": "direct", "policyType": "direct-goal", "source": "builtin"},
+            *policy_summaries,
+        )
+    evaluation = evaluate_route_policy_baselines(
+        adapters,
+        policies,
+        episode_count=episode_count,
+        evaluation_id=benchmark_id,
+        seed_start=seed_start,
+        goals=goals,
+        max_steps=max_steps,
+        thresholds=thresholds,
+        metadata={
+            "benchmarkId": benchmark_id,
+            "registryId": registry.registry_id,
+            "includeDirectBaseline": include_direct_baseline,
+            **_json_mapping(metadata or {}),
+        },
+    )
+    return RoutePolicyBenchmarkReport(
+        benchmark_id=benchmark_id,
+        evaluation=evaluation,
+        model_summary={
+            "registry": registry.to_dict(),
+            "policies": list(policy_summaries),
+        },
+        metadata={
+            "registryId": registry.registry_id,
+            "includeDirectBaseline": include_direct_baseline,
+            **_json_mapping(metadata or {}),
+        },
+    )
+
+
 def write_route_policy_benchmark_report_json(path: str | Path, report: RoutePolicyBenchmarkReport) -> Path:
     """Write a route policy benchmark report as stable JSON."""
 
@@ -127,6 +315,100 @@ def write_route_policy_benchmark_report_json(path: str | Path, report: RoutePoli
         encoding="utf-8",
     )
     return output_path
+
+
+def write_route_policy_goal_suite_json(path: str | Path, suite: RoutePolicyGoalSuite) -> Path:
+    """Write a versioned route policy goal suite JSON file."""
+
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(suite.to_dict(), ensure_ascii=False, indent=2, sort_keys=True, allow_nan=False) + "\n",
+        encoding="utf-8",
+    )
+    return output_path
+
+
+def load_route_policy_goal_suite_json(path: str | Path) -> RoutePolicyGoalSuite:
+    """Load a route policy goal suite JSON artifact."""
+
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    return route_policy_goal_suite_from_dict(_mapping(payload, "goalSuite"))
+
+
+def route_policy_goal_suite_from_dict(payload: Mapping[str, Any]) -> RoutePolicyGoalSuite:
+    """Rebuild a goal suite from its JSON payload."""
+
+    _record_type(payload, "route-policy-goal-suite")
+    version = str(payload.get("version", ROUTE_POLICY_GOAL_SUITE_VERSION))
+    if version != ROUTE_POLICY_GOAL_SUITE_VERSION:
+        raise ValueError(f"unsupported route policy goal suite version: {version}")
+    goals = tuple(
+        RoutePolicyGoalSpec(
+            goal_id=str(goal["goalId"]),
+            position=_position_tuple(_sequence(goal.get("position", ()), "position")),
+            frame_id=None if goal.get("frameId") is None else str(goal["frameId"]),
+            metadata=_json_mapping(_mapping(goal.get("metadata", {}), "metadata")),
+        )
+        for goal in (_mapping(item, "goal") for item in _sequence(payload.get("goals", ()), "goals"))
+    )
+    expected_goal_count = payload.get("goalCount")
+    if expected_goal_count is not None and int(expected_goal_count) != len(goals):
+        raise ValueError("goalCount does not match loaded goals")
+    return RoutePolicyGoalSuite(
+        suite_id=str(payload["suiteId"]),
+        goals=goals,
+        scene_id=None if payload.get("sceneId") is None else str(payload["sceneId"]),
+        frame_id=None if payload.get("frameId") is None else str(payload["frameId"]),
+        metadata=_json_mapping(_mapping(payload.get("metadata", {}), "metadata")),
+        version=version,
+    )
+
+
+def write_route_policy_registry_json(path: str | Path, registry: RoutePolicyRegistry) -> Path:
+    """Write a versioned route policy registry JSON file."""
+
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(registry.to_dict(), ensure_ascii=False, indent=2, sort_keys=True, allow_nan=False) + "\n",
+        encoding="utf-8",
+    )
+    return output_path
+
+
+def load_route_policy_registry_json(path: str | Path) -> RoutePolicyRegistry:
+    """Load a route policy registry JSON artifact."""
+
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    return route_policy_registry_from_dict(_mapping(payload, "registry"))
+
+
+def route_policy_registry_from_dict(payload: Mapping[str, Any]) -> RoutePolicyRegistry:
+    """Rebuild a policy registry from its JSON payload."""
+
+    _record_type(payload, "route-policy-registry")
+    version = str(payload.get("version", ROUTE_POLICY_REGISTRY_VERSION))
+    if version != ROUTE_POLICY_REGISTRY_VERSION:
+        raise ValueError(f"unsupported route policy registry version: {version}")
+    policies = tuple(
+        RoutePolicyRegistryEntry(
+            policy_name=str(policy["policyName"]),
+            policy_type=str(policy["policyType"]),
+            model_path=None if policy.get("modelPath") is None else str(policy["modelPath"]),
+            metadata=_json_mapping(_mapping(policy.get("metadata", {}), "metadata")),
+        )
+        for policy in (_mapping(item, "policy") for item in _sequence(payload.get("policies", ()), "policies"))
+    )
+    expected_policy_count = payload.get("policyCount")
+    if expected_policy_count is not None and int(expected_policy_count) != len(policies):
+        raise ValueError("policyCount does not match loaded policies")
+    return RoutePolicyRegistry(
+        registry_id=str(payload["registryId"]),
+        policies=policies,
+        metadata=_json_mapping(_mapping(payload.get("metadata", {}), "metadata")),
+        version=version,
+    )
 
 
 def render_route_policy_benchmark_markdown(report: RoutePolicyBenchmarkReport) -> str:
@@ -158,15 +440,13 @@ def render_route_policy_benchmark_markdown(report: RoutePolicyBenchmarkReport) -
 def run_cli(args: Any) -> None:
     """Run the route policy benchmark CLI."""
 
-    model, model_source = _load_or_fit_model(args)
-    if getattr(args, "model_output", None):
-        write_route_policy_imitation_model_json(args.model_output, model)
-
     catalog = load_simulation_catalog_from_scene_picker(
         getattr(args, "scene_catalog"),
         site_url=getattr(args, "site_url", "https://rsasaki0109.github.io/gs-mapper/"),
     )
-    scene_id = _resolve_scene_id(catalog, getattr(args, "scene_id", None))
+    goal_suite_path = getattr(args, "goal_suite", None)
+    goal_suite = load_route_policy_goal_suite_json(goal_suite_path) if goal_suite_path else None
+    scene_id = _resolve_scene_id(catalog, getattr(args, "scene_id", None), goal_suite=goal_suite)
     adapter = RoutePolicyGymAdapter(
         HeadlessPhysicalAIEnvironment(catalog),
         RoutePolicyEnvConfig(
@@ -174,23 +454,53 @@ def run_cli(args: Any) -> None:
             max_steps=getattr(args, "max_steps", None) or RoutePolicyEnvConfig().max_steps,
         ),
     )
-    report = run_route_policy_imitation_benchmark(
-        (adapter,),
-        model,
-        episode_count=int(getattr(args, "episode_count")),
-        benchmark_id=str(getattr(args, "benchmark_id")),
-        policy_name=str(getattr(args, "policy_name")),
-        include_direct_baseline=bool(getattr(args, "include_direct_baseline", False)),
-        seed_start=int(getattr(args, "seed_start")),
-        goals=_goals_from_args(catalog, scene_id, getattr(args, "goal", None)),
-        max_steps=getattr(args, "max_steps", None),
-        thresholds=_thresholds_from_args(args),
-        metadata={
-            "sceneCatalog": str(getattr(args, "scene_catalog")),
-            "sceneId": scene_id,
-            "modelSource": model_source,
-        },
-    )
+    goals = _goals_from_args(catalog, scene_id, getattr(args, "goal", None), goal_suite=goal_suite)
+    registry_path = getattr(args, "policy_registry", None)
+    metadata = {
+        "sceneCatalog": str(getattr(args, "scene_catalog")),
+        "sceneId": scene_id,
+        "goalSuite": str(goal_suite_path) if goal_suite_path else None,
+    }
+    if registry_path:
+        if getattr(args, "model_output", None):
+            raise ValueError("--model-output cannot be used with --policy-registry")
+        registry = load_route_policy_registry_json(registry_path)
+        report = run_route_policy_registry_benchmark(
+            (adapter,),
+            registry,
+            episode_count=int(getattr(args, "episode_count")),
+            benchmark_id=str(getattr(args, "benchmark_id")),
+            registry_base_path=Path(registry_path).parent,
+            include_direct_baseline=bool(getattr(args, "include_direct_baseline", False)),
+            seed_start=int(getattr(args, "seed_start")),
+            goals=goals,
+            max_steps=getattr(args, "max_steps", None),
+            thresholds=_thresholds_from_args(args),
+            metadata={
+                **metadata,
+                "registryPath": str(registry_path),
+            },
+        )
+    else:
+        model, model_source = _load_or_fit_model(args)
+        if getattr(args, "model_output", None):
+            write_route_policy_imitation_model_json(args.model_output, model)
+        report = run_route_policy_imitation_benchmark(
+            (adapter,),
+            model,
+            episode_count=int(getattr(args, "episode_count")),
+            benchmark_id=str(getattr(args, "benchmark_id")),
+            policy_name=str(getattr(args, "policy_name")),
+            include_direct_baseline=bool(getattr(args, "include_direct_baseline", False)),
+            seed_start=int(getattr(args, "seed_start")),
+            goals=goals,
+            max_steps=getattr(args, "max_steps", None),
+            thresholds=_thresholds_from_args(args),
+            metadata={
+                **metadata,
+                "modelSource": model_source,
+            },
+        )
     write_route_policy_benchmark_report_json(getattr(args, "output"), report)
     markdown = render_route_policy_benchmark_markdown(report)
     if getattr(args, "markdown_output", None):
@@ -238,10 +548,18 @@ def _load_or_fit_model(args: Any) -> tuple[RoutePolicyImitationModel, str]:
     return model, source_label
 
 
-def _resolve_scene_id(catalog: SimulationCatalog, scene_id: str | None) -> str:
+def _resolve_scene_id(
+    catalog: SimulationCatalog,
+    scene_id: str | None,
+    *,
+    goal_suite: RoutePolicyGoalSuite | None = None,
+) -> str:
     if scene_id:
         catalog.scene_by_id(scene_id)
         return str(scene_id)
+    if goal_suite is not None and goal_suite.scene_id:
+        catalog.scene_by_id(goal_suite.scene_id)
+        return goal_suite.scene_id
     if "outdoor-demo" in catalog.scene_ids():
         return "outdoor-demo"
     scene_ids = catalog.scene_ids()
@@ -254,9 +572,16 @@ def _goals_from_args(
     catalog: SimulationCatalog,
     scene_id: str,
     goal_rows: Sequence[Sequence[float]] | None,
+    *,
+    goal_suite: RoutePolicyGoalSuite | None = None,
 ) -> tuple[Pose3D, ...] | None:
+    if goal_suite is not None and goal_rows:
+        raise ValueError("--goal cannot be combined with --goal-suite")
     if not goal_rows:
-        return None
+        if goal_suite is None:
+            return None
+        frame_id = catalog.scene_by_id(scene_id).coordinate_frame.frame_id
+        return goal_suite.to_goals(frame_id=frame_id)
     frame_id = catalog.scene_by_id(scene_id).coordinate_frame.frame_id
     return tuple(
         Pose3D(
@@ -299,6 +624,49 @@ def _thresholds_from_args(args: Any) -> RoutePolicyQualityThresholds | None:
     )
 
 
+def _resolve_registry_policies(
+    registry: RoutePolicyRegistry,
+    *,
+    registry_base_path: str | Path | None,
+) -> tuple[dict[str, RoutePolicyCallable], tuple[dict[str, Any], ...]]:
+    policies: dict[str, RoutePolicyCallable] = {}
+    summaries: list[dict[str, Any]] = []
+    base_path = Path(registry_base_path) if registry_base_path is not None else Path(".")
+    for entry in registry.policies:
+        if entry.policy_type == "direct-goal":
+            policies[entry.policy_name] = _direct_goal_policy
+            summaries.append(
+                {
+                    "policyName": entry.policy_name,
+                    "policyType": entry.policy_type,
+                    "source": "builtin",
+                    "metadata": _json_mapping(entry.metadata),
+                }
+            )
+            continue
+        assert entry.model_path is not None
+        model_path = _resolve_registry_path(base_path, entry.model_path)
+        model = load_route_policy_imitation_model_json(model_path)
+        policies[entry.policy_name] = model.as_policy()
+        summaries.append(
+            {
+                "policyName": entry.policy_name,
+                "policyType": entry.policy_type,
+                "modelPath": model_path.as_posix(),
+                "sampleCount": model.sample_count,
+                "schema": model.schema.to_dict(),
+                "config": model.config.to_dict(),
+                "metadata": _json_mapping(entry.metadata),
+            }
+        )
+    return policies, tuple(summaries)
+
+
+def _resolve_registry_path(base_path: Path, path_value: str) -> Path:
+    path = Path(path_value)
+    return path if path.is_absolute() else base_path / path
+
+
 def _direct_goal_policy(observation: Mapping[str, float], info: Mapping[str, Any]) -> dict[str, Any]:
     del observation
     return {
@@ -338,6 +706,24 @@ def _position_tuple(row: Sequence[float]) -> tuple[float, float, float]:
     if len(row) != 3:
         raise ValueError("goal must contain exactly three coordinates")
     return (float(row[0]), float(row[1]), float(row[2]))
+
+
+def _record_type(payload: Mapping[str, Any], expected: str) -> None:
+    record_type = payload.get("recordType")
+    if record_type != expected:
+        raise ValueError(f"expected {expected!r}, got {record_type!r}")
+
+
+def _mapping(value: Any, field_name: str) -> Mapping[str, Any]:
+    if isinstance(value, Mapping):
+        return value
+    raise TypeError(f"{field_name} must be a mapping")
+
+
+def _sequence(value: Any, field_name: str) -> Sequence[Any]:
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        return value
+    raise TypeError(f"{field_name} must be a sequence")
 
 
 def _percent(value: float) -> str:

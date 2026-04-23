@@ -146,9 +146,13 @@ from gs_sim2real.sim import (
     RobotFootprint,
     RouteCandidate,
     RoutePolicyEnvConfig,
+    RoutePolicyGoalSpec,
+    RoutePolicyGoalSuite,
     RoutePolicyGymAdapter,
     RoutePolicyImitationFitConfig,
     RoutePolicyQualityThresholds,
+    RoutePolicyRegistry,
+    RoutePolicyRegistryEntry,
     build_occupancy_grid_from_lidar_observation,
     build_route_policy_replay_batch,
     build_route_policy_replay_schema,
@@ -158,7 +162,9 @@ from gs_sim2real.sim import (
     evaluate_route_policy_dataset_quality,
     evaluate_route_policy_imitation_model,
     fit_route_policy_imitation_model,
+    load_route_policy_goal_suite_json,
     load_route_policy_imitation_model_json,
+    load_route_policy_registry_json,
     iter_route_policy_replay_batches,
     load_route_policy_transitions_jsonl,
     replan_after_blocked_rollout,
@@ -170,7 +176,9 @@ from gs_sim2real.sim import (
     select_best_route,
     write_route_policy_benchmark_report_json,
     write_route_policy_dataset_json,
+    write_route_policy_goal_suite_json,
     write_route_policy_imitation_model_json,
+    write_route_policy_registry_json,
     write_route_policy_transitions_jsonl,
 )
 
@@ -391,6 +399,43 @@ gs-mapper route-policy-benchmark \
   --markdown-output runs/outdoor-policy-benchmark.md
 ```
 
+For repeatable comparisons, move fixed goals and saved policy paths into versioned JSON artifacts. Registry model paths are resolved relative to the registry file, so the bundle can move as one directory.
+
+```python
+goal_suite = RoutePolicyGoalSuite(
+    suite_id="outdoor-demo-fixed-goals",
+    scene_id="outdoor-demo",
+    goals=(
+        RoutePolicyGoalSpec("near", (0.25, 0.0, 0.0)),
+        RoutePolicyGoalSpec("far", (0.5, 0.0, 0.0)),
+    ),
+)
+write_route_policy_goal_suite_json("runs/outdoor-goals.json", goal_suite)
+
+registry = RoutePolicyRegistry(
+    registry_id="outdoor-demo-policies",
+    policies=(
+        RoutePolicyRegistryEntry(policy_name="direct", policy_type="direct-goal"),
+        RoutePolicyRegistryEntry(
+            policy_name="imitation-k3",
+            policy_type="imitation-model",
+            model_path="outdoor-imitation-model.json",
+        ),
+    ),
+)
+write_route_policy_registry_json("runs/outdoor-policies.json", registry)
+```
+
+```bash
+gs-mapper route-policy-benchmark \
+  --policy-registry runs/outdoor-policies.json \
+  --goal-suite runs/outdoor-goals.json \
+  --scene-catalog docs/scenes-list.json \
+  --episode-count 16 \
+  --output runs/outdoor-policy-registry-benchmark.json \
+  --markdown-output runs/outdoor-policy-registry-benchmark.md
+```
+
 Supported actions:
 
 - `twist`: `linearX`, `linearY`, `linearZ` or `vx`, `vy`, `vz`
@@ -400,4 +445,4 @@ The backend always blocks poses outside `SceneEnvironment.bounds`. When a `Voxel
 
 ## Next Implementation Layer
 
-The next useful layer is a small policy registry and named goal-suite files: load several saved policies by name, share fixed evaluation goals across runs, and keep policy comparison inputs versioned outside ad hoc CLI flags.
+The next useful layer is benchmark history aggregation: collect multiple benchmark report JSON files, compare trends across commits or datasets, and add CI gates for regressions against a blessed baseline report.

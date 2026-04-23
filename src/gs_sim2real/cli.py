@@ -1054,6 +1054,7 @@ def build_parser() -> argparse.ArgumentParser:
     source_group.add_argument("--transitions-jsonl", default=None, help="Replay transition JSONL used to fit imitation")
     source_group.add_argument("--dataset-json", default=None, help="Replay episode dataset JSON used to fit imitation")
     source_group.add_argument("--model", default=None, help="Previously saved imitation model JSON")
+    source_group.add_argument("--policy-registry", default=None, help="Policy registry JSON with named policies")
     rpb.add_argument("--model-output", default=None, help="Optional path to write the fitted imitation model JSON")
     rpb.add_argument(
         "--output", default="outputs/route_policy_benchmark/report.json", help="Benchmark report JSON path"
@@ -1079,6 +1080,7 @@ def build_parser() -> argparse.ArgumentParser:
         metavar=("X", "Y", "Z"),
         help="Fixed goal position; repeat for a goal suite",
     )
+    rpb.add_argument("--goal-suite", default=None, help="Named route policy goal-suite JSON")
     rpb.add_argument("--neighbor-count", type=int, default=1, help="k for fitted k-NN imitation")
     rpb.add_argument("--action-keys", nargs="+", default=None, help="Pinned replay action keys for target decoding")
     rpb.add_argument("--include-direct-baseline", action="store_true", help="Compare against a direct-goal baseline")
