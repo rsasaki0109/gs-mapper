@@ -146,6 +146,7 @@ from gs_sim2real.sim import (
     RobotFootprint,
     RouteCandidate,
     build_occupancy_grid_from_lidar_observation,
+    rollout_route,
     select_best_route,
 )
 
@@ -183,6 +184,19 @@ plan = select_best_route(
 best_route = plan.selected.candidate
 ```
 
+To execute the selected route through the environment step contract, roll it out as either absolute `teleport` steps or fixed-duration `twist` segments. The rollout records every transition plus applied/collision status for each action.
+
+```python
+rollout = rollout_route(
+    env,
+    plan.selected,
+    action_type="teleport",
+    stop_on_collision=True,
+)
+route_passed = rollout.passed
+rollout_metrics = rollout.metrics()
+```
+
 Supported actions:
 
 - `twist`: `linearX`, `linearY`, `linearZ` or `vx`, `vy`, `vz`
@@ -192,4 +206,4 @@ The backend always blocks poses outside `SceneEnvironment.bounds`. When a `Voxel
 
 ## Next Implementation Layer
 
-The next useful layer is route execution: add simple action rollout helpers that convert a selected route into `twist` or `teleport` steps and record per-step collision outcomes.
+The next useful layer is closed-loop replanning: feed blocked rollout steps back into route candidate generation and re-score alternatives from the last applied pose.

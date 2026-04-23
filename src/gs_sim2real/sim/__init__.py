@@ -51,6 +51,13 @@ from .rendering import (
     render_splat_point_cloud,
     resolve_scene_asset_path,
 )
+from .route_execution import (
+    RouteActionStep,
+    RouteRollout,
+    RouteStepOutcome,
+    build_route_actions,
+    rollout_route,
+)
 from .route_planning import (
     RouteCandidate,
     RouteEvaluation,
@@ -76,9 +83,12 @@ __all__ = [
     "Pose3D",
     "PlanningViewpointKey",
     "RobotFootprint",
+    "RouteActionStep",
     "RouteCandidate",
     "RouteEvaluation",
     "RoutePlan",
+    "RouteRollout",
+    "RouteStepOutcome",
     "SceneEnvironment",
     "SensorModel",
     "SensorRig",
@@ -91,6 +101,7 @@ __all__ = [
     "TrajectoryScore",
     "Vec3",
     "VoxelOccupancyGrid",
+    "build_route_actions",
     "build_occupancy_grid_from_lidar_observation",
     "build_simulation_catalog",
     "decode_lidar_points_observation",
@@ -101,6 +112,7 @@ __all__ = [
     "render_simulation_catalog_json",
     "point_to_voxel_cell",
     "resolve_scene_asset_path",
+    "rollout_route",
     "select_best_route",
     "summarize_collision_queries",
 ]
