@@ -269,6 +269,39 @@ write_route_policy_dataset_json("runs/outdoor-policy-rollouts.json", dataset)
 write_route_policy_transitions_jsonl("runs/outdoor-policy-transitions.jsonl", dataset)
 ```
 
+Gate those rollouts before they enter training. The quality report keeps pass/fail checks and metrics separate from the raw replay data, so CI can reject weak datasets without changing the collector.
+
+```python
+quality = evaluate_route_policy_dataset_quality(
+    dataset,
+    thresholds=RoutePolicyQualityThresholds(
+        min_success_rate=0.95,
+        max_collision_rate=0.01,
+        max_truncation_rate=0.05,
+        min_scene_count=1,
+        min_episode_count=16,
+    ),
+)
+print(render_route_policy_quality_markdown(quality))
+assert quality.passed
+```
+
+For simple policy comparisons, collect each named baseline against the same adapter, seed range, and goals. The returned evaluation keeps each policy dataset and its QA report isolated.
+
+```python
+baselines = evaluate_route_policy_baselines(
+    (policy_env,),
+    {
+        "direct": direct_goal_policy,
+        "agent": learned_policy,
+    },
+    episode_count=16,
+    evaluation_id="outdoor-demo-baselines",
+    seed_start=100,
+)
+print(baselines.best_policy_name)
+```
+
 Supported actions:
 
 - `twist`: `linearX`, `linearY`, `linearZ` or `vx`, `vy`, `vz`
@@ -278,4 +311,4 @@ The backend always blocks poses outside `SceneEnvironment.bounds`. When a `Voxel
 
 ## Next Implementation Layer
 
-The next useful layer is dataset QA and baseline evaluation: score collected rollouts for success rate, collision rate, reward distribution, and scene coverage before feeding them into imitation learning or offline RL.
+The next useful layer is a replay loader and offline policy training bridge: stream the JSONL transitions into imitation learning or offline RL batches, keep feature schemas versioned, and run trained policies back through the same baseline evaluator.
