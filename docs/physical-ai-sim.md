@@ -145,6 +145,8 @@ from gs_sim2real.sim import (
     OccupancyPlanningContext,
     RobotFootprint,
     RouteCandidate,
+    RoutePolicyEnvConfig,
+    RoutePolicyGymAdapter,
     build_occupancy_grid_from_lidar_observation,
     build_route_policy_sample,
     replan_after_blocked_rollout,
@@ -232,6 +234,20 @@ agent_reward = sample.reward.reward
 agent_terminal = sample.reward.terminal
 ```
 
+For learned policy loops, wrap the same route feedback with the Gymnasium-style adapter. It avoids a hard `gymnasium` dependency, but follows the same `reset()` and `step()` return shape.
+
+```python
+policy_env = RoutePolicyGymAdapter(
+    env,
+    RoutePolicyEnvConfig(scene_id="outdoor-demo", max_steps=64),
+)
+
+observation, info = policy_env.reset(seed=7, goal=goal)
+observation, reward, terminated, truncated, info = policy_env.step(
+    {"routeId": "agent-waypoint", "target": goal.to_dict()}
+)
+```
+
 Supported actions:
 
 - `twist`: `linearX`, `linearY`, `linearZ` or `vx`, `vy`, `vz`
@@ -241,4 +257,4 @@ The backend always blocks poses outside `SceneEnvironment.bounds`. When a `Voxel
 
 ## Next Implementation Layer
 
-The next useful layer is Gymnasium-style environment adapters: wrap reset/step around policy feedback samples so learned agents can consume GS Mapper scenes directly.
+The next useful layer is rollout dataset export and vectorized collection: batch these adapter episodes into replay-friendly records for imitation learning and offline RL.

@@ -18,6 +18,13 @@ from .contract import (
 )
 from .costmap import TrajectoryCollisionSummary, summarize_collision_queries
 from .footprint import RobotFootprint
+from .gym_adapter import (
+    RoutePolicyAction,
+    RoutePolicyEnvConfig,
+    RoutePolicyEnvState,
+    RoutePolicyGymAdapter,
+    make_route_policy_env,
+)
 from .headless import (
     HeadlessEnvironmentState,
     HeadlessPhysicalAIEnvironment,
@@ -102,6 +109,10 @@ __all__ = [
     "Pose3D",
     "PlanningViewpointKey",
     "RobotFootprint",
+    "RoutePolicyAction",
+    "RoutePolicyEnvConfig",
+    "RoutePolicyEnvState",
+    "RoutePolicyGymAdapter",
     "RouteActionStep",
     "RouteCandidate",
     "RouteEvaluation",
@@ -136,6 +147,7 @@ __all__ = [
     "load_scene_picker_catalog",
     "load_splat_point_cloud",
     "load_simulation_catalog_from_scene_picker",
+    "make_route_policy_env",
     "render_splat_point_cloud",
     "render_simulation_catalog_json",
     "point_to_voxel_cell",
