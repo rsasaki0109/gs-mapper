@@ -1,38 +1,88 @@
-# 屋外 3D Gaussian Splatting 開発計画 / 現行 handoff
+# 屋外 3D Gaussian Splatting / Physical AI Simulation 開発計画
 
-更新日: 2026-04-22（External SLAM import preflight collector 反映）
+更新日: 2026-04-23（Physical AI scenario CI / workflow review publishing 反映）
 
-この文書は、次の担当エージェントが屋外 3DGS パイプラインの現在地をすぐ把握するための短い handoff です。古い PR / セッションごとの詳細ログ、失敗履歴、長いコマンド transcript は [archive snapshot](archive/plan_outdoor_gs_2026_04_full_handoff.md) に退避しました。
+この文書は、GS Mapper の屋外 3DGS パイプラインと、その上に載せる Physical AI simulation / policy benchmark / scenario CI の現行計画をまとめる長めの handoff です。
 
-## 読み方
+古い PR ごとの transcript、`tuhh_day_04` の誤判定、MCD calibration 探索、実走ログ、個別コマンドの長い出力は [archive snapshot](archive/plan_outdoor_gs_2026_04_full_handoff.md) に残しています。本書は「次にどこへ進むか」を判断するための source of truth として更新します。
 
-1. まず本書の **TL;DR / 現在の残課題 / 検証コマンド** を読む。
-2. MCD calibration、`tuhh_day_04` 誤判定、`ntu_day_02` 実走値、PR #55〜#80 の履歴が必要なときだけ archive を読む。
-3. コマンド早見は `CLAUDE.md` が存在する場合はそちらも確認する。リポジトリによっては未配置なので、その場合は本書と `README.md` / `CONTRIBUTING.md` を source of truth にする。
+## 0. 読み方
 
-## TL;DR
+1. まず **TL;DR** と **現在の主戦場** を読む。
+2. 実装に入る前に **System Map** と **Scenario CI Pipeline** を確認する。
+3. 屋外データ / viewer / external SLAM だけ触るなら **Outdoor 3DGS Track** を読む。
+4. Physical AI / policy benchmark / CI を触るなら **Physical AI Simulation Track** を読む。
+5. 古い実験値、MCD calibration、`ntu_day_02` 実走値、PR #55〜#80 の履歴が必要な場合だけ archive を読む。
 
-- 本 repo は **Autoware / MCD の public outdoor data から `.splat` を生成し、GitHub Pages viewer で公開する**ところまで到達済み。
-- Production viewer picker は **8 scenes**: 2 supervised、4 pose-free、2 external-SLAM comparison。
-- `docs/scenes-list.json` が README table / preview capture / hero GIF / viewer picker の source of truth。`tests/test_pages_assets.py` が drift を検出する。
-- `tuhh_day_04` の supervised GNSS 成功扱いは撤回済み。`/vn200/GPS` は all-zero なので production picker には入れない。
-- Valid GNSS supervised MCD demo は `ntu_day_02` を採用済み。`docs/assets/outdoor-demo/mcd-ntu-day02-supervised.splat` が production asset。
-- External SLAM artifact import は VGGT-SLAM 2.0 / MASt3R-SLAM comparison splat まで実走済み。Pi3 / LoGeR profile も artifact resolver 側に候補追加済み。
-- Waymo real-data E2E は未検証。SDK / dataset agreement / manual tfrecord download が blocker。
+## 1. TL;DR
 
-## 現在の残課題
+- GS Mapper は、写真フォルダ、Autoware / MCD の robotics logs、MASt3R-SLAM / VGGT-SLAM 2.0 / Pi3 / LoGeR などの external SLAM artifacts を、3D Gaussian Splatting training / export / browser viewer へつなぐ repo。
+- Public demo は GitHub Pages で公開済み。`docs/scenes-list.json` が README table / preview capture / hero GIF / viewer picker の source of truth。
+- Production viewer picker は 8 scenes。2 supervised、4 pose-free、2 external-SLAM comparison。
+- MCD `tuhh_day_04` の supervised GNSS 成功扱いは撤回済み。`/vn200/GPS` が all-zero なので production picker には入れない。
+- Valid GNSS supervised MCD demo は `ntu_day_02`。production asset は `docs/assets/outdoor-demo/mcd-ntu-day02-supervised.splat`。
+- External SLAM import は VGGT-SLAM 2.0 / MASt3R-SLAM comparison splat まで実走済み。Pi3 / LoGeR profile も artifact resolver 側に候補追加済み。
+- 2026-04-23 時点では、屋外 3DGS だけでなく **Physical AI simulation benchmark environment** を目指す方向へ拡張中。
+- Route policy benchmark 系は、dataset / imitation / registry / benchmark / history / scenario-set / matrix / sharding / CI manifest / workflow materialization / validation / activation / review bundle まで分割済み。
+- 次に自然なのは **workflow trigger promotion**。manual-only workflow から PR / branch trigger へ広げる前に、review bundle PASS を promotion gate にする。
 
-| Priority | Task | 状態 |
+## 2. 現在の主戦場
+
+今の大きな方向転換は、単なる「屋外 3DGS のデモ生成」から、次のような **Physical AI 用 simulation / evaluation environment** に寄せることです。
+
+1. Real-world robotics logs から 3DGS scene を作る。
+2. Browser / local renderer / headless environment で観測を返す。
+3. Route policy / navigation policy / query policy を benchmark する。
+4. Scenario matrix を小さな shard に分け、CI で回す。
+5. CI workflow 自体も生成、検証、activation、review publishing の段階に分ける。
+6. Review bundle を GitHub Pages に出し、workflow trigger を広げる前に人間が inspected artifact を見られるようにする。
+
+この構成にした理由は、開発がスケールすると「1 個の巨大 E2E が落ちる」よりも、「小さい scenario / shard / validation / activation / review gate がどこで落ちたか分かる」方が速いからです。ユーザーが求めていた「モジュール分割、関数分割、クラス分割、依存の局所化、テスト単位の分離」「影響範囲を閉じ込め、検証単位を細かく設計する」は、この route policy scenario CI chain の設計方針そのものです。
+
+## 3. Recent Commits / 現在地
+
+直近の主な流れ:
+
+| Commit | 内容 |
+| --- | --- |
+| `6e68151` | Route policy scenario CI review publishing を追加。shard merge / validation / activation を Pages review bundle に集約。 |
+| `09f67d4` | Workflow activation guardrails を追加。validation PASS と `.github/workflows/` path などを gate 化。 |
+| `8c5e9b0` | Generated workflow validation を追加。YAML parse、matrix、commands、artifact paths を manifest と照合。 |
+| `8aa09b4` | Scenario CI workflow materialization を追加。manifest から GitHub Actions YAML を生成。 |
+| `99ffb52` | Scenario CI manifest を追加。shard jobs / merge job / cache / output paths を構造化。 |
+| `94b6411` | Scenario sharding を追加。scenario-set を CI-friendly shard に分割、merge report へ集約。 |
+| `f67e977` | Scenario matrix expansion を追加。registry / scene / goal suite / config matrix から scenario-set 群を生成。 |
+| `7c2f850` | Scenario-set runner を追加。scenario-set artifact を benchmark 実行単位にした。 |
+| `bb0e038` | Benchmark history gates を追加。baseline/current regression checks を構造化。 |
+| `aa8a60b` | Route policy registry artifacts を追加。policy registry と benchmark surface を分離。 |
+
+この chain は、Physical AI simulation の「検証単位を小さくする」ための土台です。
+
+## 4. System Map
+
+### 4.1 層構造
+
+| Layer | 目的 | 主な files |
 | --- | --- | --- |
-| A | BYO photos / CoVLA mini 自己実証 | 外部入力待ち。ユーザ写真または HF access 承認が必要。 |
-| A | 公開 docs の継続整理 | `docs/experiments.md` は index 化済み。本書の長い履歴は archive 化済み。今後は古い詳細を archive 側へ追記する。 |
-| A | 8-scene viewer smoke 継続運用 | `docs/scenes-list.json` source of truth 化済み。pre-PR で `pytest tests/test_pages_assets.py -q` を通す。 |
-| B | Waymo 実データ E2E | code path / prereq script はあるが、実データと Python 3.10 環境が必要。 |
-| C | NMEA / GNSS / IMU robustness | IMU orientation CSV normalization、NMEA checksum validation、GNSS timestamp anomaly、IMU angular-velocity yaw fallback の first slices は対応済み。 |
-| C | depth / appearance / sky の比較評価 | `outdoor-training-features` experiment lab で first slice 整理済み。実データ PSNR/LPIPS run は未実施。 |
-| D | MCD `ntu_day_02` quality push | `scripts/plan_mcd_quality_runs.py` で run matrix、`scripts/collect_mcd_quality_runs.py` で artifact / metric summary は整理済み。実データ再実走は未実施。 |
+| Data / assets | public demo assets、scene manifests、Pages viewer | `docs/scenes-list.json`, `docs/sim-scenes.json`, `docs/assets/outdoor-demo/`, `docs/splat.html`, `docs/index.html` |
+| Preprocess | image / video / rosbag / external SLAM artifact から COLMAP sparse 相当を作る | `src/gs_sim2real/datasets/`, `src/gs_sim2real/preprocess/`, `src/gs_sim2real/preprocess/external_slam_artifacts/` |
+| Train / export | gsplat / nerfstudio training、`.splat` / scene bundle export | `src/gs_sim2real/train/`, `src/gs_sim2real/viewer/web_export.py`, `src/gs_sim2real/cli.py` |
+| Physical AI sim contract | scene environment、sensor rig、headless env、observations/actions | `src/gs_sim2real/sim/contract.py`, `interfaces.py`, `headless.py`, `gym_adapter.py`, `occupancy.py`, `costmap.py` |
+| Policy benchmark | dataset、imitation、registry、benchmark、history gates | `policy_dataset.py`, `policy_imitation.py`, `policy_benchmark.py`, `policy_benchmark_history.py` |
+| Scenario execution | scenario-set、matrix expansion、sharding、merge | `policy_scenario_set.py`, `policy_scenario_matrix.py`, `policy_scenario_sharding.py` |
+| Scenario CI | CI manifest、workflow materialization、validation、activation、review publishing | `policy_scenario_ci_manifest.py`, `policy_scenario_ci_workflow.py`, `policy_scenario_ci_activation.py`, `policy_scenario_ci_review.py` |
+| Experiment labs | design seams の比較実験と docs 生成 | `src/gs_sim2real/experiments/`, `docs/experiments.md`, `docs/experiments.generated.md` |
 
-## 現在の production assets
+### 4.2 分割の基本方針
+
+- 外部依存の重い front-end は repo 内で import しない。MASt3R-SLAM / VGGT-SLAM / Pi3 / LoGeR は「artifact を吐いた後」に importer が受ける。
+- Generated artifact は必ず versioned JSON / Markdown / HTML のどれかにする。
+- CI workflow は手書きではなく manifest から生成する。
+- Generated workflow はすぐ active path に置かず、validation → activation → review publishing を通す。
+- Physical AI benchmark は single huge run にせず、scenario-set → matrix → shard → merge に分ける。
+- Public Pages に出すものは `docs/` 配下だけ。実データ、rosbag、calibration YAML、training output は commit しない。
+
+## 5. Production Assets / Viewer Contract
 
 `docs/scenes-list.json` の production scene list:
 
@@ -45,25 +95,377 @@
 7. `assets/outdoor-demo/mcd-tuhh-day04-mast3r.splat` — MCD `tuhh_day_04` MAST3R pose-free metric
 8. `assets/outdoor-demo/mcd-ntu-day02-supervised.splat` — MCD `ntu_day_02` supervised valid-GNSS demo
 
-`assets/outdoor-demo/mcd-tuhh-day04-supervised.splat` may exist as a diagnostic artifact, but it must not be added to the production picker or benchmark table.
+重要:
 
-## 実装の読みどころ
+- `assets/outdoor-demo/mcd-tuhh-day04-supervised.splat` は diagnostic artifact として存在してもよいが、production picker / benchmark table に追加しない。
+- production scene を増やしたら、README table、viewer picker 3 種、preview PNG、hero GIF の source of truth は `docs/scenes-list.json` に揃える。
+- Drift は `tests/test_pages_assets.py` が検出する。
+
+## 6. Outdoor 3DGS Track
+
+### 6.1 目的
+
+屋外 robotics data から 3DGS を作り、Pages viewer で公開できる `.splat` / bundle にする。
+
+### 6.2 対応済み
+
+- Autoware bag 系 supervised pipeline。
+- DUSt3R / MASt3R pose-free preprocessing。
+- MCD rosbag image / lidar / IMU / GNSS extraction。
+- MCD static calibration downloader と TF handling。
+- MCD GNSS zero guard。
+- MCD CameraInfo 欠落時の PINHOLE 合成。
+- MCD single-camera colorize / sparse depth export。
+- IMU orientation CSV normalization。
+- Angular-velocity yaw fallback。
+- External SLAM artifact import facade。
+- VGGT-SLAM 2.0 / MASt3R-SLAM comparison splat 実走。
+- Pi3 / LoGeR profile / resolver candidate patterns。
+- Pi3 / LoGeR smoke は archive に記録済み。
+- README / Pages launch-kit / docs assets 整理。
+
+### 6.3 未完
+
+| Priority | Task | 状態 |
+| --- | --- | --- |
+| A | BYO photos / CoVLA mini 自己実証 | 外部入力待ち。ユーザ写真または HF access 承認が必要。 |
+| A | 8-scene viewer smoke 継続運用 | `docs/scenes-list.json` source of truth 化済み。pre-PR で `pytest tests/test_pages_assets.py -q` を通す。 |
+| B | Waymo 実データ E2E | code path / prereq script はあるが、実データと Python 3.10 環境が必要。 |
+| B | Pi3 / LoGeR comparison production asset | Smoke は済み。production quality の full run は未実施。 |
+| C | `ntu_day_02` quality push | `scripts/plan_mcd_quality_runs.py` と collector はある。実データ再実走は未実施。 |
+| C | depth / appearance / sky の比較評価 | `outdoor-training-features` experiment lab はある。real metric run は未実施。 |
+
+### 6.4 Outdoor 実装の読みどころ
 
 | Area | Files | Notes |
 | --- | --- | --- |
 | MCD calibration / static TF | `src/gs_sim2real/datasets/ros_tf.py`, `scripts/download_mcd_calibration.sh` | MCDVIRAL official calibration YAML を downloader 経由で取得。YAML は CC BY-NC-SA なので repo に commit しない。 |
-| MCD supervised sparse import | `src/gs_sim2real/cli.py`, `src/gs_sim2real/datasets/mcd.py` | `--mcd-static-calibration`、single-camera colorize/depth、CameraInfo 欠落時の PINHOLE 合成、zero-GNSS guard、IMU orientation CSV normalization、angular-velocity yaw fallback。 |
-| MCD quality run planning | `src/gs_sim2real/experiments/mcd_quality_plan.py`, `scripts/plan_mcd_quality_runs.py`, `scripts/collect_mcd_quality_runs.py` | `ntu_day_02` の baseline / single-camera BA / multi-camera BA の preprocess→train→export commands、expected artifacts、実走後 summary を生成。 |
-| External SLAM import | `src/gs_sim2real/preprocess/external_slam.py`, `src/gs_sim2real/preprocess/external_slam_artifacts/`, `scripts/plan_external_slam_imports.py`, `scripts/collect_external_slam_imports.py` | facade + profile/resolver/materializer/importer/manifest 分割済み。VGGT-SLAM / MASt3R-SLAM 実走済み、Pi3 / LoGeR 候補追加済み。Dry-run manifest の保存先計画、集計レポート、artifact 未配置時の構造化 error manifest、Pi3/LoGeR export naming variance 吸収、collector markdown の image-dir / selected artifact / reason 表示も追加済み。 |
-| Outdoor feature comparison | `src/gs_sim2real/experiments/outdoor_training_features_lab.py` | depth supervision、appearance embedding、pose refinement、sky-mask profile を同一 fixture で比較。real metric run 前の planning harness。 |
-| Pages scene contract | `docs/scenes-list.json`, `scripts/pages_scene_manifest.py`, `tests/test_pages_assets.py` | README table、preview capture、hero GIF、3 viewer picker を manifest に揃える。 |
-| README preview capture | `scripts/capture_readme_splat_previews.py` | WebGL は headed Chromium 推奨。`--out-dir` で smoke capture を一時出力可能。 |
+| MCD supervised sparse import | `src/gs_sim2real/cli.py`, `src/gs_sim2real/datasets/mcd.py` | `--mcd-static-calibration`、single-camera colorize/depth、CameraInfo 欠落時 PINHOLE 合成、zero-GNSS guard、IMU yaw fallback。 |
+| MCD quality run planning | `src/gs_sim2real/experiments/mcd_quality_plan.py`, `scripts/plan_mcd_quality_runs.py`, `scripts/collect_mcd_quality_runs.py` | `ntu_day_02` baseline / single-camera BA / multi-camera BA の commands と summary。 |
+| External SLAM import | `src/gs_sim2real/preprocess/external_slam.py`, `src/gs_sim2real/preprocess/external_slam_artifacts/` | facade + profile/resolver/materializer/importer/manifest 分割。artifact 未配置でも structured error manifest を出す。 |
+| External SLAM planning | `scripts/plan_external_slam_imports.py`, `scripts/collect_external_slam_imports.py` | MASt3R-SLAM / VGGT-SLAM / Pi3 / LoGeR の dry-run gate matrix と collector。 |
+| Outdoor feature comparison | `src/gs_sim2real/experiments/outdoor_training_features_lab.py` | depth supervision、appearance embedding、pose refinement、sky-mask profile 比較。 |
+| Pages scene contract | `docs/scenes-list.json`, `scripts/pages_scene_manifest.py`, `tests/test_pages_assets.py` | README table、preview capture、hero GIF、viewer picker を manifest に揃える。 |
+| README preview capture | `scripts/capture_readme_splat_previews.py` | WebGL は headed Chromium 推奨。headless では黒 canvas になることがある。 |
 | Hero GIF | `scripts/record_demo_gif.py` | `docs/scenes-list.json` の production scenes を順に cycle する。 |
-| Experiment-process docs | `src/gs_sim2real/experiments/process_docs.py`, `docs/experiments.md`, `docs/experiments.generated.md` | 公開 index と詳細生成表を分離済み。 |
 
-## 検証コマンド
+## 7. External SLAM Track
 
-通常の pre-PR:
+### 7.1 現行方針
+
+MASt3R-SLAM / VGGT-SLAM 2.0 / Pi3 / LoGeR を直接 dependency として repo に抱えない。各 front-end は repo 外で実行し、出力された trajectory / pose tensor / point cloud を GS Mapper に渡す。
+
+GS Mapper 側の責務:
+
+- candidate artifact path を探索する。
+- TUM / KITTI / NMEA / tensor pose を一時 trajectory に materialize する。
+- point tensor / PLY / PCD / NPY を point cloud として読む。
+- image directory と pose count を align する。
+- dry-run manifest に selected artifact、candidate trace、missing reason、gate result を残す。
+- COLMAP sparse に変換し、既存 training path に渡す。
+
+### 7.2 Profile 状態
+
+| System | 状態 | Notes |
+| --- | --- | --- |
+| MASt3R-SLAM | production comparison 実走済み | `bag6-mast3r-slam-20-15k.splat` |
+| VGGT-SLAM 2.0 | production comparison 実走済み | `bag6-vggt-slam-20-15k.splat` |
+| Pi3 / Pi3X | smoke 済み、profile 候補追加済み | camera_poses tensor / dense points flattening 対応候補。production asset は未実走。 |
+| LoGeR | smoke 済み、profile 候補追加済み | `--output_txt` trajectory と `.pt` artifact 候補。production asset は未実走。 |
+
+### 7.3 Dry-run examples
+
+```bash
+gs-mapper preprocess --method external-slam --images <images-dir> \
+  --external-slam-system vggt-slam --external-slam-output <slam-output-dir> \
+  --external-slam-dry-run --external-slam-manifest-format json \
+  --external-slam-fail-on-dry-run-gate
+```
+
+```bash
+python3 scripts/plan_external_slam_imports.py --format markdown
+python3 scripts/plan_external_slam_imports.py --format shell
+python3 scripts/collect_external_slam_imports.py --format markdown
+```
+
+## 8. Physical AI Simulation Track
+
+### 8.1 North Star
+
+GS Mapper を「3DGS demo generator」で止めず、Physical AI policy を検証できる simulation environment にする。
+
+最小の完成形:
+
+1. Real outdoor scene を 3DGS asset として持つ。
+2. Scene metadata、bounds、sensor rig、coordinate frame を stable JSON contract として持つ。
+3. Headless environment が pose / observation / collision / reward を返す。
+4. Route policy baseline と imitation policy を同じ benchmark interface で評価できる。
+5. Scenario matrix を生成し、CI shard で実行できる。
+6. Workflow 生成から review bundle まで、自動化の各段階を小さく検証できる。
+
+### 8.2 既存モジュール
+
+| Module | Role |
+| --- | --- |
+| `contract.py` | `SimulationCatalog`, `SceneEnvironment`, `SensorRig`, `TrajectoryEpisode` などの contract。 |
+| `interfaces.py` | `PhysicalAIEnvironment`, `Observation`, `AgentAction`, `Pose3D`, `TrajectoryScore`。 |
+| `headless.py` | Headless environment。bounds / occupancy / trajectory scoring。 |
+| `gym_adapter.py` | Route policy を gym-like interface で動かす adapter。 |
+| `occupancy.py` | LiDAR observation から occupancy grid を作る utility。 |
+| `costmap.py` | Collision query summary。 |
+| `footprint.py` | Robot footprint。point collision ではなく body radius / height を見る。 |
+| `planning.py`, `route_planning.py` | occupancy planning / candidate route / replanning。 |
+| `observation_renderer.py`, `splat_renderer.py` | observation / splat render integration。 |
+
+### 8.3 Policy benchmark modules
+
+| Module | Role |
+| --- | --- |
+| `policy_dataset.py` | Route policy dataset collection / JSON / transitions JSONL。 |
+| `policy_imitation.py` | Imitation model / action decoder / fit / evaluation。 |
+| `policy_feedback.py` | Observation / reward / sample building。 |
+| `policy_quality.py` | Dataset quality / baseline evaluation。 |
+| `policy_replay.py` | Replay batches / feature schema / transition table。 |
+| `policy_benchmark.py` | Goal suite / registry / benchmark report。 |
+| `policy_benchmark_history.py` | Benchmark snapshots / regression gates / history report。 |
+
+### 8.4 まだ弱いところ
+
+| Area | 課題 |
+| --- | --- |
+| Observation realism | 現在は lightweight contract 中心。camera image / depth / splat render の統合を強める必要がある。 |
+| Dynamics | Headless env は policy evaluation の最小実装。real robot dynamics / latency / actuation constraints は薄い。 |
+| Sensor noise | GNSS / IMU / LiDAR / camera noise profile を scenario config に落としたい。 |
+| Multi-agent / moving obstacles | 現状は static occupancy 寄り。dynamic object / moving obstacle は今後。 |
+| Real benchmark correlation | 実機 / rosbag replay と sim benchmark の相関検証は未実施。 |
+
+## 9. Route Policy Scenario CI Pipeline
+
+この chain が 2026-04-23 時点の最重要な進捗です。巨大な benchmark を一発で回すのではなく、設定生成、sharding、CI workflow 生成、検証、activation、review publishing を分割します。
+
+### 9.1 Pipeline overview
+
+```text
+registry + scenes + goal suites + configs
+  -> scenario matrix
+  -> scenario sets
+  -> shard plan
+  -> shard run JSONs
+  -> shard merge report + history gate
+  -> CI manifest
+  -> generated workflow YAML
+  -> workflow validation report
+  -> workflow activation report
+  -> Pages review bundle
+  -> trigger promotion
+```
+
+### 9.2 Modules
+
+| Stage | Module | CLI | Output |
+| --- | --- | --- | --- |
+| Scenario set execution | `policy_scenario_set.py` | `route-policy-scenario-set` | scenario-set run JSON / Markdown |
+| Matrix expansion | `policy_scenario_matrix.py` | `route-policy-scenario-matrix` | scenario matrix expansion JSON |
+| Sharding | `policy_scenario_sharding.py` | `route-policy-scenario-shards` | shard plan JSON / shard scenario-set files |
+| Shard merge | `policy_scenario_sharding.py` | `route-policy-scenario-shard-merge` | shard merge JSON / history JSON |
+| CI manifest | `policy_scenario_ci_manifest.py` | `route-policy-scenario-ci-manifest` | CI manifest JSON |
+| Workflow materialization | `policy_scenario_ci_workflow.py` | `route-policy-scenario-ci-workflow` | generated YAML / workflow index JSON |
+| Workflow validation | `policy_scenario_ci_workflow.py` | `route-policy-scenario-ci-workflow-validate` | validation JSON / Markdown |
+| Workflow activation | `policy_scenario_ci_activation.py` | `route-policy-scenario-ci-workflow-activate` | activation JSON / Markdown / active workflow YAML |
+| Review publishing | `policy_scenario_ci_review.py` | `route-policy-scenario-ci-review` | review JSON / Markdown / HTML bundle |
+
+### 9.3 Important contracts
+
+- `RoutePolicyScenarioCIManifest` は shard jobs と merge job を構造化する。
+- `RoutePolicyScenarioCIWorkflowMaterialization` は generated YAML と config を保持する。
+- `RoutePolicyScenarioCIWorkflowValidationReport` は YAML parse / text checks / payload checks / manifest consistency を保持する。
+- `RoutePolicyScenarioCIWorkflowActivationReport` は validation PASS、source path、destination path、content equality、overwrite を gate 化する。
+- `RoutePolicyScenarioCIReviewArtifact` は shard merge / validation / activation を Pages 向け review bundle にまとめる。
+
+### 9.4 Example commands
+
+Scenario matrix:
+
+```bash
+gs-mapper route-policy-scenario-matrix \
+  --matrix path/to/matrix.json \
+  --output-dir runs/scenarios/generated \
+  --output runs/scenarios/matrix-expansion.json \
+  --markdown-output runs/scenarios/matrix-expansion.md
+```
+
+Shard plan:
+
+```bash
+gs-mapper route-policy-scenario-shards \
+  --expansion runs/scenarios/matrix-expansion.json \
+  --output-dir runs/scenarios/shards \
+  --max-scenarios-per-shard 4 \
+  --shard-plan-id outdoor-demo-shards \
+  --index-output runs/scenarios/shard-plan.json \
+  --markdown-output runs/scenarios/shard-plan.md
+```
+
+Shard merge:
+
+```bash
+gs-mapper route-policy-scenario-shard-merge \
+  --run runs/scenarios/ci/runs/shard-001.json \
+  --run runs/scenarios/ci/runs/shard-002.json \
+  --merge-id outdoor-demo-shard-merge \
+  --output runs/scenarios/ci/shard-merge.json \
+  --history-output runs/scenarios/ci/shard-history.json \
+  --history-markdown-output runs/scenarios/ci/shard-history.md \
+  --fail-on-regression
+```
+
+CI manifest:
+
+```bash
+gs-mapper route-policy-scenario-ci-manifest \
+  --shard-plan runs/scenarios/shard-plan.json \
+  --manifest-id outdoor-demo-ci \
+  --report-dir runs/scenarios/ci/reports \
+  --run-output-dir runs/scenarios/ci/runs \
+  --history-output-dir runs/scenarios/ci/histories \
+  --merge-id outdoor-demo-shard-merge \
+  --merge-output runs/scenarios/ci/shard-merge.json \
+  --merge-history-output runs/scenarios/ci/shard-history.json \
+  --cache-key-prefix outdoor-demo-policy \
+  --fail-on-regression \
+  --output runs/scenarios/ci-manifest.json \
+  --markdown-output runs/scenarios/ci-manifest.md
+```
+
+Workflow materialization:
+
+```bash
+gs-mapper route-policy-scenario-ci-workflow \
+  --manifest runs/scenarios/ci-manifest.json \
+  --workflow-id outdoor-demo-policy-shards \
+  --workflow-name "Outdoor Demo Policy Shards" \
+  --artifact-root runs/scenarios/ci \
+  --workflow-output .github/workflows/outdoor-demo-policy-shards.generated.yml \
+  --index-output runs/scenarios/ci-workflow.json \
+  --markdown-output runs/scenarios/ci-workflow.md
+```
+
+Workflow validation:
+
+```bash
+gs-mapper route-policy-scenario-ci-workflow-validate \
+  --manifest runs/scenarios/ci-manifest.json \
+  --workflow-index runs/scenarios/ci-workflow.json \
+  --workflow .github/workflows/outdoor-demo-policy-shards.generated.yml \
+  --output runs/scenarios/ci-workflow-validation.json \
+  --markdown-output runs/scenarios/ci-workflow-validation.md \
+  --fail-on-validation
+```
+
+Workflow activation:
+
+```bash
+gs-mapper route-policy-scenario-ci-workflow-activate \
+  --workflow-index runs/scenarios/ci-workflow.json \
+  --validation-report runs/scenarios/ci-workflow-validation.json \
+  --workflow .github/workflows/outdoor-demo-policy-shards.generated.yml \
+  --active-workflow-output .github/workflows/outdoor-demo-policy-shards.yml \
+  --output runs/scenarios/ci-workflow-activation.json \
+  --markdown-output runs/scenarios/ci-workflow-activation.md \
+  --fail-on-activation
+```
+
+Review bundle:
+
+```bash
+gs-mapper route-policy-scenario-ci-review \
+  --shard-merge runs/scenarios/ci/shard-merge.json \
+  --validation-report runs/scenarios/ci-workflow-validation.json \
+  --activation-report runs/scenarios/ci-workflow-activation.json \
+  --review-id outdoor-demo-policy-review \
+  --pages-base-url https://rsasaki0109.github.io/gs-mapper/reviews/outdoor-demo-policy/ \
+  --bundle-dir docs/reviews/outdoor-demo-policy \
+  --fail-on-review
+```
+
+### 9.5 Current next step: workflow trigger promotion
+
+次の実装単位は `policy_scenario_ci_promotion.py` になる見込み。
+
+目的:
+
+- Review bundle が PASS していることを確認する。
+- manual-only workflow から PR / branch trigger を有効化する判断を report 化する。
+- promotion report に review artifact URL、workflow id、manifest id、allowed branches、trigger mode を記録する。
+- promotion は active workflow YAML を直接 mutation するより、まずは **policy / report** として作る方が安全。
+
+想定 API:
+
+```python
+promotion = build_route_policy_scenario_ci_workflow_promotion(
+    review_artifact,
+    trigger_mode="pull-request",
+    branches=("main",),
+    review_url="https://rsasaki0109.github.io/gs-mapper/reviews/outdoor-demo-policy/",
+)
+write_route_policy_scenario_ci_workflow_promotion_json("runs/scenarios/ci-promotion.json", promotion)
+```
+
+想定 CLI:
+
+```bash
+gs-mapper route-policy-scenario-ci-workflow-promote \
+  --review runs/scenarios/ci-review.json \
+  --review-url https://rsasaki0109.github.io/gs-mapper/reviews/outdoor-demo-policy/ \
+  --trigger-mode pull-request \
+  --branch main \
+  --output runs/scenarios/ci-promotion.json \
+  --markdown-output runs/scenarios/ci-promotion.md \
+  --fail-on-promotion
+```
+
+Promotion で見るべき checks:
+
+- review artifact が PASS。
+- validation が PASS。
+- activation が ACTIVE。
+- shard merge が PASS。
+- history gate が PASS。
+- review URL が空ではない。
+- trigger mode が allowed set。
+- branches が空でない。
+- workflow id / manifest id が stable。
+
+## 10. Public / Launch Track
+
+### 10.1 現状
+
+- README に CI / Pages badge がある。
+- GitHub Pages live demo がある。
+- `docs/index.html` は GS Mapper の public landing として整備済み。
+- `docs/launch-kit.md` / `docs/launch-kit.json` に external announcement 素材がある。
+- README 冒頭に MASt3R-SLAM / VGGT-SLAM 2.0 / Pi3 / LoGeR updates への star/watch callout がある。
+
+### 10.2 Star を増やすために効く方向
+
+コード機能よりも「初見で何がすごいか分かる」ことが重要。
+
+優先順:
+
+1. README top の live demo preview を安定させる。
+2. External SLAM comparison table を維持する。
+3. `docs/launch-kit.md` の copy を短くする。
+4. Pi3 / LoGeR production comparison asset を足す。
+5. Review bundle を Pages に出して、CI / benchmark の信頼性を見せる。
+6. 使い方を `photos-to-splat` / `external-slam import` / `physical-ai benchmark` の 3 入口に分ける。
+
+### 10.3 ただし今の主目的
+
+「告知機能」だけを作りすぎない。現在の主目的は Physical AI simulation environment の品質を上げること。外向けの整備は、実装された実体を見せるためにやる。
+
+## 11. Verification Commands
+
+### 11.1 通常 pre-PR
 
 ```bash
 ruff format --check src/ tests/ scripts/
@@ -71,7 +473,23 @@ ruff check src/ tests/ scripts/
 PYTHONPATH=src pytest tests/ -q --ignore=tests/e2e
 ```
 
-屋外 / Pages まわりを触ったとき:
+現行環境では `python` がない場合があるので `python3` を使う。
+
+### 11.2 Full local validation
+
+```bash
+ruff check src/ tests/ scripts/
+ruff format --check src/ tests/ scripts/
+mypy src/gs_sim2real/sim/policy_scenario_ci_review.py \
+  src/gs_sim2real/sim/policy_scenario_ci_activation.py \
+  src/gs_sim2real/sim/policy_scenario_ci_workflow.py \
+  src/gs_sim2real/sim/__init__.py
+python3 -m compileall -q src/gs_sim2real tests
+pytest -q
+git diff --check
+```
+
+### 11.3 Outdoor / Pages まわり
 
 ```bash
 PYTHONPATH=src pytest \
@@ -89,75 +507,106 @@ Viewer assets だけなら:
 PYTHONPATH=src pytest tests/test_pages_assets.py tests/test_viewer.py -q
 ```
 
-External SLAM output を COLMAP 化する前に artifact 解決だけ確認する場合:
+### 11.4 Physical AI / scenario CI まわり
 
 ```bash
-gs-mapper preprocess --method external-slam --images <images-dir> \
-  --external-slam-system vggt-slam --external-slam-output <slam-output-dir> \
-  --external-slam-dry-run --external-slam-manifest-format json \
-  --external-slam-fail-on-dry-run-gate
+pytest tests/test_physical_ai_policy_benchmark.py tests/test_cli.py -q
 ```
 
-Dry-run manifest には trajectory pose 数、point cloud 点数、入力画像数、sequential fallback 時に何 frame が
-align されるかと、その manifest gate 判定を含める。Artifact が未配置でも JSON manifest として
-`ready=false` / `error` / candidate patterns / per-pattern trace を残すので、`collect_external_slam_imports.py`
-で欠落理由を集計できる。
-
-External SLAM 候補の dry-run gate matrix を出す場合:
+絞り込み:
 
 ```bash
-python3 scripts/plan_external_slam_imports.py --format markdown
-python3 scripts/plan_external_slam_imports.py --format shell
-python3 scripts/collect_external_slam_imports.py --format markdown
+pytest tests/test_physical_ai_policy_benchmark.py -q -k "scenario_ci_workflow"
+pytest tests/test_physical_ai_policy_benchmark.py -q -k "scenario_ci_review"
+pytest tests/test_cli.py -q -k "scenario_ci"
 ```
 
-README preview PNG を再生成する場合:
+### 11.5 Preview / GIF
+
+README preview PNG:
 
 ```bash
 export DISPLAY=:0
 python3 scripts/capture_readme_splat_previews.py
 ```
 
-Hero GIF を再生成する場合:
+Hero GIF:
 
 ```bash
 python3 scripts/record_demo_gif.py
 ```
 
-MCD GNSS を新 session で使う前:
+### 11.6 MCD quality planning
 
 ```bash
 python3 scripts/check_mcd_gnss.py <session-dir> --gnss-topic /vn200/GPS
-```
-
-MCD `ntu_day_02` quality run matrix を出す場合:
-
-```bash
 python3 scripts/plan_mcd_quality_runs.py --format markdown
 python3 scripts/collect_mcd_quality_runs.py --format markdown
 python3 scripts/collect_mcd_quality_runs.py --format benchmark
 python3 scripts/collect_mcd_quality_runs.py --format gate --fail-on-gate
 ```
 
-## Scope Boundaries
+## 12. Backlog
 
-- Python package path `gs_sim2real` is intentionally kept for compatibility. Do not rename it as part of outdoor-pipeline work.
-- Keep the legacy `gs-sim2real` CLI alias unless doing a dedicated deprecation/removal pass.
-- Do not commit downloaded MCD calibration YAML, rosbag data, Waymo tfrecords, or generated training outputs.
-- Avoid broad DreamWalker / Unity / robotics reorgs from this handoff. Outdoor 3DGS work should stay scoped to preprocessing, training/export, viewer assets, and validation.
-- Treat vendored viewer code, especially `docs/splat-viewer/main.js`, as external unless a focused compatibility fix is required.
+### 12.1 A: Immediate next
 
-## 既知の落とし穴
+| Task | Why | Suggested slice |
+| --- | --- | --- |
+| Workflow trigger promotion report | Review bundle までできたので、manual-only から PR/branch trigger へ安全に進める gate が必要 | `policy_scenario_ci_promotion.py` + CLI + tests |
+| Scenario CI docs tightening | `physical-ai-sim.md` に実装はあるが、README からの導線は薄い | README に Physical AI benchmark section を追加 |
+| Review bundle sample under docs | Synthetic fixture でもよいので Pages の `/reviews/` 例を置くか判断 | まず generated sample は commit しない方針で検討 |
+| Route policy CI smoke recipe | 最小 fixture で matrix→shard→manifest→workflow→review を一周する script | `scripts/smoke_route_policy_scenario_ci.py` |
+
+### 12.2 B: Physical AI env hardening
+
+| Task | Why |
+| --- | --- |
+| Observation renderer integration | Policy が実際に scene image / depth を見る流れに近づける。 |
+| Sensor noise profiles | GNSS / IMU / LiDAR / camera uncertainty を scenario config に入れる。 |
+| Dynamic obstacles | Static occupancy だけでは Physical AI benchmark として弱い。 |
+| Route policy replay viewer | Policy trajectory と scene を Pages で inspect したい。 |
+| Real-vs-sim correlation report | rosbag replay と headless benchmark の差を見る。 |
+
+### 12.3 B: Outdoor asset quality
+
+| Task | Why |
+| --- | --- |
+| Pi3 production comparison | README に Pi3 が出ているので production asset があると強い。 |
+| LoGeR production comparison | Same。External SLAM comparison の説得力が増す。 |
+| MCD `ntu_day_02` quality reruns | supervised demo の品質改善余地がある。 |
+| Waymo E2E | high-value だが dataset access と env blocker がある。 |
+
+### 12.4 C: Public launch polish
+
+| Task | Why |
+| --- | --- |
+| Launch kit cleanup | Star を増やすには短い copy と画像が必要。 |
+| README quickstart split | photos / external SLAM / physical AI benchmark の 3 入口を明確化。 |
+| Demo preview refresh | visual freshness と信頼性。 |
+
+## 13. Scope Boundaries
+
+- Python package path `gs_sim2real` は compatibility のため維持する。屋外 pipeline work の一部として rename しない。
+- Legacy `gs-sim2real` CLI alias は dedicated deprecation pass まで残す。
+- Downloaded MCD calibration YAML、rosbag data、Waymo tfrecords、generated training outputs は commit しない。
+- External SLAM implementation 本体を repo に vendor しない。artifact importer だけを持つ。
+- `docs/splat-viewer/main.js` など vendored viewer code は、compatibility fix 以外で大きく触らない。
+- Generated workflow は直接 `.github/workflows/` に置かず、validation / activation / review flow を通す。
+- `docs/scenes-list.json` の production scene 追加は README / viewer / tests とセットで扱う。
+
+## 14. 既知の落とし穴
 
 - MCD topic は `/vn200/GPS` の大文字 `GPS`。`/vn200/gps` ではない。
 - `tuhh_day_04` の `/vn200/GPS` は all-zero。supervised GNSS demo には使わない。
 - MCD calibration YAML は公式 Download page から取得できるが、license 上 repo に YAML を commit しない。
-- IMU orientation CSV は zero-length / non-finite quaternion を無視し、全 identity のときだけ姿勢なし扱いにする。一定の non-identity mount orientation は有効な姿勢として残す。orientation が全 identity でも `angular_velocity_z` が非ゼロなら yaw-only fallback として積分する。
-- `capture_readme_splat_previews.py` は headless だと WebGL canvas が真っ黒になることがある。CI では静的 contract test、実 capture は headed smoke として扱う。
-- `docs/scenes-list.json` に production scene を追加したら、README table、viewer picker 3 種、preview PNG が `tests/test_pages_assets.py` で一致する必要がある。
+- IMU orientation CSV は zero-length / non-finite quaternion を無視し、全 identity のときだけ姿勢なし扱いにする。一定の non-identity mount orientation は有効な姿勢として残す。
+- Orientation が全 identity でも `angular_velocity_z` が非ゼロなら yaw-only fallback として積分する。
+- `capture_readme_splat_previews.py` は headless だと WebGL canvas が黒になることがある。CI では静的 contract test、実 capture は headed smoke。
 - Waymo は code path があっても実データ E2E 未検証。Python 3.10 venv と dataset agreement を先に確認する。
+- Review bundle は CI workflow の信頼性を示す artifact であり、benchmark の実行そのものを代替しない。
+- Activation report の `activated=True` は workflow file が guardrail を通ったという意味。GitHub 上で workflow が成功したという意味ではない。
 
-## Archive Map
+## 15. Archive Map
 
 古い詳細は [archive snapshot](archive/plan_outdoor_gs_2026_04_full_handoff.md) に残しています。
 
@@ -168,16 +617,19 @@ python3 scripts/collect_mcd_quality_runs.py --format gate --fail-on-gate
 | `ntu_day_02` valid-GNSS 実走値 | `## 15.5` |
 | MCD calibration YAML discovery / Drive ID | `## 4.3.3.a`, `## 4.3.3.c`, `## 15.1` |
 | 8-scene viewer smoke transcript | `## 15.3` |
+| Pi3 / LoGeR smoke details | External SLAM sections near `Pi3X official model` and `LoGeR official reimplementation` |
 | Legacy command blocks / one-off output paths | `## 9`, `## 15.*` |
 
-## 関連ドキュメント
+## 16. Related Documents
 
 | File | Role |
 | --- | --- |
 | `README.md` | Public-facing overview, live demo, benchmark table |
 | `CONTRIBUTING.md` | Development workflow and issue/PR expectations |
+| `docs/physical-ai-sim.md` | Physical AI simulation contract and route policy benchmark docs |
 | `docs/experiments.md` | Public experiment-process index |
 | `docs/experiments.generated.md` | Generated detailed experiment comparison tables |
 | `docs/decisions.md` | Accepted/deferred design decisions |
 | `docs/interfaces.md` | Stable interfaces that production code may depend on |
+| `docs/launch-kit.md` | Public announcement / launch material |
 | `docs/archive/plan_outdoor_gs_2026_04_full_handoff.md` | Full historical outdoor-GS handoff snapshot |
