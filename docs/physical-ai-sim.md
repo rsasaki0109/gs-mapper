@@ -162,6 +162,7 @@ from gs_sim2real.sim import (
     RoutePolicyScenarioSet,
     RoutePolicyScenarioSpec,
     RoutePolicyScenarioCIWorkflowConfig,
+    RoutePolicyScenarioCIWorkflowValidationReport,
     build_route_policy_scenario_ci_manifest,
     build_route_policy_scenario_shard_plan,
     build_route_policy_benchmark_history,
@@ -181,6 +182,7 @@ from gs_sim2real.sim import (
     load_route_policy_registry_json,
     load_route_policy_scenario_ci_manifest_json,
     load_route_policy_scenario_ci_workflow_json,
+    load_route_policy_scenario_ci_workflow_validation_json,
     load_route_policy_scenario_matrix_json,
     load_route_policy_scenario_set_json,
     load_route_policy_scenario_set_run_json,
@@ -195,12 +197,14 @@ from gs_sim2real.sim import (
     render_route_policy_quality_markdown,
     render_route_policy_scenario_ci_manifest_markdown,
     render_route_policy_scenario_ci_workflow_markdown,
+    render_route_policy_scenario_ci_workflow_validation_markdown,
     render_route_policy_scenario_matrix_markdown,
     render_route_policy_scenario_set_markdown,
     render_route_policy_scenario_shard_merge_markdown,
     render_route_policy_scenario_shard_plan_markdown,
     run_route_policy_imitation_benchmark,
     run_route_policy_scenario_set,
+    validate_route_policy_scenario_ci_workflow,
     rollout_route,
     rollout_route_with_replanning,
     select_best_route,
@@ -212,6 +216,7 @@ from gs_sim2real.sim import (
     write_route_policy_registry_json,
     write_route_policy_scenario_ci_manifest_json,
     write_route_policy_scenario_ci_workflow_json,
+    write_route_policy_scenario_ci_workflow_validation_json,
     write_route_policy_scenario_ci_workflow_yaml,
     write_route_policy_scenario_matrix_expansion_json,
     write_route_policy_scenario_matrix_json,
@@ -749,6 +754,31 @@ gs-mapper route-policy-scenario-ci-workflow \
   --markdown-output runs/scenarios/ci-workflow.md
 ```
 
+Validate the generated YAML before enabling the workflow. The validator parses the YAML, checks materialization metadata, verifies shard matrix entries and commands against the manifest, and writes a JSON report that can be used as a review gate.
+
+```python
+validation = validate_route_policy_scenario_ci_workflow(
+    ci_manifest,
+    workflow,
+    workflow_path=".github/workflows/outdoor-demo-policy-shards.generated.yml",
+)
+write_route_policy_scenario_ci_workflow_validation_json(
+    "runs/scenarios/ci-workflow-validation.json",
+    validation,
+)
+print(render_route_policy_scenario_ci_workflow_validation_markdown(validation))
+```
+
+```bash
+gs-mapper route-policy-scenario-ci-workflow-validate \
+  --manifest runs/scenarios/ci-manifest.json \
+  --workflow-index runs/scenarios/ci-workflow.json \
+  --workflow .github/workflows/outdoor-demo-policy-shards.generated.yml \
+  --output runs/scenarios/ci-workflow-validation.json \
+  --markdown-output runs/scenarios/ci-workflow-validation.md \
+  --fail-on-validation
+```
+
 Supported actions:
 
 - `twist`: `linearX`, `linearY`, `linearZ` or `vx`, `vy`, `vz`
@@ -758,4 +788,4 @@ The backend always blocks poses outside `SceneEnvironment.bounds`. When a `Voxel
 
 ## Next Implementation Layer
 
-The next useful layer is generated workflow validation: lint the materialized YAML, dry-run command paths against the manifest, and check that every shard artifact path can be reconstructed before the workflow is committed.
+The next useful layer is workflow activation guardrails: require a passing workflow-validation report before moving generated YAML into active `.github/workflows/` paths, publish shard summaries as review artifacts, and keep push or pull-request triggers opt-in until the generated workflow is reviewable.

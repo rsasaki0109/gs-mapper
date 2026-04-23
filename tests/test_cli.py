@@ -182,6 +182,12 @@ class TestCLIHelp:
             main(["route-policy-scenario-ci-workflow", "--help"])
         assert exc_info.value.code == 0
 
+    def test_cli_route_policy_scenario_ci_workflow_validate_help(self) -> None:
+        """Running route-policy-scenario-ci-workflow-validate --help raises SystemExit(0)."""
+        with pytest.raises(SystemExit) as exc_info:
+            main(["route-policy-scenario-ci-workflow-validate", "--help"])
+        assert exc_info.value.code == 0
+
     def test_cli_experiment_localization_alignment_help(self) -> None:
         """Running experiment-localization-alignment --help raises SystemExit(0)."""
         with pytest.raises(SystemExit) as exc_info:
@@ -2142,6 +2148,34 @@ class TestCLIHelp:
         assert args.workflow_output == "workflow.yml"
         assert args.index_output == "workflow.json"
         assert args.markdown_output == "workflow.md"
+
+    def test_cli_route_policy_scenario_ci_workflow_validate_flags(self) -> None:
+        """route-policy-scenario-ci-workflow-validate parser accepts validation settings."""
+        args = build_parser().parse_args(
+            [
+                "route-policy-scenario-ci-workflow-validate",
+                "--manifest",
+                "manifest.json",
+                "--workflow-index",
+                "workflow.json",
+                "--workflow",
+                "workflow.yml",
+                "--validation-id",
+                "unit-validation",
+                "--output",
+                "validation.json",
+                "--markdown-output",
+                "validation.md",
+                "--fail-on-validation",
+            ]
+        )
+        assert args.manifest == "manifest.json"
+        assert args.workflow_index == "workflow.json"
+        assert args.workflow == "workflow.yml"
+        assert args.validation_id == "unit-validation"
+        assert args.output == "validation.json"
+        assert args.markdown_output == "validation.md"
+        assert args.fail_on_validation is True
 
     def test_cli_experiment_localization_alignment_flags(self) -> None:
         """experiment-localization-alignment parser accepts evaluation settings."""

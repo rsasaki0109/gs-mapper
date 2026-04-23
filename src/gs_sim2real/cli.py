@@ -1400,6 +1400,27 @@ def build_parser() -> argparse.ArgumentParser:
     )
     rpswf.add_argument("--markdown-output", default=None, help="Optional workflow materialization Markdown path")
 
+    # route policy scenario CI workflow validation
+    rpswfv = subparsers.add_parser(
+        "route-policy-scenario-ci-workflow-validate",
+        help="Validate a generated route policy scenario CI workflow against its manifest",
+    )
+    rpswfv.add_argument("--manifest", required=True, help="Route policy scenario CI manifest JSON")
+    rpswfv.add_argument("--workflow-index", required=True, help="Workflow materialization metadata JSON")
+    rpswfv.add_argument("--workflow", default=None, help="Generated GitHub Actions workflow YAML to validate")
+    rpswfv.add_argument("--validation-id", default=None, help="Optional validation report id")
+    rpswfv.add_argument(
+        "--output",
+        default="outputs/route_policy_scenarios/scenario_ci_workflow_validation.json",
+        help="Workflow validation report JSON path",
+    )
+    rpswfv.add_argument("--markdown-output", default=None, help="Optional workflow validation Markdown path")
+    rpswfv.add_argument(
+        "--fail-on-validation",
+        action="store_true",
+        help="Exit with status 2 when workflow validation fails",
+    )
+
     # experiment labs — specs drive a nested `experiment` subparser plus
     # hidden top-level aliases for back-compat.
     experiment_specs: list[tuple[str, str, str]] = [
@@ -2345,6 +2366,13 @@ def cmd_route_policy_scenario_ci_workflow(args: argparse.Namespace) -> None:
     run_cli(args)
 
 
+def cmd_route_policy_scenario_ci_workflow_validate(args: argparse.Namespace) -> None:
+    """Handle the route-policy-scenario-ci-workflow-validate subcommand."""
+    from gs_sim2real.sim.policy_scenario_ci_workflow import run_validation_cli
+
+    run_validation_cli(args)
+
+
 def cmd_experiment(args: argparse.Namespace) -> None:
     """Handle the nested `experiment` subcommand by deferring to the legacy handler."""
     handler_map = {
@@ -2525,6 +2553,7 @@ def main(argv: list[str] | None = None) -> None:
         "route-policy-benchmark-history": cmd_route_policy_benchmark_history,
         "route-policy-scenario-ci-manifest": cmd_route_policy_scenario_ci_manifest,
         "route-policy-scenario-ci-workflow": cmd_route_policy_scenario_ci_workflow,
+        "route-policy-scenario-ci-workflow-validate": cmd_route_policy_scenario_ci_workflow_validate,
         "route-policy-scenario-matrix": cmd_route_policy_scenario_matrix,
         "route-policy-scenario-shard-merge": cmd_route_policy_scenario_shard_merge,
         "route-policy-scenario-shards": cmd_route_policy_scenario_shards,
