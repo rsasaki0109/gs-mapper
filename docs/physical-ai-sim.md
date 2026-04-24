@@ -878,6 +878,40 @@ gs-mapper route-policy-scenario-ci-workflow-promote \
   --fail-on-promotion
 ```
 
+After the promotion report passes, the adoption step re-materializes the scenario CI manifest with the promoted trigger mode / branches, re-runs validation and activation against a **separate** active workflow path, and records a per-gate adoption report. The manual-only active workflow file is never overwritten — adoption always writes a parallel YAML so the two files can be diffed side by side before flipping the repo over to the trigger-enabled workflow.
+
+```python
+from gs_sim2real.sim import (
+    adopt_route_policy_scenario_ci_workflow,
+    write_route_policy_scenario_ci_workflow_adoption_json,
+)
+
+adoption = adopt_route_policy_scenario_ci_workflow(
+    promotion,
+    manifest,
+    materialization,  # the manual-only materialization that produced the activated YAML
+    adopted_source_workflow_path="runs/scenarios/ci-workflow-adopted.generated.yml",
+    adopted_active_workflow_path=".github/workflows/outdoor-demo-policy-shards-adopted.yml",
+)
+write_route_policy_scenario_ci_workflow_adoption_json(
+    "runs/scenarios/ci-workflow-adoption.json",
+    adoption,
+)
+```
+
+Adoption gates:
+
+- `promotion-promoted`: only adopt from a PROMOTED report.
+- `manifest-id` / `workflow-id`: the adoption must target the same manifest and workflow the promotion report was built from.
+- `adopted-path-distinct-from-manual`: the adopted active workflow path must differ from the promoted `active_workflow_path`; collisions fail pre-materialization so the manual YAML is never touched.
+- `adopted-source-path-distinct`: the staged YAML source path must also be separate from the manual active path.
+- `workflow-dispatch-retained`: adopted YAML keeps `workflow_dispatch` so on-demand reruns still work.
+- `push-trigger-emitted` / `pull-request-trigger-emitted`: required trigger blocks appear when the promoted `trigger_mode` demands them.
+- Per-branch gates (`push-branch:<name>` / `pull-request-branch:<name>`): each promoted branch literally appears in the adopted YAML.
+- `adopted-validation-passed` / `adopted-activation-active`: the re-run validation and activation reports must themselves pass.
+
+A minimal end-to-end recipe that walks matrix expansion all the way through adoption lives at `scripts/smoke_route_policy_scenario_ci.py`.
+
 Supported actions:
 
 - `twist`: `linearX`, `linearY`, `linearZ` or `vx`, `vy`, `vz`
@@ -887,4 +921,4 @@ The backend always blocks poses outside `SceneEnvironment.bounds`. When a `Voxel
 
 ## Next Implementation Layer
 
-The next useful layer is a smoke recipe that runs matrix expansion through promotion on tiny fixtures, then documents the exact handoff for re-materializing and activating a trigger-enabled workflow after the promotion report passes.
+The scenario CI chain from matrix expansion through promotion-backed adoption is now covered by `scripts/smoke_route_policy_scenario_ci.py`. The next useful layer is surfacing the adoption gate via a dedicated CLI command (today the library API is driven from Python or the smoke script) and wiring the adopted workflow path into the Pages review bundle so reviewers can see both the manual and trigger-enabled YAMLs without checking out the branch.

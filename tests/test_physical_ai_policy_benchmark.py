@@ -1871,6 +1871,178 @@ def test_route_policy_scenario_ci_workflow_promotion_cli_writes_report(tmp_path:
     assert "Route Policy Scenario CI Workflow Promotion" in markdown_path.read_text(encoding="utf-8")
 
 
+def test_route_policy_scenario_ci_workflow_adoption_materializes_trigger_enabled_workflow(
+    tmp_path: Path,
+) -> None:
+    from gs_sim2real.sim import (
+        adopt_route_policy_scenario_ci_workflow,
+        render_route_policy_scenario_ci_workflow_adoption_markdown,
+        write_route_policy_scenario_ci_workflow_adoption_json,
+    )
+
+    manifest = build_unit_ci_workflow_manifest("unit-adoption-manifest")
+    materialization = materialize_route_policy_scenario_ci_workflow(
+        manifest,
+        config=RoutePolicyScenarioCIWorkflowConfig(workflow_id="unit-adoption-workflow", artifact_root="ci"),
+    )
+    source_path = write_route_policy_scenario_ci_workflow_yaml(
+        tmp_path / "unit-adoption.generated.yml", materialization
+    )
+    validation = validate_route_policy_scenario_ci_workflow(manifest, materialization, workflow_path=source_path)
+    manual_active = tmp_path / ".github" / "workflows" / "unit-adoption.yml"
+    activation = activate_route_policy_scenario_ci_workflow(
+        materialization,
+        validation,
+        source_workflow_path=source_path,
+        active_workflow_path=manual_active,
+        activation_id="unit-adoption-activation",
+    )
+    review = build_route_policy_scenario_ci_review_artifact(
+        build_unit_ci_shard_merge_report(),
+        validation,
+        activation,
+        review_id="unit-adoption-review",
+        pages_base_url="https://example.test/reviews/unit-adoption/",
+    )
+    promotion = promote_route_policy_scenario_ci_workflow(
+        review,
+        trigger_mode="push-and-pull-request",
+        push_branches=("main",),
+        pull_request_branches=("main",),
+        review_url="https://example.test/reviews/unit-adoption/",
+        promotion_id="unit-adoption-promotion",
+    )
+    assert promotion.promoted is True
+
+    adopted_source = tmp_path / "unit-adoption-adopted.generated.yml"
+    adopted_active = tmp_path / ".github" / "workflows" / "unit-adoption-adopted.yml"
+    report = adopt_route_policy_scenario_ci_workflow(
+        promotion,
+        manifest,
+        materialization,
+        adopted_source_workflow_path=adopted_source,
+        adopted_active_workflow_path=adopted_active,
+        adoption_id="unit-adoption",
+    )
+
+    assert report.adopted is True
+    assert report.trigger_mode == "push-and-pull-request"
+    assert report.manual_active_workflow_path == manual_active.as_posix()
+    assert report.adopted_active_workflow_path == adopted_active.as_posix()
+    assert manual_active.read_text(encoding="utf-8") != adopted_active.read_text(encoding="utf-8")
+    adopted_text = adopted_active.read_text(encoding="utf-8")
+    assert "push:" in adopted_text
+    assert "pull_request:" in adopted_text
+    assert "workflow_dispatch" in adopted_text
+
+    report_path = write_route_policy_scenario_ci_workflow_adoption_json(tmp_path / "adoption.json", report)
+    assert report_path.exists()
+    markdown = render_route_policy_scenario_ci_workflow_adoption_markdown(report)
+    assert "Route Policy Scenario CI Workflow Adoption: unit-adoption" in markdown
+    assert "ADOPTED" in markdown
+
+
+def test_route_policy_scenario_ci_workflow_adoption_blocks_when_promotion_failed(tmp_path: Path) -> None:
+    from gs_sim2real.sim import (
+        RoutePolicyScenarioCIWorkflowPromotionCheck,
+        RoutePolicyScenarioCIWorkflowPromotionReport,
+        adopt_route_policy_scenario_ci_workflow,
+    )
+
+    manifest = build_unit_ci_workflow_manifest("unit-blocked-adoption-manifest")
+    materialization = materialize_route_policy_scenario_ci_workflow(
+        manifest,
+        config=RoutePolicyScenarioCIWorkflowConfig(workflow_id="unit-blocked-adoption-workflow", artifact_root="ci"),
+    )
+    manual_active = tmp_path / ".github" / "workflows" / "unit-blocked-adoption.yml"
+    failed_promotion = RoutePolicyScenarioCIWorkflowPromotionReport(
+        promotion_id="unit-blocked-adoption-promotion",
+        review_id="unit-blocked-adoption-review",
+        workflow_id=materialization.workflow_id,
+        manifest_id=manifest.manifest_id,
+        active_workflow_path=manual_active.as_posix(),
+        trigger_mode="pull-request",
+        promoted=False,
+        checks=(
+            RoutePolicyScenarioCIWorkflowPromotionCheck(
+                check_id="review-passed",
+                passed=False,
+                message="scenario CI review did not pass",
+            ),
+        ),
+        pull_request_branches=("main",),
+        review_url="https://example.test/reviews/unit-blocked-adoption/",
+    )
+
+    adopted_active = tmp_path / ".github" / "workflows" / "unit-blocked-adoption-adopted.yml"
+    report = adopt_route_policy_scenario_ci_workflow(
+        failed_promotion,
+        manifest,
+        materialization,
+        adopted_source_workflow_path=tmp_path / "unit-blocked-adoption-adopted.generated.yml",
+        adopted_active_workflow_path=adopted_active,
+    )
+
+    assert report.adopted is False
+    assert "promotion-promoted" in report.failed_checks
+    assert report.adopted_validation is None
+    assert report.adopted_activation is None
+    assert not adopted_active.exists()
+    assert not (tmp_path / "unit-blocked-adoption-adopted.generated.yml").exists()
+
+
+def test_route_policy_scenario_ci_workflow_adoption_blocks_when_paths_collide(tmp_path: Path) -> None:
+    from gs_sim2real.sim import adopt_route_policy_scenario_ci_workflow
+
+    manifest = build_unit_ci_workflow_manifest("unit-collide-adoption-manifest")
+    materialization = materialize_route_policy_scenario_ci_workflow(
+        manifest,
+        config=RoutePolicyScenarioCIWorkflowConfig(workflow_id="unit-collide-adoption-workflow", artifact_root="ci"),
+    )
+    source_path = write_route_policy_scenario_ci_workflow_yaml(tmp_path / "unit-collide.generated.yml", materialization)
+    validation = validate_route_policy_scenario_ci_workflow(manifest, materialization, workflow_path=source_path)
+    manual_active = tmp_path / ".github" / "workflows" / "unit-collide-adoption.yml"
+    activation = activate_route_policy_scenario_ci_workflow(
+        materialization,
+        validation,
+        source_workflow_path=source_path,
+        active_workflow_path=manual_active,
+        activation_id="unit-collide-adoption-activation",
+    )
+    review = build_route_policy_scenario_ci_review_artifact(
+        build_unit_ci_shard_merge_report(),
+        validation,
+        activation,
+        review_id="unit-collide-adoption-review",
+        pages_base_url="https://example.test/reviews/unit-collide-adoption/",
+    )
+    promotion = promote_route_policy_scenario_ci_workflow(
+        review,
+        trigger_mode="pull-request",
+        pull_request_branches=("main",),
+        review_url="https://example.test/reviews/unit-collide-adoption/",
+        promotion_id="unit-collide-adoption-promotion",
+    )
+    assert promotion.promoted is True
+
+    # Point the adopted active path at the manual active path so the
+    # distinct-from-manual gate fires and no overwrite happens.
+    report = adopt_route_policy_scenario_ci_workflow(
+        promotion,
+        manifest,
+        materialization,
+        adopted_source_workflow_path=tmp_path / "unit-collide-adopted.generated.yml",
+        adopted_active_workflow_path=manual_active,
+    )
+
+    assert report.adopted is False
+    assert "adopted-path-distinct-from-manual" in report.failed_checks
+    # The manual file is left as-is (still the materialization content, not a
+    # trigger-enabled replacement).
+    manual_text = manual_active.read_text(encoding="utf-8")
+    assert "pull_request:" not in manual_text
+
+
 def build_unit_ci_review_artifact(
     tmp_path: Path,
     *,

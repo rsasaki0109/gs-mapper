@@ -3,12 +3,13 @@
 
 Walks ``matrix -> shard plan -> scenario-set runs -> shard merge -> CI
 manifest -> workflow materialization -> validation -> activation -> review
-bundle -> promotion`` inside a tmpdir, using a tiny one-scene / one-policy
-fixture. Each gate prints a ``PASS``/``FAIL`` line; the script exits
-non-zero at the first failing gate so CI can point at it directly.
+bundle -> promotion -> adoption`` inside a tmpdir, using a tiny one-scene /
+one-policy fixture. Each gate prints a ``PASS``/``FAIL`` line; the script
+exits non-zero at the first failing gate so CI can point at it directly.
 
-Workflow activation is written under ``<tmpdir>/.github/workflows/...`` so
-the real repo's ``.github/workflows/`` is never touched.
+Both the manual-only and the adopted, trigger-enabled workflows are written
+under ``<tmpdir>/.github/workflows/...`` so the real repo's
+``.github/workflows/`` is never touched.
 
 Usage
 -----
@@ -43,6 +44,7 @@ from gs_sim2real.sim import (
     RoutePolicyScenarioCIWorkflowConfig,
     RoutePolicyScenarioMatrix,
     activate_route_policy_scenario_ci_workflow,
+    adopt_route_policy_scenario_ci_workflow,
     build_route_policy_scenario_ci_manifest,
     build_route_policy_scenario_ci_review_artifact,
     expand_route_policy_scenario_matrix_to_directory,
@@ -58,6 +60,7 @@ from gs_sim2real.sim import (
     write_route_policy_scenario_ci_review_bundle,
     write_route_policy_scenario_ci_review_json,
     write_route_policy_scenario_ci_workflow_activation_json,
+    write_route_policy_scenario_ci_workflow_adoption_json,
     write_route_policy_scenario_ci_workflow_json,
     write_route_policy_scenario_ci_workflow_promotion_json,
     write_route_policy_scenario_ci_workflow_validation_json,
@@ -291,6 +294,24 @@ def run_smoke(root: Path, *, log: Callable[[str], None] = print) -> dict[str, Pa
     )
     _gate(log, "workflow promotion", promotion.promoted)
 
+    adopted_source_path = root / "ci-workflow-adopted.generated.yml"
+    adopted_active_path = root / ".github" / "workflows" / f"{SMOKE_PREFIX}-adopted.yml"
+    adoption = adopt_route_policy_scenario_ci_workflow(
+        promotion,
+        manifest,
+        materialization,
+        adopted_source_workflow_path=adopted_source_path,
+        adopted_active_workflow_path=adopted_active_path,
+        adoption_id=f"{SMOKE_PREFIX}-adoption",
+    )
+    adoption_path = write_route_policy_scenario_ci_workflow_adoption_json(root / "ci-workflow-adoption.json", adoption)
+    _gate(
+        log,
+        "workflow adoption",
+        adoption.adopted,
+        f"adopted active path {adopted_active_path}",
+    )
+
     return {
         "matrix": matrix_path,
         "expansion": expansion_path,
@@ -305,6 +326,9 @@ def run_smoke(root: Path, *, log: Callable[[str], None] = print) -> dict[str, Pa
         "review": review_json_path,
         "review_bundle_html": Path(bundle_paths["html"]),
         "promotion": promotion_path,
+        "adoption": adoption_path,
+        "adopted_source_workflow": adopted_source_path,
+        "adopted_active_workflow": adopted_active_path,
     }
 
 

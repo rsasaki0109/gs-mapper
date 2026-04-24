@@ -23,9 +23,9 @@
 - Valid GNSS supervised MCD demo は `ntu_day_02`。production asset は `docs/assets/outdoor-demo/mcd-ntu-day02-supervised.splat`。
 - External SLAM import は VGGT-SLAM 2.0 / MASt3R-SLAM comparison splat まで実走済み。Pi3 / LoGeR profile も artifact resolver 側に候補追加済み。
 - 2026-04-24 時点では、屋外 3DGS だけでなく **Physical AI simulation benchmark environment** を目指す方向へ拡張中。
-- Route policy benchmark 系は、dataset / imitation / registry / benchmark / history / scenario-set / matrix / sharding / CI manifest / workflow materialization / validation / activation / review bundle / workflow trigger promotion gate まで分割済み。
-- 最新の pushed commit は `dc08c2f`。scenario CI workflow promotion gate を追加し、local full pytest / GitHub Actions CI / Pages deploy は green。
-- matrix から promotion までを一周する smoke recipe は `scripts/smoke_route_policy_scenario_ci.py` として実装済み。次は promotion report PASS 後に trigger-enabled workflow を再 materialize / activate する adoption 手順の固定。
+- Route policy benchmark 系は、dataset / imitation / registry / benchmark / history / scenario-set / matrix / sharding / CI manifest / workflow materialization / validation / activation / review bundle / workflow trigger promotion gate / promotion-backed trigger adoption まで分割済み。
+- 最新の pushed commit は `0971f1c`。scenario CI smoke recipe を追加し、local full pytest / GitHub Actions CI / Pages deploy は green。
+- adoption step (`adopt_route_policy_scenario_ci_workflow`) まで実装済み。manual-only YAML を触らず、`.github/workflows/<id>-adopted.yml` に trigger-enabled 版を別ファイルで書き出し、validation + activation を通す形。
 
 ## 2. 現在の主戦場
 
@@ -276,11 +276,12 @@ registry + scenes + goal suites + configs
   -> shard run JSONs
   -> shard merge report + history gate
   -> CI manifest
-  -> generated workflow YAML
+  -> generated workflow YAML (manual-only)
   -> workflow validation report
-  -> workflow activation report
+  -> workflow activation report (manual-only active path)
   -> Pages review bundle
   -> trigger promotion report
+  -> trigger-enabled adoption (re-materialize + re-validate + re-activate to a distinct active path)
 ```
 
 ### 9.2 Modules
@@ -297,6 +298,7 @@ registry + scenes + goal suites + configs
 | Workflow activation | `policy_scenario_ci_activation.py` | `route-policy-scenario-ci-workflow-activate` | activation JSON / Markdown / active workflow YAML |
 | Review publishing | `policy_scenario_ci_review.py` | `route-policy-scenario-ci-review` | review JSON / Markdown / HTML bundle |
 | Workflow trigger promotion | `policy_scenario_ci_promotion.py` | `route-policy-scenario-ci-workflow-promote` | promotion JSON / Markdown |
+| Trigger-enabled adoption | `policy_scenario_ci_adoption.py` | library-only (smoke script) | adoption JSON / Markdown / adopted YAML under `.github/workflows/<id>-adopted.yml` |
 
 ### 9.3 Important contracts
 
@@ -306,6 +308,7 @@ registry + scenes + goal suites + configs
 - `RoutePolicyScenarioCIWorkflowActivationReport` は validation PASS、source path、destination path、content equality、overwrite を gate 化する。
 - `RoutePolicyScenarioCIReviewArtifact` は shard merge / validation / activation を Pages 向け review bundle にまとめる。
 - `RoutePolicyScenarioCIWorkflowPromotionReport` は review PASS、history PASS、review URL、trigger mode、allowed branches を gate 化する。
+- `RoutePolicyScenarioCIWorkflowAdoptionReport` は promotion PASS、manifest / workflow id 一致、manual path と distinct な adopted active path、adopted YAML の trigger block / branch literal 出力、再 validation / activation の PASS を gate 化する。
 
 ### 9.4 Example commands
 
@@ -464,19 +467,28 @@ Promotion checks:
 
 ### 9.6 Scenario CI smoke recipe
 
-`scripts/smoke_route_policy_scenario_ci.py` が tiny 1-scene / 1-policy fixture で `scenario matrix -> shard plan -> scenario-set run -> shard merge -> CI manifest -> workflow materialization -> validation -> activation -> review -> promotion` を一周する。各 gate に `[PASS]/[FAIL] <name>` を出し、落ちた gate で `GateFailure` を上げて non-zero exit する。
+`scripts/smoke_route_policy_scenario_ci.py` が tiny 1-scene / 1-policy fixture で `scenario matrix -> shard plan -> scenario-set run -> shard merge -> CI manifest -> workflow materialization -> validation -> activation -> review -> promotion -> adoption` を一周する。各 gate に `[PASS]/[FAIL] <name>` を出し、落ちた gate で `GateFailure` を上げて non-zero exit する。
 
 狙い:
 
 - chain 全体の integration smoke を、巨大 E2E ではなく 1 分未満で回せる形にする。
-- workflow activation は `<tmpdir>/.github/workflows/...` に閉じ、repo 本物の `.github/workflows/` には触らない。
-- review bundle / promotion report の JSON / Markdown / HTML を tmpdir に吐き、目視レビューしたいときは `--keep` / `--root <path>` で保持できる。
+- workflow activation / adoption は `<tmpdir>/.github/workflows/...` に閉じ、repo 本物の `.github/workflows/` には触らない。
+- review bundle / promotion / adoption report の JSON / Markdown / HTML を tmpdir に吐き、目視レビューしたいときは `--keep` / `--root <path>` で保持できる。
 
 回帰検出:
 
-- `tests/test_smoke_route_policy_scenario_ci.py` が `run_smoke()` を importlib で叩き、全 gate の PASS ログと artifact path、promotion trigger config を snapshot-assert する。
+- `tests/test_smoke_route_policy_scenario_ci.py` が `run_smoke()` を importlib で叩き、全 gate の PASS ログ、artifact path、promotion trigger config、manual vs adopted YAML の差分 (`workflow_dispatch` のみ vs `pull_request:` 追加) を snapshot-assert する。
 
-次の Claude slice は、この smoke の上に「promotion PASS → trigger-enabled workflow を再 materialize / validate / activate」する adoption recipe を docs として固定すること。
+### 9.7 Promotion-backed trigger adoption
+
+`adopt_route_policy_scenario_ci_workflow` が promotion report PASS を受けて、manual-only workflow YAML を触らずに trigger-enabled 版を別ファイルとして生成する。
+
+- 入力: `RoutePolicyScenarioCIWorkflowPromotionReport`、同じ `RoutePolicyScenarioCIManifest`、manual-only の materialization。
+- 出力: `.github/workflows/<id>-adopted.yml`（活性化された trigger-enabled YAML）、`ci-workflow-adoption.json`（gate report）、同 Markdown レンダリング。
+- 失敗時は materialize も write もせずに blocked report を返すので、manual path を絶対に上書きしない。
+- Gate: `promotion-promoted`, `manifest-id`, `workflow-id`, `adopted-path-distinct-from-manual`, `adopted-source-path-distinct`, trigger block (`workflow-dispatch-retained`, `push-trigger-emitted`, `pull-request-trigger-emitted`), per-branch literal check (`push-branch:<name>` / `pull-request-branch:<name>`), `adopted-validation-passed`, `adopted-activation-active`。
+
+次の Claude slice は、adoption を `gs-mapper route-policy-scenario-ci-workflow-adopt` CLI として surface することと、adopted YAML の path を Pages review bundle に載せて reviewer が checkout なしで manual / trigger-enabled 両 YAML を比較できるようにすること。
 
 ## 10. Public / Launch Track
 
@@ -597,7 +609,8 @@ python3 scripts/collect_mcd_quality_runs.py --format gate --fail-on-gate
 
 | Task | Why | Suggested slice |
 | --- | --- | --- |
-| Promotion-backed workflow adoption recipe | promotion report PASS 後に trigger-enabled workflow を安全に再 materialize / activate する手順が必要 | docs + smoke recipe (`scripts/smoke_route_policy_scenario_ci.py`) に基づく手順固定 |
+| Adoption CLI surface | adoption は library-only。`gs-mapper route-policy-scenario-ci-workflow-adopt` を追加して manifest / materialization / promotion JSON 入力でも一周できるようにする | `src/gs_sim2real/cli.py` に subcommand 追加、既存 CLI テストに parity テスト |
+| Adopted YAML を Pages review bundle に露出 | reviewer が branch checkout なしで manual / trigger-enabled YAML を diff できるようにする | `policy_scenario_ci_review.py` に adoption artifact 参照を追加、`render_route_policy_scenario_ci_review_html` に diff 表示 |
 | Scenario CI docs tightening | `physical-ai-sim.md` に実装はあるが、README からの導線は薄い | README に Physical AI benchmark section を追加 |
 | Review bundle sample under docs | Synthetic fixture でもよいので Pages の `/reviews/` 例を置くか判断 | まず generated sample は commit しない方針で検討 |
 
