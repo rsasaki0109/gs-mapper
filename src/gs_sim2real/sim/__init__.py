@@ -32,6 +32,7 @@ from .headless import (
 from .interfaces import (
     AgentAction,
     CollisionQuery,
+    KinematicState,
     Observation,
     ObservationRequest,
     PhysicalAIEnvironment,
@@ -372,6 +373,7 @@ __all__ = [
     "EvaluationTask",
     "HeadlessEnvironmentState",
     "HeadlessPhysicalAIEnvironment",
+    "KinematicState",
     "NoisyObservationRenderer",
     "Observation",
     "ObservationRenderer",

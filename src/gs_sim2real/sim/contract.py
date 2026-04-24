@@ -457,13 +457,14 @@ def _default_sensor_rig() -> SensorRig:
             SensorModel(
                 sensor_id="imu-proxy",
                 modality="imu",
-                status="placeholder-metadata-only",
+                status="ready-via-kinematic-finite-diff",
                 outputs=("angular-velocity", "linear-acceleration"),
                 description=(
-                    "IMU proxy placeholder: the headless env has no physics layer, so render_observation "
-                    "returns a metadata-only response until a downstream renderer emits numeric readings. "
-                    "Raw-sensor noise profiles already accept IMU σ fields and perturb matching outputs "
-                    "if a future renderer produces them."
+                    "IMU proxy synthesised by HeadlessPhysicalAIEnvironment: each step finite-differences "
+                    "the agent pose to estimate body-frame angular velocity and linear acceleration, with "
+                    "no gravity model. teleport actions and the post-reset state both report the zero "
+                    "kinematic state (step_dt_seconds == 0). Raw-sensor noise profiles' IMU σ fields "
+                    "perturb the rendered outputs in place."
                 ),
             ),
         ),

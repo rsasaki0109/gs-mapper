@@ -75,6 +75,35 @@ class Observation:
 
 
 @dataclass(frozen=True, slots=True)
+class KinematicState:
+    """Per-step kinematic estimate of an agent.
+
+    ``linear_velocity_world`` is metres-per-second in the scene world frame.
+    ``angular_velocity_body`` is radians-per-second in the agent body frame
+    (the conventional gyroscope axes). ``linear_acceleration_body`` is
+    metres-per-second-squared in the agent body frame (the conventional
+    accelerometer axes); gravity is **not** added — it is a kinematic
+    finite-difference accelerometer, not a full inertial-frame model.
+    ``step_dt_seconds`` is the duration of the step that produced the
+    estimate; ``0.0`` indicates the value is the post-reset zero state and
+    no finite-difference is available yet.
+    """
+
+    linear_velocity_world: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    angular_velocity_body: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    linear_acceleration_body: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    step_dt_seconds: float = 0.0
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "linearVelocityWorld": list(self.linear_velocity_world),
+            "angularVelocityBody": list(self.angular_velocity_body),
+            "linearAccelerationBody": list(self.linear_acceleration_body),
+            "stepDtSeconds": self.step_dt_seconds,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class CollisionQuery:
     """Collision query result for a pose or footprint."""
 

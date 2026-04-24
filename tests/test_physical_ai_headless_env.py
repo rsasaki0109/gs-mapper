@@ -321,3 +321,117 @@ def test_headless_env_set_raw_sensor_noise_profile_toggles_behavior() -> None:
     env.set_raw_sensor_noise_profile(None)
     restored = env.render_observation(_depth_request(env))
     assert np.allclose(_decode_depth(restored), 12.5)
+
+
+def _imu_request(env: HeadlessPhysicalAIEnvironment) -> ObservationRequest:
+    return ObservationRequest(
+        pose=env.state.pose,
+        sensor_id="imu-proxy",
+        outputs=("angular-velocity", "linear-acceleration"),
+    )
+
+
+def _decode_imu_vector(observation: Observation, *, key: str, base64_key: str) -> np.ndarray:
+    block = observation.outputs[key]
+    return np.frombuffer(base64.b64decode(block[base64_key]), dtype="<f4")
+
+
+def test_imu_observation_after_reset_is_zero_kinematic_state() -> None:
+    env = build_env()
+    env.reset("outdoor-demo")
+
+    observation = env.render_observation(_imu_request(env))
+
+    assert observation.outputs["mode"] == "kinematic-finite-diff"
+    assert observation.outputs["frameId"] == "agent-body"
+    assert observation.outputs["stepDtSeconds"] == 0.0
+    angular = _decode_imu_vector(observation, key="angular-velocity", base64_key="angularVelocityBase64")
+    linear = _decode_imu_vector(observation, key="linear-acceleration", base64_key="linearAccelerationBase64")
+    assert np.allclose(angular, 0.0)
+    assert np.allclose(linear, 0.0)
+
+
+def test_imu_observation_finite_differences_twist_motion() -> None:
+    env = build_env()
+    env.reset("outdoor-demo")
+
+    # First twist: 0 -> 2 m/s along +X over 0.5 s. Acceleration is 4 m/s^2.
+    env.step(AgentAction("twist", {"linearX": 2.0}, duration_seconds=0.5))
+    after_first_step = env.render_observation(_imu_request(env))
+    linear = _decode_imu_vector(after_first_step, key="linear-acceleration", base64_key="linearAccelerationBase64")
+    angular = _decode_imu_vector(after_first_step, key="angular-velocity", base64_key="angularVelocityBase64")
+    assert after_first_step.outputs["stepDtSeconds"] == pytest.approx(0.5)
+    # Identity orientation -> world == body, so accel is (4, 0, 0).
+    assert linear[0] == pytest.approx(4.0, rel=1e-3)
+    assert linear[1] == pytest.approx(0.0, abs=1e-5)
+    assert linear[2] == pytest.approx(0.0, abs=1e-5)
+    assert np.allclose(angular, 0.0)
+
+    # Second twist at the same velocity: acceleration drops to zero.
+    env.step(AgentAction("twist", {"linearX": 2.0}, duration_seconds=0.5))
+    after_second_step = env.render_observation(_imu_request(env))
+    linear_steady = _decode_imu_vector(
+        after_second_step, key="linear-acceleration", base64_key="linearAccelerationBase64"
+    )
+    assert np.allclose(linear_steady, 0.0, atol=1e-5)
+
+
+def test_imu_observation_resets_to_zero_after_teleport() -> None:
+    env = build_env()
+    env.reset("outdoor-demo")
+    env.step(AgentAction("twist", {"linearX": 2.0}, duration_seconds=0.5))
+    moving = env.render_observation(_imu_request(env))
+    moving_linear = _decode_imu_vector(moving, key="linear-acceleration", base64_key="linearAccelerationBase64")
+    assert not np.allclose(moving_linear, 0.0)
+
+    pose = env.state.pose
+    env.step(
+        AgentAction(
+            "teleport",
+            {"x": pose.position[0], "y": pose.position[1], "z": pose.position[2]},
+            duration_seconds=0.5,
+        )
+    )
+    after_teleport = env.render_observation(_imu_request(env))
+    angular = _decode_imu_vector(after_teleport, key="angular-velocity", base64_key="angularVelocityBase64")
+    linear = _decode_imu_vector(after_teleport, key="linear-acceleration", base64_key="linearAccelerationBase64")
+    assert np.allclose(angular, 0.0)
+    assert np.allclose(linear, 0.0)
+
+
+def test_imu_observation_respects_requested_outputs_subset() -> None:
+    env = build_env()
+    env.reset("outdoor-demo")
+    env.step(AgentAction("twist", {"linearX": 1.0}, duration_seconds=0.25))
+
+    angular_only = env.render_observation(
+        ObservationRequest(
+            pose=env.state.pose,
+            sensor_id="imu-proxy",
+            outputs=("angular-velocity",),
+        )
+    )
+    assert "angular-velocity" in angular_only.outputs
+    assert "linear-acceleration" not in angular_only.outputs
+
+
+def test_imu_observation_picks_up_raw_sensor_noise_profile() -> None:
+    profile = RawSensorNoiseProfile(
+        profile_id="imu-env",
+        imu_angular_velocity_std_rad_per_sec=0.05,
+        imu_linear_acceleration_std_m_per_sec_sq=0.2,
+    )
+    env = HeadlessPhysicalAIEnvironment(
+        load_simulation_catalog_from_scene_picker(REPO_ROOT / "docs" / "scenes-list.json"),
+        raw_sensor_noise_profile=profile,
+    )
+    env.reset("outdoor-demo", seed=3)
+    env.step(AgentAction("twist", {"linearX": 1.0}, duration_seconds=0.5))
+
+    noisy = env.render_observation(_imu_request(env))
+    angular = _decode_imu_vector(noisy, key="angular-velocity", base64_key="angularVelocityBase64")
+    linear = _decode_imu_vector(noisy, key="linear-acceleration", base64_key="linearAccelerationBase64")
+    # Without noise the angular reading would be exactly zero and the linear
+    # reading would be exactly (2, 0, 0); the profile must perturb them.
+    assert not np.allclose(angular, 0.0)
+    assert not np.allclose(linear, (2.0, 0.0, 0.0))

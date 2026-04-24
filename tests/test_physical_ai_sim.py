@@ -44,7 +44,7 @@ def test_simulation_catalog_wraps_all_public_scenes() -> None:
     lidar_sensor = next(sensor for sensor in outdoor.sensor_rig.sensors if sensor.sensor_id == "lidar-ray-proxy")
     assert lidar_sensor.status == "ready-via-depth-rays"
     imu_sensor = next(sensor for sensor in outdoor.sensor_rig.sensors if sensor.sensor_id == "imu-proxy")
-    assert imu_sensor.status == "placeholder-metadata-only"
+    assert imu_sensor.status == "ready-via-kinematic-finite-diff"
     assert tuple(imu_sensor.outputs) == ("angular-velocity", "linear-acceleration")
 
     dust3r = catalog.scene_by_id("outdoor-demo-dust3r")
