@@ -8,6 +8,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+import cv2
+import numpy as np
+import pytest
+
 from gs_sim2real.experiments.external_slam_import_collect import (
     collect_external_slam_import_preflight_results,
     render_external_slam_import_report_json,
@@ -20,6 +24,22 @@ from gs_sim2real.experiments.external_slam_import_plan import (
     render_plan_markdown,
     render_plan_shell,
 )
+from gs_sim2real.preprocess.external_slam import (
+    build_external_slam_artifact_manifest,
+    render_external_slam_artifact_manifest_json,
+)
+
+
+def _write_dummy_images(image_dir: Path, count: int = 2) -> None:
+    image_dir.mkdir(parents=True, exist_ok=True)
+    for idx in range(count):
+        cv2.imwrite(str(image_dir / f"frame_{idx:06d}.jpg"), np.zeros((32, 48, 3), dtype=np.uint8))
+
+
+def _persist_manifest(run_manifest_path: str, manifest: dict) -> None:
+    path = Path(run_manifest_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(render_external_slam_artifact_manifest_json(manifest), encoding="utf-8")
 
 
 def test_external_slam_import_plan_contains_all_default_frontends() -> None:
@@ -256,3 +276,132 @@ def test_collect_external_slam_imports_script_can_emit_missing_json(tmp_path) ->
     assert payload["missingCount"] == 1
     assert payload["runs"][0]["name"] == "bag6_pi3"
     assert payload["runs"][0]["missing"] == ["manifest"]
+
+
+def test_pi3_fixture_manifest_flows_through_plan_and_collect(tmp_path) -> None:
+    images_dir = tmp_path / "images"
+    _write_dummy_images(images_dir, count=2)
+    artifact_root = tmp_path / "slam"
+    pi3_dir = artifact_root / "pi3"
+    pi3_dir.mkdir(parents=True)
+    poses = np.repeat(np.eye(4)[None, ...], 2, axis=0)
+    np.savez(pi3_dir / "camera_poses.npz", camera_poses=poses)
+    np.savez(pi3_dir / "points.npz", points=np.zeros((2, 2, 3), dtype=np.float32))
+
+    plan = build_external_slam_import_plan(
+        ExternalSLAMImportPlanContext(
+            image_dir=str(images_dir),
+            artifact_root=str(artifact_root),
+            output_root=str(tmp_path / "imports"),
+        )
+    )
+    pi3_run = next(run for run in plan.runs if run.profile.system == "pi3")
+
+    manifest = build_external_slam_artifact_manifest(
+        image_dir=images_dir,
+        system="pi3",
+        artifact_dir=pi3_run.artifact_dir,
+    )
+    _persist_manifest(pi3_run.manifest_path, manifest)
+
+    report = collect_external_slam_import_preflight_results(plan)
+    pi3_row = next(row for row in report["runs"] if row["system"] == "pi3")
+
+    assert manifest["trajectory"]["materialization"] == "pose_tensor_to_tum"
+    assert manifest["pointcloud"]["materialization"] == "point_tensor_to_npy"
+    assert pi3_row["manifestExists"] is True
+    assert pi3_row["manifestValid"] is True
+    assert pi3_row["trajectorySelectedPath"].endswith("pi3/camera_poses.npz")
+    assert pi3_row["pointcloudSelectedPath"].endswith("pi3/points.npz")
+    assert pi3_row["trajectoryResolutionReason"] == "selected_candidate"
+    assert pi3_row["pointcloudResolutionReason"] == "selected_candidate"
+    assert pi3_row["poseCount"] == 2
+    assert pi3_row["imageCount"] == 2
+    assert pi3_row["alignedFrameCount"] == 2
+    assert pi3_row["pointCount"] == 4
+    assert pi3_row["missing"] == ["gate"]
+
+
+def test_loger_fixture_manifest_flows_through_plan_and_collect(tmp_path) -> None:
+    torch = pytest.importorskip("torch")
+    images_dir = tmp_path / "images"
+    _write_dummy_images(images_dir, count=2)
+    artifact_root = tmp_path / "slam"
+    loger_dir = artifact_root / "loger"
+    loger_dir.mkdir(parents=True)
+    poses = torch.eye(4).repeat(2, 1, 1)
+    torch.save({"camera_poses": poses}, loger_dir / "results.pt")
+    np.save(loger_dir / "points3d.npy", np.zeros((2, 3), dtype=np.float32))
+
+    plan = build_external_slam_import_plan(
+        ExternalSLAMImportPlanContext(
+            image_dir=str(images_dir),
+            artifact_root=str(artifact_root),
+            output_root=str(tmp_path / "imports"),
+        )
+    )
+    loger_run = next(run for run in plan.runs if run.profile.system == "loger")
+
+    manifest = build_external_slam_artifact_manifest(
+        image_dir=images_dir,
+        system="loger",
+        artifact_dir=loger_run.artifact_dir,
+    )
+    _persist_manifest(loger_run.manifest_path, manifest)
+
+    report = collect_external_slam_import_preflight_results(plan)
+    loger_row = next(row for row in report["runs"] if row["system"] == "loger")
+
+    assert manifest["trajectory"]["materialization"] == "pose_tensor_to_tum"
+    assert loger_row["manifestExists"] is True
+    assert loger_row["manifestValid"] is True
+    assert loger_row["trajectorySelectedPath"].endswith("loger/results.pt")
+    assert loger_row["pointcloudSelectedPath"].endswith("loger/points3d.npy")
+    assert loger_row["trajectoryResolutionReason"] == "selected_candidate"
+    assert loger_row["pointcloudResolutionReason"] == "selected_candidate"
+    assert loger_row["poseCount"] == 2
+    assert loger_row["imageCount"] == 2
+    assert loger_row["alignedFrameCount"] == 2
+    assert loger_row["missing"] == ["gate"]
+
+
+def test_error_manifest_for_unresolved_pi3_is_surfaced_by_collector(tmp_path) -> None:
+    images_dir = tmp_path / "images"
+    _write_dummy_images(images_dir, count=1)
+    artifact_root = tmp_path / "slam"
+    pi3_dir = artifact_root / "pi3"
+    pi3_dir.mkdir(parents=True)
+
+    plan = build_external_slam_import_plan(
+        ExternalSLAMImportPlanContext(
+            image_dir=str(images_dir),
+            artifact_root=str(artifact_root),
+            output_root=str(tmp_path / "imports"),
+        )
+    )
+    pi3_run = next(run for run in plan.runs if run.profile.system == "pi3")
+
+    from gs_sim2real.preprocess.external_slam import build_external_slam_artifact_error_manifest
+
+    with pytest.raises(FileNotFoundError):
+        build_external_slam_artifact_manifest(
+            image_dir=images_dir,
+            system="pi3",
+            artifact_dir=pi3_run.artifact_dir,
+        )
+
+    manifest = build_external_slam_artifact_error_manifest(
+        error=FileNotFoundError(f"Could not find Pi3/Pi3X trajectory under {pi3_dir}"),
+        image_dir=images_dir,
+        system="pi3",
+        artifact_dir=pi3_run.artifact_dir,
+    )
+    _persist_manifest(pi3_run.manifest_path, manifest)
+
+    report = collect_external_slam_import_preflight_results(plan)
+    pi3_row = next(row for row in report["runs"] if row["system"] == "pi3")
+
+    assert pi3_row["ready"] is False
+    assert pi3_row["errorType"] == "FileNotFoundError"
+    assert pi3_row["trajectoryResolutionReason"] == "no_candidate_match"
+    assert pi3_row["missing"] == ["error"]

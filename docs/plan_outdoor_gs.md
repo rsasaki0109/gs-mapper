@@ -646,6 +646,24 @@ python3 scripts/collect_mcd_quality_runs.py --format gate --fail-on-gate
 | MCD `ntu_day_02` quality reruns | supervised demo の品質改善余地がある。 |
 | Waymo E2E | high-value だが dataset access と env blocker がある。 |
 
+#### 12.3.1 MCD quality gate targets
+
+Production rerun は `scripts/collect_mcd_quality_runs.py --format gate --fail-on-gate` が通る状態を目標にする。Gate 本体は `src/gs_sim2real/experiments/mcd_quality_gate.py` の `MCDQualityGatePolicy` で、default は:
+
+| Check | Default threshold | Notes |
+| --- | --- | --- |
+| `artifacts` | `require_complete_artifacts=True` | plan の `expected_artifacts` が全部そろっている |
+| `frames` | `min_frame_fraction=0.95` | 取れた image 数 / planned `max_frames` |
+| `depth` | `min_depth_fraction=0.95` | depth map 数 / image 数 (depth export 有効時) |
+| `registered` | `min_registered_fraction=0.90` | COLMAP `images.txt` の登録行数 / image 数 |
+| `sparse_points` | `min_sparse_points=1` | `points3D.txt` の行数下限 |
+| `trained_gaussians` | `min_trained_gaussians=1` | `point_cloud.ply` の vertex 数 |
+| `splat_gaussians` | `min_splat_gaussians=1` | `.splat` byte / 32 |
+| `final_l1` | `require_final_l1=True` | train log に final L1 が残っている |
+| `final_l1_max` | `max_final_l1=None` | 数値上限が必要なときだけ set する |
+
+`ntu_day_02` rerun profile (`ntu_day02_single_400_depth_long` / `ntu_day02_single_800_ba` / `ntu_day02_multi_3cam_300each_ba`) は `scripts/plan_mcd_quality_runs.py` が生成。production 実行後は上記 gate を全 profile で満たす ことが完了条件。`max_final_l1` は baseline run の実測が出るまで `None` のままにしておく (regression guard として後から絞る)。
+
 ### 12.4 C: Public launch polish
 
 | Task | Why |
