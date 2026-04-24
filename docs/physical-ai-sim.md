@@ -1127,6 +1127,115 @@ Supported actions:
 
 The backend always blocks poses outside `SceneEnvironment.bounds`. When a `VoxelOccupancyGrid` is set, in-bounds collision checks also reject poses that fall into occupied voxels. When a `RobotFootprint` is set, the occupancy query checks every voxel touched by the circular body radius and height instead of only the pose point. `score_trajectory()` uses the same collision path and reports `collision-rate`, `collision-count`, clearance metrics, and per-reason notes.
 
+## Partial-information benchmark recipe
+
+A common task is "evaluate a route policy against noisy pose + obstacles that react to it". The individual primitives are documented above; this recipe stitches them together into one scenario-set run so a reader can see the whole partial-information surface in one place.
+
+1. **Author the noise profile(s).** `RoutePolicySensorNoiseProfile` perturbs pose / goal / heading that the policy observes; `RawSensorNoiseProfile` perturbs rendered camera / depth / LiDAR / IMU arrays at the observation renderer boundary. Persist each as JSON — the scenario spec references them by path.
+
+   ```python
+   from gs_sim2real.sim import (
+       RawSensorNoiseProfile,
+       RoutePolicySensorNoiseProfile,
+       write_raw_sensor_noise_profile_json,
+       write_route_policy_sensor_noise_profile_json,
+   )
+
+   write_route_policy_sensor_noise_profile_json(
+       "runs/scenarios/sensor-noise/outdoor-gnss.json",
+       RoutePolicySensorNoiseProfile(
+           profile_id="outdoor-gnss",
+           pose_position_std_meters=0.25,
+           pose_heading_std_radians=0.02,
+           goal_position_std_meters=0.15,
+       ),
+   )
+   write_raw_sensor_noise_profile_json(
+       "runs/scenarios/raw-noise/outdoor-sensor.json",
+       RawSensorNoiseProfile(
+           profile_id="outdoor-sensor",
+           depth_range_std_meters=0.10,
+           lidar_range_std_meters=0.05,
+       ),
+   )
+   ```
+
+2. **Author the reactive obstacle timeline.** Combine chase + flee + static waypoint obstacles on one `DynamicObstacleTimeline`. The gym adapter surfaces the top-two closest obstacles with a `reactive-mode` scalar (`+1`/`-1`/`0`), so the policy can condition on threat mode directly.
+
+   ```python
+   from gs_sim2real.sim import (
+       DynamicObstacle,
+       DynamicObstacleTimeline,
+       DynamicObstacleWaypoint,
+       write_route_policy_dynamic_obstacle_timeline_json,
+   )
+
+   write_route_policy_dynamic_obstacle_timeline_json(
+       "runs/scenarios/obstacles/mixed-reactive.json",
+       DynamicObstacleTimeline(
+           timeline_id="mixed-reactive",
+           obstacles=(
+               DynamicObstacle(
+                   obstacle_id="hunter",
+                   waypoints=(DynamicObstacleWaypoint(step_index=0, position=(3.0, 0.0, 0.0)),),
+                   radius_meters=0.25,
+                   chase_target_agent=True,
+                   chase_speed_m_per_step=0.5,
+               ),
+               DynamicObstacle(
+                   obstacle_id="runner",
+                   waypoints=(DynamicObstacleWaypoint(step_index=0, position=(0.0, 1.0, 0.0)),),
+                   radius_meters=0.25,
+                   flee_from_agent=True,
+                   chase_speed_m_per_step=0.5,
+               ),
+               DynamicObstacle(
+                   obstacle_id="bollard",
+                   waypoints=(DynamicObstacleWaypoint(step_index=0, position=(0.0, -2.0, 0.0)),),
+                   radius_meters=0.25,
+               ),
+           ),
+       ),
+   )
+   ```
+
+   Use `python3 scripts/show_dynamic_obstacle_timeline.py runs/scenarios/obstacles/mixed-reactive.json` to eyeball the Markdown summary (reactive mode + speed columns per obstacle).
+
+3. **Wire all three paths into the scenario spec.** `sensor_noise_profile_path`, `raw_sensor_noise_profile_path`, and `dynamic_obstacles_path` each carry independently — a scenario can set any subset.
+
+   ```python
+   from gs_sim2real.sim import (
+       RoutePolicyScenarioSet,
+       RoutePolicyScenarioSpec,
+       write_route_policy_scenario_set_json,
+   )
+
+   scenario_set = RoutePolicyScenarioSet(
+       scenario_set_id="partial-information-outdoor",
+       policy_registry_path="registries/outdoor.json",
+       scenarios=(
+           RoutePolicyScenarioSpec(
+               scenario_id="outdoor-near-partial",
+               scene_catalog="scenes.json",
+               scene_id="outdoor-demo",
+               goal_suite_path="near-goals.json",
+               sensor_noise_profile_path="sensor-noise/outdoor-gnss.json",
+               raw_sensor_noise_profile_path="raw-noise/outdoor-sensor.json",
+               dynamic_obstacles_path="obstacles/mixed-reactive.json",
+               episode_count=8,
+               max_steps=16,
+           ),
+       ),
+   )
+   write_route_policy_scenario_set_json(
+       "runs/scenarios/partial-information-outdoor.json", scenario_set
+   )
+   ```
+
+4. **Run through the standard scenario-set runner.** `run_route_policy_scenario_set` loads every profile and timeline, constructs `HeadlessPhysicalAIEnvironment` + `RoutePolicyGymAdapter` with the pose-facing noise on the adapter and the raw-sensor noise on the env, then evaluates the registry. The same CLI + scenario-shard + review-bundle chain (`gs-mapper route-policy-scenario-set`, `scripts/smoke_route_policy_scenario_ci.py`, etc.) keeps working — partial-information knobs only affect inputs, not the pipeline shape.
+
+Determinism stays intact across all three knobs: each noise profile's RNG is seeded from `(reset_seed | profile_id | episode_index | step_index | kind)`, and each reactive obstacle is a pure function of the current agent position and the step index. A scenario rerun under the same seeds produces bit-identical observations and bit-identical feature dicts.
+
 ## Next Implementation Layer
 
 The scenario CI chain from matrix expansion through promotion-backed adoption is now covered by `scripts/smoke_route_policy_scenario_ci.py`, with both library API (`adopt_route_policy_scenario_ci_workflow`) and CLI surface (`gs-mapper route-policy-scenario-ci-workflow-adopt`). The review bundle is adoption-aware: passing `--adoption-report` to the review CLI (or `adoption=` to `build_route_policy_scenario_ci_review_artifact`) embeds the trigger mode, branches, and unified manual-vs-adopted YAML diff into the Pages-hosted bundle. The next useful layer is surfacing the reviews on the `/reviews/` Pages index so discovery no longer requires knowing the bundle URL in advance.
