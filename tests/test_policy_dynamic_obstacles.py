@@ -14,6 +14,7 @@ from gs_sim2real.sim import (
     DynamicObstacleWaypoint,
     HeadlessPhysicalAIEnvironment,
     RoutePolicyEnvConfig,
+    RoutePolicyEnvState,
     RoutePolicyGymAdapter,
     build_simulation_catalog,
     load_route_policy_dynamic_obstacle_timeline_json,
@@ -192,6 +193,117 @@ def test_gym_adapter_rollout_respects_dynamic_obstacle() -> None:
     adapter_clear.reset(seed=7, goal=(0.5, 0.0, 0.0))
     _, _, _, _, info_clear = adapter_clear.step({"x": 0.25, "y": 0.0, "z": 0.0})
     assert info_clear["blocked"] is False
+
+
+def test_gym_adapter_omits_obstacle_features_when_no_timeline() -> None:
+    env = HeadlessPhysicalAIEnvironment(_unit_catalog())
+    adapter = RoutePolicyGymAdapter(
+        env,
+        RoutePolicyEnvConfig(scene_id="unit-scene", max_steps=4, goal_tolerance_meters=0.02),
+    )
+    observation, _ = adapter.reset(seed=1, goal=(0.3, 0.0, 0.0))
+
+    # Feature block is silent by default — back-compat for existing fixtures.
+    assert "nearest-dynamic-obstacle-distance-meters" not in observation
+    assert "dynamic-obstacle-count" not in observation
+
+
+def test_gym_adapter_emits_obstacle_features_and_tracks_movement() -> None:
+    # Single obstacle that starts 0.5m to the +x of an always-at-origin
+    # trajectory and then drifts further away. The distance feature should
+    # grow with the adapter's step index.
+    timeline = DynamicObstacleTimeline(
+        timeline_id="tracker",
+        obstacles=(
+            DynamicObstacle(
+                obstacle_id="mover",
+                waypoints=(
+                    DynamicObstacleWaypoint(step_index=0, position=(0.5, 0.0, 0.0)),
+                    DynamicObstacleWaypoint(step_index=2, position=(1.5, 0.0, 0.0)),
+                ),
+                radius_meters=0.1,
+            ),
+        ),
+    )
+    env = HeadlessPhysicalAIEnvironment(_unit_catalog(), dynamic_obstacles=timeline)
+    adapter = RoutePolicyGymAdapter(
+        env,
+        RoutePolicyEnvConfig(scene_id="unit-scene", max_steps=4, goal_tolerance_meters=0.02),
+    )
+
+    from gs_sim2real.sim import Pose3D
+
+    observation, _ = adapter.reset(seed=11, goal=(0.3, 0.0, 0.0))
+    # Force the observed pose to the origin so bearings are deterministic.
+    adapter._state = RoutePolicyEnvState(  # type: ignore[attr-defined]
+        scene_id=adapter.state.scene_id,
+        episode_index=adapter.state.episode_index,
+        step_index=0,
+        pose=Pose3D(position=(0.0, 0.0, 0.0), orientation_xyzw=(0.0, 0.0, 0.0, 1.0)),
+        goal=adapter.state.goal,
+        done=False,
+    )
+    obs_step_0 = adapter._observation_features(adapter.state)
+
+    assert math.isclose(obs_step_0["dynamic-obstacle-count"], 1.0)
+    assert math.isclose(obs_step_0["nearest-dynamic-obstacle-distance-meters"], 0.4, rel_tol=0, abs_tol=1e-9)
+    assert math.isclose(obs_step_0["nearest-dynamic-obstacle-bearing-radians"], 0.0, abs_tol=1e-9)
+    assert math.isclose(obs_step_0["nearest-dynamic-obstacle-bearing-x"], 1.0, abs_tol=1e-9)
+    assert math.isclose(obs_step_0["nearest-dynamic-obstacle-bearing-y"], 0.0, abs_tol=1e-9)
+
+    adapter._state = RoutePolicyEnvState(  # type: ignore[attr-defined]
+        scene_id=adapter.state.scene_id,
+        episode_index=adapter.state.episode_index,
+        step_index=2,
+        pose=Pose3D(position=(0.0, 0.0, 0.0), orientation_xyzw=(0.0, 0.0, 0.0, 1.0)),
+        goal=adapter.state.goal,
+        done=False,
+    )
+    obs_step_2 = adapter._observation_features(adapter.state)
+    # Obstacle drifted from 0.5m to 1.5m, clearance grew from 0.4 to 1.4.
+    assert (
+        obs_step_2["nearest-dynamic-obstacle-distance-meters"] > obs_step_0["nearest-dynamic-obstacle-distance-meters"]
+    )
+    assert math.isclose(obs_step_2["nearest-dynamic-obstacle-distance-meters"], 1.4, rel_tol=0, abs_tol=1e-9)
+
+
+def test_gym_adapter_obstacle_features_respect_bearing_signs() -> None:
+    timeline = DynamicObstacleTimeline(
+        timeline_id="bearings",
+        obstacles=(
+            DynamicObstacle(
+                obstacle_id="south-west",
+                waypoints=(DynamicObstacleWaypoint(step_index=0, position=(-1.0, 0.0, -1.0)),),
+                radius_meters=0.1,
+            ),
+        ),
+    )
+    env = HeadlessPhysicalAIEnvironment(_unit_catalog(), dynamic_obstacles=timeline)
+    adapter = RoutePolicyGymAdapter(
+        env,
+        RoutePolicyEnvConfig(scene_id="unit-scene", max_steps=4, goal_tolerance_meters=0.02),
+    )
+
+    from gs_sim2real.sim import Pose3D
+
+    adapter.reset(seed=3, goal=(0.2, 0.0, 0.0))
+    adapter._state = RoutePolicyEnvState(  # type: ignore[attr-defined]
+        scene_id=adapter.state.scene_id,
+        episode_index=adapter.state.episode_index,
+        step_index=0,
+        pose=Pose3D(position=(0.0, 0.0, 0.0), orientation_xyzw=(0.0, 0.0, 0.0, 1.0)),
+        goal=adapter.state.goal,
+        done=False,
+    )
+    observation = adapter._observation_features(adapter.state)
+
+    # Obstacle is at (-1, 0, -1) in scene coords. The adapter only uses XY for
+    # bearing, so this obstacle should read as the -x, -y quadrant.
+    assert observation["nearest-dynamic-obstacle-bearing-x"] < 0.0
+    # The XY direction from origin to (-1, 0) is pure -x; -y component is zero.
+    # (We set position.y to 0 on both sides.)
+    assert math.isclose(observation["nearest-dynamic-obstacle-bearing-y"], 0.0, abs_tol=1e-9)
+    assert math.isclose(observation["nearest-dynamic-obstacle-bearing-radians"], math.pi, abs_tol=1e-9)
 
 
 def test_trajectory_score_uses_per_step_obstacle_positions() -> None:

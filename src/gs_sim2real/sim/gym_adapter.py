@@ -216,9 +216,49 @@ class RoutePolicyGymAdapter:
             "goal-delta-y": float(observed_goal.position[1] - observed_pose.position[1]),
             "goal-delta-z": float(observed_goal.position[2] - observed_pose.position[2]),
         }
+        features.update(self._dynamic_obstacle_features(state, observed_pose))
         if sample is not None:
             features.update(_prefixed("route", sample.observation.features))
         return _finite_features(features)
+
+    def _dynamic_obstacle_features(
+        self,
+        state: RoutePolicyEnvState,
+        observed_pose: Pose3D,
+    ) -> dict[str, float]:
+        """Return the obstacle-awareness block, empty when no timeline is set.
+
+        Distances and bearings are measured from the same ``observed_pose``
+        the policy already sees — so a sensor-noise profile shifts obstacle
+        observations alongside the pose / goal observations, keeping the
+        feature block consistent under partial-information benchmarks.
+        """
+
+        timeline = getattr(self.environment, "dynamic_obstacles", None)
+        if timeline is None or timeline.obstacle_count == 0:
+            return {}
+        nearest_distance: float | None = None
+        nearest_centre: tuple[float, float, float] | None = None
+        for obstacle in timeline.obstacles:
+            centre = obstacle.position_at_step(state.step_index)
+            distance = math.dist(tuple(observed_pose.position), centre)
+            clearance = max(0.0, distance - float(obstacle.radius_meters))
+            if nearest_distance is None or clearance < nearest_distance:
+                nearest_distance = clearance
+                nearest_centre = centre
+        if nearest_distance is None or nearest_centre is None:
+            return {}
+        delta_x = float(nearest_centre[0] - observed_pose.position[0])
+        delta_y = float(nearest_centre[1] - observed_pose.position[1])
+        planar = math.hypot(delta_x, delta_y)
+        bearing = math.atan2(delta_y, delta_x) if planar > 0.0 else 0.0
+        return {
+            "dynamic-obstacle-count": float(timeline.obstacle_count),
+            "nearest-dynamic-obstacle-distance-meters": float(nearest_distance),
+            "nearest-dynamic-obstacle-bearing-radians": bearing,
+            "nearest-dynamic-obstacle-bearing-x": delta_x / planar if planar > 0.0 else 0.0,
+            "nearest-dynamic-obstacle-bearing-y": delta_y / planar if planar > 0.0 else 0.0,
+        }
 
     def _apply_sensor_noise(self, state: RoutePolicyEnvState) -> tuple[Pose3D, Pose3D]:
         """Return the observed ``(pose, goal)`` with sensor noise applied."""
