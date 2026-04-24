@@ -72,15 +72,20 @@ class DynamicObstacle:
     When ``chase_target_agent`` is ``True``, the obstacle ignores later
     waypoints and instead walks from ``waypoints[0].position`` toward the
     queried agent position at up to ``chase_speed_m_per_step`` metres per
-    step, clamped at the agent once the two meet. The chase path is a pure
-    function of the current agent position and the step index, so replays
-    stay deterministic: no agent-pose history is retained.
+    step, clamped at the agent once the two meet. When ``flee_from_agent``
+    is ``True`` it uses the same ``chase_speed_m_per_step`` magnitude but
+    walks *away* from the queried agent starting at ``waypoints[0]``, with
+    no upper-bound clamp (the obstacle just keeps retreating). Both modes
+    are pure functions of the current agent position and the step index,
+    so replays stay deterministic: no agent-pose history is retained, and
+    ``chase_target_agent`` and ``flee_from_agent`` are mutually exclusive.
     """
 
     obstacle_id: str
     waypoints: tuple[DynamicObstacleWaypoint, ...]
     radius_meters: float
     chase_target_agent: bool = False
+    flee_from_agent: bool = False
     chase_speed_m_per_step: float = 0.0
     metadata: Mapping[str, Any] = field(default_factory=dict)
     version: str = ROUTE_POLICY_DYNAMIC_OBSTACLE_VERSION
@@ -90,6 +95,8 @@ class DynamicObstacle:
             raise ValueError("obstacle_id must not be empty")
         if not self.waypoints:
             raise ValueError("dynamic obstacle must contain at least one waypoint")
+        if self.chase_target_agent and self.flee_from_agent:
+            raise ValueError("chase_target_agent and flee_from_agent are mutually exclusive")
         radius = float(self.radius_meters)
         if not math.isfinite(radius) or radius <= 0.0:
             raise ValueError("radius_meters must be positive and finite")
@@ -119,13 +126,18 @@ class DynamicObstacle:
         When ``chase_target_agent`` is set and ``agent_position`` is provided
         the obstacle ignores later waypoints and walks from ``waypoints[0]``
         toward the agent, capped at ``chase_speed_m_per_step * max(0,
-        step_index)`` metres of travel. Without ``agent_position`` the chase
-        obstacle stays pinned at its first waypoint so renderers that do not
-        know the agent pose still see a stable position.
+        step_index)`` metres of travel. ``flee_from_agent`` uses the same
+        speed magnitude but walks away from the agent, along the ``waypoint
+        → agent`` direction flipped through ``waypoint[0]`` — no clamp, the
+        obstacle just keeps retreating. Both reactive modes fall back to
+        ``waypoints[0]`` when ``agent_position`` is ``None`` so headless
+        renderers still see a stable position.
         """
 
         if self.chase_target_agent:
             return self._chase_position(step_index, agent_position)
+        if self.flee_from_agent:
+            return self._flee_position(step_index, agent_position)
         return self._waypoint_position(step_index)
 
     def contains(
@@ -145,6 +157,7 @@ class DynamicObstacle:
             "obstacleId": self.obstacle_id,
             "radiusMeters": self.radius_meters,
             "chaseTargetAgent": bool(self.chase_target_agent),
+            "fleeFromAgent": bool(self.flee_from_agent),
             "chaseSpeedMPerStep": float(self.chase_speed_m_per_step),
             "waypoints": [waypoint.to_dict() for waypoint in self.waypoints],
             "metadata": _json_mapping(self.metadata),
@@ -190,6 +203,29 @@ class DynamicObstacle:
         max_travel = max(0.0, float(step_index)) * self.chase_speed_m_per_step
         distance = min(gap, max_travel)
         fraction = 0.0 if gap <= 0.0 else distance / gap
+        return (
+            start[0] + fraction * delta_x,
+            start[1] + fraction * delta_y,
+            start[2] + fraction * delta_z,
+        )
+
+    def _flee_position(
+        self,
+        step_index: int,
+        agent_position: Sequence[float] | None,
+    ) -> tuple[float, float, float]:
+        start = self.waypoints[0].position
+        if agent_position is None:
+            return start
+        origin = tuple(float(c) for c in agent_position)
+        delta_x = start[0] - origin[0]
+        delta_y = start[1] - origin[1]
+        delta_z = start[2] - origin[2]
+        gap = math.sqrt(delta_x * delta_x + delta_y * delta_y + delta_z * delta_z)
+        if gap <= 0.0:
+            return start
+        distance = max(0.0, float(step_index)) * self.chase_speed_m_per_step
+        fraction = distance / gap
         return (
             start[0] + fraction * delta_x,
             start[1] + fraction * delta_y,
@@ -293,6 +329,7 @@ def route_policy_dynamic_obstacle_from_dict(payload: Mapping[str, Any]) -> Dynam
         waypoints=waypoints,
         radius_meters=float(payload["radiusMeters"]),
         chase_target_agent=bool(payload.get("chaseTargetAgent", False)),
+        flee_from_agent=bool(payload.get("fleeFromAgent", False)),
         chase_speed_m_per_step=float(payload.get("chaseSpeedMPerStep", 0.0)),
         metadata=_json_mapping(_mapping(payload.get("metadata", {}), "metadata")),
         version=version,

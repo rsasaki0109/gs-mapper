@@ -519,6 +519,113 @@ def test_gym_adapter_feature_block_tracks_chase_obstacle_approach() -> None:
     assert math.isclose(after_approach["nearest-dynamic-obstacle-bearing-x"], 1.0, abs_tol=1e-9)
 
 
+def test_flee_obstacle_retreats_along_start_minus_agent_direction() -> None:
+    # Flee obstacle starts at (5, 0, 0) with the agent at origin. The
+    # start→agent direction is -x, so the retreat direction (agent→start
+    # extended past start) is +x. With 0.5 m/step and step_index=4 the
+    # obstacle should have moved 2m east of its starting position.
+    obstacle = DynamicObstacle(
+        obstacle_id="runner",
+        waypoints=(DynamicObstacleWaypoint(step_index=0, position=(5.0, 0.0, 0.0)),),
+        radius_meters=0.1,
+        flee_from_agent=True,
+        chase_speed_m_per_step=0.5,
+    )
+    agent = (0.0, 0.0, 0.0)
+
+    assert obstacle.position_at_step(0, agent_position=agent) == (5.0, 0.0, 0.0)
+    assert obstacle.position_at_step(4, agent_position=agent) == pytest.approx((7.0, 0.0, 0.0))
+    # Unlike chase, flee has no upper bound — the obstacle keeps retreating.
+    assert obstacle.position_at_step(100, agent_position=agent) == pytest.approx((55.0, 0.0, 0.0))
+
+    # Without an agent position the flee obstacle stays pinned at its start.
+    assert obstacle.position_at_step(4) == (5.0, 0.0, 0.0)
+
+
+def test_obstacle_rejects_simultaneous_chase_and_flee() -> None:
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        DynamicObstacle(
+            obstacle_id="confused",
+            waypoints=(DynamicObstacleWaypoint(step_index=0, position=(1.0, 0.0, 0.0)),),
+            radius_meters=0.1,
+            chase_target_agent=True,
+            flee_from_agent=True,
+            chase_speed_m_per_step=0.5,
+        )
+
+
+def test_flee_obstacle_round_trips_through_json(tmp_path: Path) -> None:
+    timeline = DynamicObstacleTimeline(
+        timeline_id="flee-timeline",
+        obstacles=(
+            DynamicObstacle(
+                obstacle_id="runner",
+                waypoints=(DynamicObstacleWaypoint(step_index=0, position=(2.0, 0.0, 0.0)),),
+                radius_meters=0.15,
+                flee_from_agent=True,
+                chase_speed_m_per_step=0.8,
+            ),
+        ),
+    )
+    path = write_route_policy_dynamic_obstacle_timeline_json(tmp_path / "flee.json", timeline)
+    loaded = load_route_policy_dynamic_obstacle_timeline_json(path)
+    assert loaded == timeline
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    flee_payload = payload["obstacles"][0]
+    assert flee_payload["fleeFromAgent"] is True
+    assert flee_payload["chaseTargetAgent"] is False
+    assert flee_payload["chaseSpeedMPerStep"] == 0.8
+
+
+def test_gym_adapter_feature_block_tracks_flee_obstacle_retreating() -> None:
+    timeline = DynamicObstacleTimeline(
+        timeline_id="gym-flee",
+        obstacles=(
+            DynamicObstacle(
+                obstacle_id="gym-runner",
+                waypoints=(DynamicObstacleWaypoint(step_index=0, position=(1.0, 0.0, 0.0)),),
+                radius_meters=0.1,
+                flee_from_agent=True,
+                chase_speed_m_per_step=0.5,
+            ),
+        ),
+    )
+    env = HeadlessPhysicalAIEnvironment(_unit_catalog(), dynamic_obstacles=timeline)
+    adapter = RoutePolicyGymAdapter(
+        env,
+        RoutePolicyEnvConfig(scene_id="unit-scene", max_steps=8, goal_tolerance_meters=0.02),
+    )
+
+    from gs_sim2real.sim import Pose3D
+
+    adapter.reset(seed=1, goal=(0.05, 0.0, 0.0))
+    adapter._state = RoutePolicyEnvState(  # type: ignore[attr-defined]
+        scene_id=adapter.state.scene_id,
+        episode_index=adapter.state.episode_index,
+        step_index=0,
+        pose=Pose3D(position=(0.0, 0.0, 0.0), orientation_xyzw=(0.0, 0.0, 0.0, 1.0)),
+        goal=adapter.state.goal,
+        done=False,
+    )
+    at_start = adapter._observation_features(adapter.state)
+    # Step 0: obstacle still at (1, 0, 0); clearance = 1.0 - 0.1 = 0.9.
+    assert math.isclose(at_start["nearest-dynamic-obstacle-distance-meters"], 0.9, abs_tol=1e-9)
+
+    adapter._state = RoutePolicyEnvState(  # type: ignore[attr-defined]
+        scene_id=adapter.state.scene_id,
+        episode_index=adapter.state.episode_index,
+        step_index=4,
+        pose=Pose3D(position=(0.0, 0.0, 0.0), orientation_xyzw=(0.0, 0.0, 0.0, 1.0)),
+        goal=adapter.state.goal,
+        done=False,
+    )
+    after_retreat = adapter._observation_features(adapter.state)
+    # Step 4: obstacle has retreated 4 * 0.5 = 2.0m further from the agent,
+    # so it's at (3, 0, 0); clearance = 3.0 - 0.1 = 2.9.
+    assert math.isclose(after_retreat["nearest-dynamic-obstacle-distance-meters"], 2.9, abs_tol=1e-9)
+    assert math.isclose(after_retreat["nearest-dynamic-obstacle-bearing-x"], 1.0, abs_tol=1e-9)
+
+
 def test_trajectory_score_uses_per_step_obstacle_positions() -> None:
     # Obstacle moves from (0.3, 0, 0) at step 0 to (-10, 0, 0) at step 1,
     # so only the first pose of a two-pose trajectory is blocked.

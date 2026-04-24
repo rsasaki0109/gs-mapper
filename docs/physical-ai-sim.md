@@ -785,7 +785,7 @@ config = RoutePolicyMatrixConfigSpec(
 
 When the environment's collision check sees that a query pose sits inside any obstacle's sphere at the current step, it reports `dynamic-obstacle:<obstacle_id>` and lets the scenario CI chain record it the same way static occupancy collisions are recorded. Trajectory scoring steps through the trajectory pose-by-pose so each step of a multi-pose rollout is checked against the obstacle's interpolated position at that step — an obstacle crossing the path between step 3 and step 4 blocks step 3 but not step 5.
 
-**Reactive chase obstacles**: a `DynamicObstacle` can also ignore later waypoints and walk toward the queried agent at a fixed speed. Set `chase_target_agent=True` and `chase_speed_m_per_step=<metres>` on the obstacle; the timeline then computes the obstacle position as `waypoints[0] + direction_to_agent * min(step * speed, distance_to_agent)`. The chase path is a pure function of the current agent position and the step index (no agent-pose history is retained), so replays stay deterministic. A chase obstacle without a queried agent (e.g. headless Markdown rendering) stays pinned at its first waypoint.
+**Reactive chase and flee obstacles**: a `DynamicObstacle` can also ignore later waypoints and react to the queried agent position at a fixed speed. `chase_target_agent=True` walks from `waypoints[0]` toward the agent at `waypoints[0] + direction_to_agent * min(step * chase_speed_m_per_step, distance_to_agent)` — clamped once the obstacle reaches the agent. `flee_from_agent=True` uses the same speed magnitude but walks *away* from the agent along the `agent → waypoints[0]` direction with no upper bound, so the obstacle keeps retreating every step. The two modes are mutually exclusive and both are pure functions of the current agent position and the step index, so replays stay deterministic (no agent-pose history is retained). A reactive obstacle queried without an agent position (e.g. headless Markdown rendering) stays pinned at its first waypoint.
 
 ```python
 hunter = DynamicObstacle(
@@ -794,6 +794,13 @@ hunter = DynamicObstacle(
     radius_meters=0.25,
     chase_target_agent=True,
     chase_speed_m_per_step=0.5,  # metres per scenario step
+)
+runner = DynamicObstacle(
+    obstacle_id="runner",
+    waypoints=(DynamicObstacleWaypoint(step_index=0, position=(1.0, 0.0, 0.0)),),
+    radius_meters=0.25,
+    flee_from_agent=True,
+    chase_speed_m_per_step=0.5,  # same magnitude, sign flipped
 )
 ```
 
