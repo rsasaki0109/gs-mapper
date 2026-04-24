@@ -185,11 +185,55 @@
 			body.nohf #progress, body.nohf .cube-face {
 				background: #ff9d0d;
 			}
+			body.embed {
+				background: transparent;
+			}
+			body.embed #info,
+			body.embed details,
+			body.embed #quality,
+			body.embed #caminfo,
+			body.embed #progress,
+			body.embed .nohf {
+				display: none !important;
+			}
 		</style>
 	</head>
 	<body>
 		<script>
 			if(location.host.includes('hf.space')) document.body.classList.add('nohf');
+			(function () {
+				var params = new URLSearchParams(location.search);
+				if (params.get('embed') !== '1') return;
+				document.body.classList.add('embed');
+				function startCarousel() {
+					window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyP' }));
+				}
+				window.addEventListener('load', function () {
+					var spinner = document.getElementById('spinner');
+					var fired = false;
+					function trigger() {
+						if (fired) return;
+						fired = true;
+						startCarousel();
+					}
+					if (!spinner) {
+						setTimeout(trigger, 1500);
+						return;
+					}
+					if (spinner.style.display === 'none') {
+						trigger();
+						return;
+					}
+					var observer = new MutationObserver(function () {
+						if (spinner.style.display === 'none') {
+							observer.disconnect();
+							trigger();
+						}
+					});
+					observer.observe(spinner, { attributes: true, attributeFilter: ['style'] });
+					setTimeout(trigger, 15000);
+				});
+			})();
 		</script>
 		<div id="info">
 			<h3 class="nohf">GS Mapper — Real WebGL Gaussian Splat</h3>

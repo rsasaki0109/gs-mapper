@@ -307,3 +307,28 @@ def test_readme_preview_images_cover_every_production_scene() -> None:
         assert preview.stat().st_size > 50_000, f"preview looks too small: {preview}"
         with Image.open(preview) as image:
             assert image.size == (1280, 720), f"preview should be a full-canvas 1280x720 grab: {preview}"
+
+
+def test_splat_html_supports_embed_mode() -> None:
+    """splat.html must honor ?embed=1 so index.html can inline the viewer as a hero."""
+    html = (REPO_ROOT / "docs" / "splat.html").read_text(encoding="utf-8")
+    assert "body.embed" in html, "splat.html must define body.embed CSS for hero embed"
+    assert "body.embed #info" in html, "embed mode should hide the info block"
+    assert "body.embed .nohf" in html, "embed mode should also hide hf.space chrome"
+    assert "params.get('embed')" in html, "splat.html must read ?embed=1 from the query string"
+    assert "classList.add('embed')" in html, "embed mode must toggle the body class"
+    assert "KeyP" in html, "embed mode must trigger the built-in carousel via the KeyP shortcut"
+
+
+def test_index_hero_embeds_live_outdoor_splat() -> None:
+    """docs/index.html hero must show the live WebGL splat viewer, not just the fallback GIF."""
+    html = (REPO_ROOT / "docs" / "index.html").read_text(encoding="utf-8")
+    assert "hero-bg-splat" in html, "hero iframe needs the hero-bg-splat class"
+    assert "hero-bg-fallback" in html, "hero must retain the GIF as a reduced-motion / fallback layer"
+    assert "splat.html?url=" in html, "hero iframe must point at splat.html with a ?url= scene"
+    assert "embed=1" in html, "hero iframe must request embed mode"
+    assert "mcd-ntu-day02-supervised.splat" in html, (
+        "hero should default to the supervised ntu_day_02 scene (largest outdoor production splat)"
+    )
+    assert "pointer-events: none" in html, "hero iframe must not capture clicks from the hero buttons"
+    assert "prefers-reduced-motion" in html, "hero must fall back for users with reduced motion"

@@ -133,16 +133,35 @@ nav a:hover { color: var(--text); background: rgba(255,255,255,0.06); }
   opacity: 0.42;
 }
 
+.hero-bg-splat {
+  border: 0;
+  opacity: 0.62;
+  pointer-events: none;
+  background: #05070c;
+  z-index: 1;
+}
+
+.hero-bg-fallback {
+  z-index: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-bg-splat { display: none; }
+  .hero-bg-fallback { opacity: 0.42; }
+}
+
 .hero::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, rgba(13,17,23,0.96) 0%, rgba(13,17,23,0.76) 48%, rgba(13,17,23,0.42) 100%);
+  background: linear-gradient(90deg, rgba(13,17,23,0.94) 0%, rgba(13,17,23,0.72) 48%, rgba(13,17,23,0.36) 100%);
+  z-index: 2;
+  pointer-events: none;
 }
 
 .hero-inner {
   position: relative;
-  z-index: 1;
+  z-index: 3;
   width: min(920px, 100%);
   margin: 0 auto;
 }
@@ -641,7 +660,8 @@ footer a:hover { text-decoration: underline; }
 
 <!-- Hero -->
 <div class="hero">
-  <img class="hero-bg" src="images/demo-sweep/hero.gif" alt="GS Mapper bundled splat scenes cycling in the browser viewer">
+  <iframe class="hero-bg hero-bg-splat" src="splat.html?url=assets/outdoor-demo/mcd-ntu-day02-supervised.splat&amp;embed=1" title="Live Gaussian splat of MCD ntu_day_02 supervised outdoor drive, auto-rotating" loading="eager" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin"></iframe>
+  <img class="hero-bg hero-bg-fallback" src="images/demo-sweep/hero.gif" alt="GS Mapper bundled splat scenes cycling in the browser viewer">
   <div class="hero-inner">
     <div class="hero-kicker">Robot data to Physical AI benchmarks</div>
     <h1>GS Mapper</h1>
