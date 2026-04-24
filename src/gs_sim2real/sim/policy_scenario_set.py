@@ -33,6 +33,7 @@ from .policy_benchmark_history import (
 from .policy_dynamic_obstacles import load_route_policy_dynamic_obstacle_timeline_json
 from .policy_quality import RoutePolicyQualityThresholds
 from .policy_sensor_noise import load_route_policy_sensor_noise_profile_json
+from .raw_sensor_noise import load_raw_sensor_noise_profile_json
 
 
 ROUTE_POLICY_SCENARIO_SET_VERSION = "gs-mapper-route-policy-scenario-set/v1"
@@ -53,6 +54,7 @@ class RoutePolicyScenarioSpec:
     site_url: str | None = None
     thresholds: RoutePolicyQualityThresholds | None = None
     sensor_noise_profile_path: str | None = None
+    raw_sensor_noise_profile_path: str | None = None
     dynamic_obstacles_path: str | None = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
@@ -81,6 +83,7 @@ class RoutePolicyScenarioSpec:
             "siteUrl": self.site_url,
             "thresholds": None if self.thresholds is None else self.thresholds.to_dict(),
             "sensorNoiseProfilePath": self.sensor_noise_profile_path,
+            "rawSensorNoiseProfilePath": self.raw_sensor_noise_profile_path,
             "dynamicObstaclesPath": self.dynamic_obstacles_path,
             "metadata": _json_mapping(self.metadata),
         }
@@ -360,6 +363,9 @@ def route_policy_scenario_spec_from_dict(payload: Mapping[str, Any]) -> RoutePol
         sensor_noise_profile_path=None
         if payload.get("sensorNoiseProfilePath") is None
         else str(payload["sensorNoiseProfilePath"]),
+        raw_sensor_noise_profile_path=None
+        if payload.get("rawSensorNoiseProfilePath") is None
+        else str(payload["rawSensorNoiseProfilePath"]),
         dynamic_obstacles_path=None
         if payload.get("dynamicObstaclesPath") is None
         else str(payload["dynamicObstaclesPath"]),
@@ -509,6 +515,16 @@ def _run_scenario(
         if sensor_noise_profile_path is None
         else load_route_policy_sensor_noise_profile_json(sensor_noise_profile_path)
     )
+    raw_sensor_noise_profile_path = (
+        None
+        if scenario.raw_sensor_noise_profile_path is None
+        else _resolve_path(base_path, scenario.raw_sensor_noise_profile_path)
+    )
+    raw_sensor_noise_profile = (
+        None
+        if raw_sensor_noise_profile_path is None
+        else load_raw_sensor_noise_profile_json(raw_sensor_noise_profile_path)
+    )
     dynamic_obstacles_path = (
         None if scenario.dynamic_obstacles_path is None else _resolve_path(base_path, scenario.dynamic_obstacles_path)
     )
@@ -518,7 +534,11 @@ def _run_scenario(
         else load_route_policy_dynamic_obstacle_timeline_json(dynamic_obstacles_path)
     )
     adapter = RoutePolicyGymAdapter(
-        HeadlessPhysicalAIEnvironment(catalog, dynamic_obstacles=dynamic_obstacles),
+        HeadlessPhysicalAIEnvironment(
+            catalog,
+            dynamic_obstacles=dynamic_obstacles,
+            raw_sensor_noise_profile=raw_sensor_noise_profile,
+        ),
         RoutePolicyEnvConfig(
             scene_id=scene_id,
             max_steps=max_steps or RoutePolicyEnvConfig().max_steps,

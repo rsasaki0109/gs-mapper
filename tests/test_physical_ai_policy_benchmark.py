@@ -980,6 +980,111 @@ def test_route_policy_scenario_set_honours_sensor_noise_profile(tmp_path: Path) 
     assert run.scenario_results[0].passed is True
 
 
+def test_route_policy_scenario_set_round_trips_raw_sensor_noise_profile_path(tmp_path: Path) -> None:
+    from gs_sim2real.sim import (
+        RawSensorNoiseProfile,
+        RoutePolicyScenarioSet,
+        RoutePolicyScenarioSpec,
+        route_policy_scenario_set_from_dict,
+        write_raw_sensor_noise_profile_json,
+        write_route_policy_scenario_set_json,
+    )
+
+    catalog_path = write_unit_scene_catalog(tmp_path / "scenes.json")
+    registry_path = write_route_policy_registry_json(
+        tmp_path / "registry.json",
+        RoutePolicyRegistry(
+            registry_id="unit-raw-noise-registry",
+            policies=(RoutePolicyRegistryEntry(policy_name="direct", policy_type="direct-goal"),),
+        ),
+    )
+    write_route_policy_goal_suite_json(
+        tmp_path / "near-goals.json",
+        RoutePolicyGoalSuite(
+            suite_id="near-goals",
+            scene_id="unit-scene",
+            frame_id="generic_world",
+            goals=(RoutePolicyGoalSpec("near", (0.25, 0.0, 0.0)),),
+        ),
+    )
+    raw_profile_path = write_raw_sensor_noise_profile_json(
+        tmp_path / "raw-noise.json",
+        RawSensorNoiseProfile(
+            profile_id="scenario-raw-noise",
+            rgb_intensity_std=3.0,
+            depth_range_std_meters=0.1,
+            lidar_range_std_meters=0.05,
+        ),
+    )
+
+    scenario_set = RoutePolicyScenarioSet(
+        scenario_set_id="unit-raw-noise-scenarios",
+        policy_registry_path=str(registry_path),
+        scenarios=(
+            RoutePolicyScenarioSpec(
+                scenario_id="raw-noise-short",
+                scene_catalog=str(catalog_path.name),
+                scene_id="unit-scene",
+                goal_suite_path="near-goals.json",
+                episode_count=1,
+                seed_start=0,
+                max_steps=4,
+                raw_sensor_noise_profile_path=str(raw_profile_path.name),
+            ),
+        ),
+    )
+    scenario_set_path = write_route_policy_scenario_set_json(tmp_path / "scenario-set.json", scenario_set)
+
+    loaded_set = route_policy_scenario_set_from_dict(json.loads(scenario_set_path.read_text(encoding="utf-8")))
+    assert loaded_set.scenarios[0].raw_sensor_noise_profile_path == str(raw_profile_path.name)
+
+    # Running the scenario picks the profile up without crashing, even though the
+    # direct-goal rollout does not actually render an observation — the env still
+    # loads and carries the profile end-to-end.
+    registry = load_route_policy_registry_json(registry_path)
+    run = run_route_policy_scenario_set(
+        loaded_set,
+        registry,
+        report_dir=tmp_path / "reports",
+        scenario_set_base_path=tmp_path,
+        registry_base_path=tmp_path,
+        policy_registry_path=registry_path,
+    )
+    assert run.scenario_count == 1
+    assert run.scenario_results[0].passed is True
+
+
+def test_route_policy_scenario_matrix_preserves_raw_sensor_noise_profile_path() -> None:
+    from gs_sim2real.sim import (
+        RoutePolicyMatrixConfigSpec,
+        RoutePolicyMatrixGoalSuiteSpec,
+        RoutePolicyMatrixRegistrySpec,
+        RoutePolicyMatrixSceneSpec,
+        RoutePolicyScenarioMatrix,
+        expand_route_policy_scenario_matrix,
+        route_policy_matrix_config_spec_from_dict,
+    )
+
+    config = RoutePolicyMatrixConfigSpec(
+        config_id="raw-noise-config",
+        raw_sensor_noise_profile_path="raw-noise.json",
+    )
+    payload = config.to_dict()
+    assert payload["rawSensorNoiseProfilePath"] == "raw-noise.json"
+    assert route_policy_matrix_config_spec_from_dict(payload) == config
+
+    # Expansion carries the profile path down to every generated scenario spec.
+    matrix = RoutePolicyScenarioMatrix(
+        matrix_id="raw-noise-matrix",
+        registries=(RoutePolicyMatrixRegistrySpec("direct", "direct-registry.json"),),
+        scenes=(RoutePolicyMatrixSceneSpec("unit", "scenes.json", scene_id="unit-scene"),),
+        goal_suites=(RoutePolicyMatrixGoalSuiteSpec("near", "near-goals.json"),),
+        configs=(config,),
+    )
+    scenario_sets = expand_route_policy_scenario_matrix(matrix)
+    assert scenario_sets[0].scenarios[0].raw_sensor_noise_profile_path == "raw-noise.json"
+
+
 def test_route_policy_scenario_shards_cli_writes_plan_and_merge(tmp_path: Path) -> None:
     catalog_path = write_unit_scene_catalog(tmp_path / "scenes.json")
     registry_path = write_route_policy_registry_json(

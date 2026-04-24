@@ -632,7 +632,7 @@ python3 scripts/collect_mcd_quality_runs.py --format gate --fail-on-gate
 | Task | Why |
 | --- | --- |
 | Observation renderer integration | Policy が実際に scene image / depth を見る流れに近づける。`HeadlessPhysicalAIEnvironment` は `raw_sensor_noise_profile` 引数 + `render_observation()` での auto-wrap まで着地。残りは gym adapter 側で observation を policy feature に通す seam、および scene bundle に input 可能な sensor を増やすこと。 |
-| Sensor noise profiles (raw sensors) | Pose / goal / heading 用の `RoutePolicySensorNoiseProfile` + RGB / depth / LiDAR 用の `RawSensorNoiseProfile` (`src/gs_sim2real/sim/raw_sensor_noise.py`) + headless env 自動適用 着地済み。残りは IMU output を observation renderer に追加すること、および scenario config への wiring (scenario spec の `raw_sensor_noise_profile_path` 追加)。 |
+| Sensor noise profiles (raw sensors) | Pose / goal / heading 用の `RoutePolicySensorNoiseProfile` + RGB / depth / LiDAR 用の `RawSensorNoiseProfile` + headless env 自動適用 + scenario spec / matrix config への `raw_sensor_noise_profile_path` wiring 着地済み。残りは IMU output を observation renderer に追加すること、および route policy benchmark から observation 経由で feature を引く seam。 |
 | Dynamic obstacles (multi-agent) | シングル moving obstacle は scenario config に入った。残りは multiple agents の同時動き / reactive response との結合、obstacle 側も policy を持つ状況。 |
 | Route policy replay viewer | Policy trajectory と scene を Pages で inspect したい。 |
 | Real-vs-sim correlation report | rosbag replay と headless benchmark の差を見る。 |
