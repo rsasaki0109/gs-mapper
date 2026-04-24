@@ -1,0 +1,13 @@
+{
+  "depthRangeStdMeters": 0.1,
+  "imuAngularVelocityStdRadPerSec": 0.0,
+  "imuLinearAccelerationStdMPerSecSq": 0.0,
+  "lidarRangeStdMeters": 0.05,
+  "metadata": {
+    "source": "docs/physical-ai-sim.md partial-information benchmark recipe"
+  },
+  "profileId": "outdoor-sensor",
+  "recordType": "raw-sensor-noise-profile",
+  "rgbIntensityStd": 0.0,
+  "version": "gs-mapper-raw-sensor-noise-profile/v1"
+}

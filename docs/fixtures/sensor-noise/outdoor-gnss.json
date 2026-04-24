@@ -1,0 +1,11 @@
+{
+  "goalPositionStdMeters": 0.15,
+  "metadata": {
+    "source": "docs/physical-ai-sim.md partial-information benchmark recipe"
+  },
+  "poseHeadingStdRadians": 0.02,
+  "posePositionStdMeters": 0.25,
+  "profileId": "outdoor-gnss",
+  "recordType": "route-policy-sensor-noise-profile",
+  "version": "gs-mapper-route-policy-sensor-noise-profile/v1"
+}
