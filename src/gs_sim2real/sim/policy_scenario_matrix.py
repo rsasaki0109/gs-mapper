@@ -106,6 +106,7 @@ class RoutePolicyMatrixConfigSpec:
     max_steps: int | None = None
     thresholds: RoutePolicyQualityThresholds | None = None
     sensor_noise_profile_path: str | None = None
+    dynamic_obstacles_path: str | None = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -127,6 +128,7 @@ class RoutePolicyMatrixConfigSpec:
             "maxSteps": self.max_steps,
             "thresholds": None if self.thresholds is None else self.thresholds.to_dict(),
             "sensorNoiseProfilePath": self.sensor_noise_profile_path,
+            "dynamicObstaclesPath": self.dynamic_obstacles_path,
             "metadata": _json_mapping(self.metadata),
         }
 
@@ -441,6 +443,9 @@ def route_policy_matrix_config_spec_from_dict(payload: Mapping[str, Any]) -> Rou
         sensor_noise_profile_path=None
         if payload.get("sensorNoiseProfilePath") is None
         else str(payload["sensorNoiseProfilePath"]),
+        dynamic_obstacles_path=None
+        if payload.get("dynamicObstaclesPath") is None
+        else str(payload["dynamicObstaclesPath"]),
         metadata=_json_mapping(_mapping(payload.get("metadata", {}), "metadata")),
     )
 
@@ -544,6 +549,7 @@ def _scenario_from_axes(
         site_url=scene.site_url,
         thresholds=config.thresholds,
         sensor_noise_profile_path=config.sensor_noise_profile_path,
+        dynamic_obstacles_path=config.dynamic_obstacles_path,
         metadata={
             "matrixId": matrix.matrix_id,
             "registryId": registry.registry_id,
@@ -585,6 +591,7 @@ def _rebase_scenario_set_paths(
                 sensor_noise_profile_path=_rebase_optional_path(
                     scenario.sensor_noise_profile_path, source_base, target_base
                 ),
+                dynamic_obstacles_path=_rebase_optional_path(scenario.dynamic_obstacles_path, source_base, target_base),
                 metadata=scenario.metadata,
             )
             for scenario in scenario_set.scenarios

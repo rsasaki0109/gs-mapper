@@ -689,6 +689,58 @@ config = RoutePolicyMatrixConfigSpec(
 
 Determinism: the noise RNG is derived from `sha256(base_seed | profile_id | episode_index | step_index | kind)` so the same scenario replay always produces identical noisy observations across Python interpreter restarts. Setting every σ to `0.0` (the default) returns the identity profile — the adapter short-circuits to the true pose.
 
+### Dynamic obstacles
+
+Static occupancy grids collapse the gap between trivial direct-goal policies and policies that have to react to the world. `DynamicObstacleTimeline` layers on top of the static scene: each `DynamicObstacle` carries a sorted list of `(step_index, position)` waypoints plus a sphere radius, and the environment consults the timeline inside every collision query. Positions are linearly interpolated between bracketing waypoints (clamped outside the range), so a single pair of waypoints gives a constant-velocity moving obstacle for free.
+
+```python
+from gs_sim2real.sim import (
+    DynamicObstacle,
+    DynamicObstacleTimeline,
+    DynamicObstacleWaypoint,
+    write_route_policy_dynamic_obstacle_timeline_json,
+)
+
+timeline = DynamicObstacleTimeline(
+    timeline_id="outdoor-cross-traffic",
+    obstacles=(
+        DynamicObstacle(
+            obstacle_id="cyclist",
+            waypoints=(
+                DynamicObstacleWaypoint(step_index=0, position=(-1.0, 0.0, 0.0)),
+                DynamicObstacleWaypoint(step_index=8, position=(1.0, 0.0, 0.0)),
+            ),
+            radius_meters=0.25,
+        ),
+    ),
+)
+write_route_policy_dynamic_obstacle_timeline_json(
+    "runs/scenarios/obstacles/outdoor-cross-traffic.json",
+    timeline,
+)
+```
+
+Scenario specs and matrix configs reference the timeline JSON via a new optional `dynamic_obstacles_path` — the same shape the sensor noise profile uses:
+
+```python
+scenario = RoutePolicyScenarioSpec(
+    scenario_id="outdoor-near-cross-traffic",
+    scene_catalog="scenes.json",
+    scene_id="outdoor-demo",
+    goal_suite_path="near-goals.json",
+    dynamic_obstacles_path="obstacles/outdoor-cross-traffic.json",
+)
+config = RoutePolicyMatrixConfigSpec(
+    config_id="cross-traffic",
+    episode_count=2,
+    seed_start=0,
+    max_steps=8,
+    dynamic_obstacles_path="obstacles/outdoor-cross-traffic.json",
+)
+```
+
+When the environment's collision check sees that a query pose sits inside any obstacle's sphere at the current step, it reports `dynamic-obstacle:<obstacle_id>` and lets the scenario CI chain record it the same way static occupancy collisions are recorded. Trajectory scoring steps through the trajectory pose-by-pose so each step of a multi-pose rollout is checked against the obstacle's interpolated position at that step — an obstacle crossing the path between step 3 and step 4 blocks step 3 but not step 5.
+
 For CI-sized execution, split the generated scenario sets into shard scenario-set files. Each shard is still a normal `RoutePolicyScenarioSet`, so CI jobs can run shards with the existing `route-policy-scenario-set` command. The final merge step reads the shard run JSON files, collects every per-scenario benchmark report, and rebuilds one global history gate.
 
 ```python

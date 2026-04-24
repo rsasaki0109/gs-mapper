@@ -20,6 +20,7 @@ from .interfaces import (
 )
 from .footprint import RobotFootprint
 from .occupancy import OccupancyQuery, VoxelOccupancyGrid, point_to_voxel_cell
+from .policy_dynamic_obstacles import DynamicObstacleTimeline
 from .rendering import ObservationRenderer
 
 
@@ -52,11 +53,13 @@ class HeadlessPhysicalAIEnvironment(PhysicalAIEnvironment):
         observation_renderer: ObservationRenderer | None = None,
         occupancy_grid: VoxelOccupancyGrid | None = None,
         robot_footprint: RobotFootprint | None = None,
+        dynamic_obstacles: DynamicObstacleTimeline | None = None,
     ):
         self.catalog = catalog
         self.observation_renderer = observation_renderer
         self.occupancy_grid = occupancy_grid
         self.robot_footprint = robot_footprint
+        self.dynamic_obstacles = dynamic_obstacles
         self._state: HeadlessEnvironmentState | None = None
 
     def set_occupancy_grid(self, occupancy_grid: VoxelOccupancyGrid | None) -> None:
@@ -68,6 +71,11 @@ class HeadlessPhysicalAIEnvironment(PhysicalAIEnvironment):
         """Set or clear the robot footprint used by occupancy collision queries."""
 
         self.robot_footprint = robot_footprint
+
+    def set_dynamic_obstacles(self, dynamic_obstacles: DynamicObstacleTimeline | None) -> None:
+        """Set or clear the dynamic obstacle timeline consulted by collision queries."""
+
+        self.dynamic_obstacles = dynamic_obstacles
 
     @property
     def state(self) -> HeadlessEnvironmentState:
@@ -124,9 +132,15 @@ class HeadlessPhysicalAIEnvironment(PhysicalAIEnvironment):
 
     def query_collision(self, pose: Pose3D) -> CollisionQuery:
         scene = self.catalog.scene_by_id(self.state.scene_id)
-        return self._query_collision_for_scene(scene, pose)
+        return self._query_collision_for_scene(scene, pose, step_index=self.state.step_index)
 
-    def _query_collision_for_scene(self, scene: SceneEnvironment, pose: Pose3D) -> CollisionQuery:
+    def _query_collision_for_scene(
+        self,
+        scene: SceneEnvironment,
+        pose: Pose3D,
+        *,
+        step_index: int = 0,
+    ) -> CollisionQuery:
         point = Vec3.from_sequence(pose.position)
         if not scene.bounds.contains(point):
             return CollisionQuery(
@@ -135,6 +149,17 @@ class HeadlessPhysicalAIEnvironment(PhysicalAIEnvironment):
                 reason="outside-bounds",
                 clearance_meters=0.0,
             )
+        if self.dynamic_obstacles is not None:
+            blocking = self.dynamic_obstacles.blocking_obstacle(pose.position, step_index)
+            if blocking is not None:
+                centre = blocking.position_at_step(step_index)
+                clearance = max(0.0, math.dist(tuple(pose.position), centre) - blocking.radius_meters)
+                return CollisionQuery(
+                    pose=pose,
+                    collides=True,
+                    reason=f"dynamic-obstacle:{blocking.obstacle_id}",
+                    clearance_meters=clearance,
+                )
         if self.occupancy_grid is not None:
             occupancy = self._query_occupancy(pose)
             if occupancy.occupied:
@@ -202,7 +227,9 @@ class HeadlessPhysicalAIEnvironment(PhysicalAIEnvironment):
         inside_rate = inside / len(trajectory)
         path_length = _path_length(trajectory)
         collision_summary = summarize_collision_queries(
-            tuple(self._query_collision_for_scene(scene, pose) for pose in trajectory)
+            tuple(
+                self._query_collision_for_scene(scene, pose, step_index=index) for index, pose in enumerate(trajectory)
+            )
         )
         metrics = {
             "inside-bounds-rate": inside_rate,
