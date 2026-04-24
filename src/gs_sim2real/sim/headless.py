@@ -186,7 +186,7 @@ class HeadlessPhysicalAIEnvironment(PhysicalAIEnvironment):
         if self.dynamic_obstacles is not None:
             blocking = self.dynamic_obstacles.blocking_obstacle(pose.position, step_index)
             if blocking is not None:
-                centre = blocking.position_at_step(step_index)
+                centre = blocking.position_at_step(step_index, agent_position=pose.position)
                 clearance = max(0.0, math.dist(tuple(pose.position), centre) - blocking.radius_meters)
                 return CollisionQuery(
                     pose=pose,

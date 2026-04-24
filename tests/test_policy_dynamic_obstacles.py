@@ -377,6 +377,148 @@ def test_gym_adapter_omits_second_nearest_block_when_only_one_obstacle() -> None
     assert "second-nearest-dynamic-obstacle-bearing-x" not in observation
 
 
+def test_chase_obstacle_interpolates_toward_agent_by_step_and_clamps_at_contact() -> None:
+    # Chase obstacle starts 5m east of origin and chases the agent at the
+    # origin. With 1 m/step travel the obstacle should be at x=4 at step 1,
+    # x=0 at step 5 (fully caught up), and clamp at x=0 thereafter.
+    obstacle = DynamicObstacle(
+        obstacle_id="chaser",
+        waypoints=(DynamicObstacleWaypoint(step_index=0, position=(5.0, 0.0, 0.0)),),
+        radius_meters=0.1,
+        chase_target_agent=True,
+        chase_speed_m_per_step=1.0,
+    )
+    agent_position = (0.0, 0.0, 0.0)
+
+    assert obstacle.position_at_step(0, agent_position=agent_position) == (5.0, 0.0, 0.0)
+    assert obstacle.position_at_step(1, agent_position=agent_position) == pytest.approx((4.0, 0.0, 0.0))
+    assert obstacle.position_at_step(5, agent_position=agent_position) == pytest.approx((0.0, 0.0, 0.0))
+    # Clamped at agent once caught up.
+    assert obstacle.position_at_step(10, agent_position=agent_position) == pytest.approx((0.0, 0.0, 0.0))
+
+    # Without agent_position the chaser stays pinned at its start waypoint so
+    # headless renderers / Markdown summaries still see a stable position.
+    assert obstacle.position_at_step(4) == (5.0, 0.0, 0.0)
+
+
+def test_chase_obstacle_round_trips_through_json(tmp_path: Path) -> None:
+    timeline = DynamicObstacleTimeline(
+        timeline_id="chase-timeline",
+        obstacles=(
+            DynamicObstacle(
+                obstacle_id="chaser",
+                waypoints=(DynamicObstacleWaypoint(step_index=0, position=(1.0, 0.0, 0.0)),),
+                radius_meters=0.2,
+                chase_target_agent=True,
+                chase_speed_m_per_step=0.5,
+            ),
+        ),
+    )
+    path = write_route_policy_dynamic_obstacle_timeline_json(tmp_path / "chase.json", timeline)
+    loaded = load_route_policy_dynamic_obstacle_timeline_json(path)
+    assert loaded == timeline
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    chase_payload = payload["obstacles"][0]
+    assert chase_payload["chaseTargetAgent"] is True
+    assert chase_payload["chaseSpeedMPerStep"] == 0.5
+
+
+def test_chase_obstacle_rejects_negative_speed() -> None:
+    with pytest.raises(ValueError, match="chase_speed_m_per_step must be non-negative"):
+        DynamicObstacle(
+            obstacle_id="bad-chaser",
+            waypoints=(DynamicObstacleWaypoint(step_index=0, position=(1.0, 0.0, 0.0)),),
+            radius_meters=0.1,
+            chase_target_agent=True,
+            chase_speed_m_per_step=-0.2,
+        )
+
+
+def test_headless_env_chase_obstacle_catches_agent_and_reports_collision() -> None:
+    timeline = DynamicObstacleTimeline(
+        timeline_id="env-chaser",
+        obstacles=(
+            DynamicObstacle(
+                obstacle_id="hunter",
+                waypoints=(DynamicObstacleWaypoint(step_index=0, position=(0.5, 0.0, 0.0)),),
+                radius_meters=0.1,
+                chase_target_agent=True,
+                chase_speed_m_per_step=0.2,
+            ),
+        ),
+    )
+    env = HeadlessPhysicalAIEnvironment(_unit_catalog(), dynamic_obstacles=timeline)
+    env.reset("unit-scene")
+
+    from gs_sim2real.sim import Pose3D
+
+    # At step 0 the obstacle is still 0.5m away; agent at origin is clear.
+    origin_pose = Pose3D(position=(0.0, 0.0, 0.0), orientation_xyzw=(0.0, 0.0, 0.0, 1.0))
+    clear = env.query_collision(origin_pose)
+    assert clear.collides is False
+
+    # Fast-forward the env step index to 3 — the chaser should now be at
+    # (0.5 - 0.6, 0, 0) == (-0.1, 0, 0), closer than its 0.1m radius to origin.
+    env._state = env.state.__class__(  # type: ignore[attr-defined]
+        scene_id=env.state.scene_id,
+        pose=origin_pose,
+        step_index=3,
+    )
+    blocked = env.query_collision(origin_pose)
+    assert blocked.collides is True
+    assert blocked.reason == "dynamic-obstacle:hunter"
+
+
+def test_gym_adapter_feature_block_tracks_chase_obstacle_approach() -> None:
+    timeline = DynamicObstacleTimeline(
+        timeline_id="gym-chaser",
+        obstacles=(
+            DynamicObstacle(
+                obstacle_id="gym-hunter",
+                waypoints=(DynamicObstacleWaypoint(step_index=0, position=(3.0, 0.0, 0.0)),),
+                radius_meters=0.1,
+                chase_target_agent=True,
+                chase_speed_m_per_step=0.5,
+            ),
+        ),
+    )
+    env = HeadlessPhysicalAIEnvironment(_unit_catalog(), dynamic_obstacles=timeline)
+    adapter = RoutePolicyGymAdapter(
+        env,
+        RoutePolicyEnvConfig(scene_id="unit-scene", max_steps=8, goal_tolerance_meters=0.02),
+    )
+
+    from gs_sim2real.sim import Pose3D
+
+    adapter.reset(seed=1, goal=(0.05, 0.0, 0.0))
+    adapter._state = RoutePolicyEnvState(  # type: ignore[attr-defined]
+        scene_id=adapter.state.scene_id,
+        episode_index=adapter.state.episode_index,
+        step_index=0,
+        pose=Pose3D(position=(0.0, 0.0, 0.0), orientation_xyzw=(0.0, 0.0, 0.0, 1.0)),
+        goal=adapter.state.goal,
+        done=False,
+    )
+    at_start = adapter._observation_features(adapter.state)
+    # Step 0: obstacle still at (3.0, 0, 0); clearance = 3.0 - 0.1 = 2.9.
+    assert math.isclose(at_start["nearest-dynamic-obstacle-distance-meters"], 2.9, abs_tol=1e-9)
+
+    adapter._state = RoutePolicyEnvState(  # type: ignore[attr-defined]
+        scene_id=adapter.state.scene_id,
+        episode_index=adapter.state.episode_index,
+        step_index=4,
+        pose=Pose3D(position=(0.0, 0.0, 0.0), orientation_xyzw=(0.0, 0.0, 0.0, 1.0)),
+        goal=adapter.state.goal,
+        done=False,
+    )
+    after_approach = adapter._observation_features(adapter.state)
+    # Step 4: obstacle has travelled 4 * 0.5 = 2.0 toward agent, now at
+    # (1.0, 0, 0); clearance = 1.0 - 0.1 = 0.9.
+    assert math.isclose(after_approach["nearest-dynamic-obstacle-distance-meters"], 0.9, abs_tol=1e-9)
+    # Bearing still on the +x axis since both start and chased path are on x.
+    assert math.isclose(after_approach["nearest-dynamic-obstacle-bearing-x"], 1.0, abs_tol=1e-9)
+
+
 def test_trajectory_score_uses_per_step_obstacle_positions() -> None:
     # Obstacle moves from (0.3, 0, 0) at step 0 to (-10, 0, 0) at step 1,
     # so only the first pose of a two-pose trajectory is blocked.
