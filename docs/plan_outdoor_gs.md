@@ -631,8 +631,8 @@ python3 scripts/collect_mcd_quality_runs.py --format gate --fail-on-gate
 
 | Task | Why |
 | --- | --- |
-| Observation renderer integration | Policy が実際に scene image / depth を見る流れに近づける。 |
-| Sensor noise profiles (raw sensors) | Pose / goal / heading 用の `RoutePolicySensorNoiseProfile` は着地済み。残りは LiDAR / camera / IMU の raw sensor noise を observation renderer に injection する枠組み。 |
+| Observation renderer integration | Policy が実際に scene image / depth を見る流れに近づける。`NoisyObservationRenderer` wrapper (raw sensor noise) は着地したが、gym adapter 側で observation を feature 化する seam はまだない。 |
+| Sensor noise profiles (raw sensors) | Pose / goal / heading 用の `RoutePolicySensorNoiseProfile` + RGB / depth / LiDAR 用の `RawSensorNoiseProfile` (`src/gs_sim2real/sim/raw_sensor_noise.py`) 着地済み。残りは IMU output を observation renderer に追加すること、および scenario config への wiring。 |
 | Dynamic obstacles (multi-agent) | シングル moving obstacle は scenario config に入った。残りは multiple agents の同時動き / reactive response との結合、obstacle 側も policy を持つ状況。 |
 | Route policy replay viewer | Policy trajectory と scene を Pages で inspect したい。 |
 | Real-vs-sim correlation report | rosbag replay と headless benchmark の差を見る。 |
