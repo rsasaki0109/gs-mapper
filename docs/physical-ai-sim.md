@@ -1131,7 +1131,7 @@ The backend always blocks poses outside `SceneEnvironment.bounds`. When a `Voxel
 
 A common task is "evaluate a route policy against noisy pose + obstacles that react to it". The individual primitives are documented above; this recipe stitches them together into one scenario-set run so a reader can see the whole partial-information surface in one place.
 
-1. **Author the noise profile(s).** `RoutePolicySensorNoiseProfile` perturbs pose / goal / heading that the policy observes; `RawSensorNoiseProfile` perturbs rendered camera / depth / LiDAR / IMU arrays at the observation renderer boundary. Persist each as JSON — the scenario spec references them by path.
+1. **Author the noise profile(s).** `RoutePolicySensorNoiseProfile` perturbs pose / goal / heading that the policy observes; `RawSensorNoiseProfile` perturbs rendered camera / depth / LiDAR / IMU arrays at the observation renderer boundary. Persist each as JSON — the scenario spec references them by path. Ready-to-copy references live at [`docs/fixtures/sensor-noise/outdoor-gnss.json`](fixtures/sensor-noise/outdoor-gnss.json) (pose-facing) and [`docs/fixtures/raw-noise/outdoor-sensor.json`](fixtures/raw-noise/outdoor-sensor.json) (raw-sensor), both pinned by `tests/test_bundled_sensor_noise_fixtures.py`.
 
    ```python
    from gs_sim2real.sim import (
