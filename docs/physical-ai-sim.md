@@ -1286,6 +1286,23 @@ python3 scripts/run_rosbag_correlation.py \
 
 The sim-rollout JSONL is one record per line with `timestampSeconds`, `position` (3-element list), and `orientationXyzw` (4-element list). The script writes the JSON report (with up to `--max-pairs-kept` evenly-strided `CorrelatedPosePair` entries embedded — pass `--no-pairs` to drop them entirely) and an optional Markdown summary suitable for PR / scenario-CI artifact display.
 
+Pass `--imu-topic <topic>` to merge a `sensor_msgs/Imu` orientation stream onto the NavSatFix positions: each NavSatFix sample picks up the nearest-timestamp IMU quaternion within `--imu-pair-dt-seconds` (default 0.05 s), and the correlator's heading-error mean / max fields populate from the resulting `BagPoseStream`. The same composition is available as a library:
+
+```python
+from gs_sim2real.robotics import (
+    merge_navsat_with_imu_orientation,
+    read_imu_orientation_stream,
+    read_navsat_pose_stream,
+)
+
+bag = ["data/autoware_leo_drive_bag1"]
+navsat = read_navsat_pose_stream(bag)
+imu = read_imu_orientation_stream(bag)  # /sensing/imu/imu_data on the Autoware Leo Drive bags
+fused = merge_navsat_with_imu_orientation(navsat, imu, max_pair_dt_seconds=0.05)
+```
+
+NavSatFix samples whose nearest IMU quaternion is more than `max_pair_dt_seconds` away keep `orientation_xyzw=None` so the correlator skips them when reducing heading errors — the mean / max are computed over the matched pairs only.
+
 ## Next Implementation Layer
 
 The scenario CI chain from matrix expansion through promotion-backed adoption is now covered by `scripts/smoke_route_policy_scenario_ci.py`, with both library API (`adopt_route_policy_scenario_ci_workflow`) and CLI surface (`gs-mapper route-policy-scenario-ci-workflow-adopt`). The review bundle is adoption-aware: passing `--adoption-report` to the review CLI (or `adoption=` to `build_route_policy_scenario_ci_review_artifact`) embeds the trigger mode, branches, and unified manual-vs-adopted YAML diff into the Pages-hosted bundle. The next useful layer is surfacing the reviews on the `/reviews/` Pages index so discovery no longer requires knowing the bundle URL in advance.

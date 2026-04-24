@@ -196,6 +196,7 @@ class RealVsSimCorrelationReport:
 
 
 _NAVSAT_MSGTYPES: frozenset[str] = frozenset({"sensor_msgs/msg/NavSatFix", "sensor_msgs/NavSatFix"})
+_IMU_MSGTYPES: frozenset[str] = frozenset({"sensor_msgs/msg/Imu", "sensor_msgs/Imu"})
 _WGS84_A = 6378137.0
 _WGS84_F = 1.0 / 298.257223563
 _WGS84_E_SQ = _WGS84_F * (2.0 - _WGS84_F)
@@ -311,6 +312,116 @@ def read_navsat_pose_stream(
         source_topic=chosen_topic,
         source_msgtype=chosen_msgtype,
         reference_origin_wgs84=origin,
+    )
+
+
+def read_imu_orientation_stream(
+    bag_paths: Sequence[Path],
+    *,
+    topic: str | None = None,
+) -> tuple[tuple[float, tuple[float, float, float, float]], ...]:
+    """Read a ``sensor_msgs/Imu`` topic into ``(timestamp, xyzw)`` pairs.
+
+    Imu has no position field, so the result is a flat list of
+    timestamped quaternions sorted ascending by timestamp. Pair the
+    result onto a NavSatFix-derived :class:`BagPoseStream` using
+    :func:`merge_navsat_with_imu_orientation`. Identity-or-zero
+    quaternions (norm below ``1e-6``) are dropped — public bags
+    occasionally publish placeholder identity samples during sensor
+    warm-up.
+    """
+
+    paths = [Path(item) for item in bag_paths]
+    if not paths:
+        raise ValueError("read_imu_orientation_stream requires at least one bag path")
+
+    from rosbags.highlevel import AnyReader
+    from rosbags.typesys import Stores, get_typestore
+
+    typestore = get_typestore(Stores.ROS2_HUMBLE)
+    samples: list[tuple[float, tuple[float, float, float, float]]] = []
+
+    with AnyReader(paths, default_typestore=typestore) as reader:
+        connection = _select_imu_connection(reader.topics, topic)
+        if connection is None:
+            raise FileNotFoundError("no sensor_msgs/Imu topic found in the supplied bag paths")
+        for _, timestamp_ns, rawdata in reader.messages(connections=[connection]):
+            ts = float(timestamp_ns) * 1e-9
+            msg = reader.deserialize(rawdata, connection.msgtype)
+            orientation = getattr(msg, "orientation", None)
+            if orientation is None:
+                continue
+            try:
+                qx = float(orientation.x)
+                qy = float(orientation.y)
+                qz = float(orientation.z)
+                qw = float(orientation.w)
+            except AttributeError:
+                continue
+            if not all(math.isfinite(component) for component in (qx, qy, qz, qw)):
+                continue
+            norm = math.sqrt(qx * qx + qy * qy + qz * qz + qw * qw)
+            if norm <= 1e-6:
+                continue
+            inv_norm = 1.0 / norm
+            samples.append((ts, (qx * inv_norm, qy * inv_norm, qz * inv_norm, qw * inv_norm)))
+
+    if not samples:
+        raise ValueError("no valid Imu orientation samples were extracted from the supplied bag paths")
+    samples.sort(key=lambda item: item[0])
+    return tuple(samples)
+
+
+def merge_navsat_with_imu_orientation(
+    navsat_stream: BagPoseStream,
+    imu_orientations: Sequence[tuple[float, tuple[float, float, float, float]]],
+    *,
+    max_pair_dt_seconds: float = 0.05,
+) -> BagPoseStream:
+    """Pair each NavSatFix sample with the nearest-timestamp IMU orientation.
+
+    Returns a new :class:`BagPoseStream` whose samples carry the
+    NavSatFix position plus the matched IMU quaternion. Samples whose
+    nearest IMU orientation is more than ``max_pair_dt_seconds`` away
+    keep ``orientation_xyzw=None`` so the correlator's heading-error
+    aggregation continues to skip them, matching the behaviour of a
+    NavSatFix-only stream. The output preserves the source bag's frame
+    id, topic, msgtype, and reference origin.
+    """
+
+    if max_pair_dt_seconds < 0.0 or not math.isfinite(max_pair_dt_seconds):
+        raise ValueError("max_pair_dt_seconds must be finite and non-negative")
+    if not imu_orientations:
+        raise ValueError("imu_orientations must contain at least one sample")
+
+    imu_timestamps = [ts for ts, _ in imu_orientations]
+    if any(b < a for a, b in zip(imu_timestamps, imu_timestamps[1:])):
+        raise ValueError("imu_orientations must be sorted ascending by timestamp")
+
+    fused: list[BagPoseSample] = []
+    for sample in navsat_stream.samples:
+        nearest = _nearest_bag_index(imu_timestamps, sample.timestamp_seconds)
+        if nearest is None:
+            fused.append(sample)
+            continue
+        imu_ts, quaternion = imu_orientations[nearest]
+        if abs(imu_ts - sample.timestamp_seconds) > max_pair_dt_seconds:
+            fused.append(sample)
+            continue
+        fused.append(
+            BagPoseSample(
+                timestamp_seconds=sample.timestamp_seconds,
+                position=sample.position,
+                orientation_xyzw=quaternion,
+            )
+        )
+
+    return BagPoseStream(
+        samples=tuple(fused),
+        frame_id=navsat_stream.frame_id,
+        source_topic=navsat_stream.source_topic,
+        source_msgtype=navsat_stream.source_msgtype,
+        reference_origin_wgs84=navsat_stream.reference_origin_wgs84,
     )
 
 
@@ -494,17 +605,32 @@ def _sim_pose_sample_from_dict(payload: Mapping[str, Any], line_number: int) -> 
 def _select_navsat_connection(topics: Mapping[str, Any], requested: str | None):
     """Pick the first NavSatFix connection (preferring ``requested`` when supplied)."""
 
+    return _select_typed_connection(topics, requested, _NAVSAT_MSGTYPES, "NavSatFix")
+
+
+def _select_imu_connection(topics: Mapping[str, Any], requested: str | None):
+    """Pick the first sensor_msgs/Imu connection (preferring ``requested`` when supplied)."""
+
+    return _select_typed_connection(topics, requested, _IMU_MSGTYPES, "Imu")
+
+
+def _select_typed_connection(
+    topics: Mapping[str, Any],
+    requested: str | None,
+    allowed_msgtypes: frozenset[str],
+    label: str,
+):
     if requested:
         info = topics.get(requested)
         if info is None:
             raise ValueError(f"requested topic not found: {requested}")
         for connection in info.connections:
-            if connection.msgtype in _NAVSAT_MSGTYPES:
+            if connection.msgtype in allowed_msgtypes:
                 return connection
-        raise ValueError(f"requested topic {requested} is not a NavSatFix topic")
+        raise ValueError(f"requested topic {requested} is not a {label} topic")
     for info in topics.values():
         for connection in info.connections:
-            if connection.msgtype in _NAVSAT_MSGTYPES:
+            if connection.msgtype in allowed_msgtypes:
                 return connection
     return None
 

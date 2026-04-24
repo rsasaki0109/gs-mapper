@@ -18,6 +18,7 @@ from gs_sim2real.robotics import (
     SimPoseSample,
     correlate_against_sim_trajectory,
     load_sim_pose_samples_jsonl,
+    merge_navsat_with_imu_orientation,
     render_real_vs_sim_correlation_markdown,
     wgs84_to_ecef,
     wgs84_to_local_enu,
@@ -391,3 +392,66 @@ def test_bag_pose_stream_validation_rejects_unsorted_samples() -> None:
             source_topic="/x",
             source_msgtype="sensor_msgs/msg/NavSatFix",
         )
+
+
+def test_merge_navsat_with_imu_orientation_fills_in_quaternion_within_window() -> None:
+    navsat = _make_bag_stream(
+        [
+            BagPoseSample(timestamp_seconds=0.0, position=(0.0, 0.0, 0.0)),
+            BagPoseSample(timestamp_seconds=1.0, position=(1.0, 0.0, 0.0)),
+            BagPoseSample(timestamp_seconds=2.0, position=(2.0, 0.0, 0.0)),
+        ]
+    )
+    imu = (
+        (0.01, (0.0, 0.0, 0.0, 1.0)),
+        (1.02, (0.0, 0.0, math.sin(math.pi / 4.0), math.cos(math.pi / 4.0))),
+        # No IMU sample anywhere near t=2.0; that NavSatFix sample stays None.
+    )
+
+    fused = merge_navsat_with_imu_orientation(navsat, imu, max_pair_dt_seconds=0.05)
+
+    assert fused.source_topic == navsat.source_topic
+    assert fused.reference_origin_wgs84 == navsat.reference_origin_wgs84
+    assert fused.samples[0].orientation_xyzw == (0.0, 0.0, 0.0, 1.0)
+    assert fused.samples[1].orientation_xyzw is not None
+    assert fused.samples[2].orientation_xyzw is None
+
+
+def test_merge_navsat_with_imu_orientation_rejects_unsorted_imu_samples() -> None:
+    navsat = _make_bag_stream([BagPoseSample(timestamp_seconds=0.0, position=(0.0, 0.0, 0.0))])
+    out_of_order = (
+        (1.0, (0.0, 0.0, 0.0, 1.0)),
+        (0.5, (0.0, 0.0, 0.0, 1.0)),
+    )
+    with pytest.raises(ValueError, match="sorted ascending"):
+        merge_navsat_with_imu_orientation(navsat, out_of_order)
+
+
+def test_merge_navsat_with_imu_orientation_rejects_empty_imu_samples() -> None:
+    navsat = _make_bag_stream([BagPoseSample(timestamp_seconds=0.0, position=(0.0, 0.0, 0.0))])
+    with pytest.raises(ValueError, match="at least one sample"):
+        merge_navsat_with_imu_orientation(navsat, ())
+
+
+def test_correlator_emits_heading_error_on_imu_merged_stream() -> None:
+    navsat = _make_bag_stream(
+        [
+            BagPoseSample(timestamp_seconds=0.0, position=(0.0, 0.0, 0.0)),
+            BagPoseSample(timestamp_seconds=1.0, position=(1.0, 0.0, 0.0)),
+        ]
+    )
+    imu = (
+        (0.01, (0.0, 0.0, 0.0, 1.0)),
+        (1.0, (0.0, 0.0, math.sin(math.pi / 8.0), math.cos(math.pi / 8.0))),  # 45 deg yaw
+    )
+    fused = merge_navsat_with_imu_orientation(navsat, imu, max_pair_dt_seconds=0.05)
+    sim_samples = [
+        SimPoseSample(timestamp_seconds=0.0, position=(0.0, 0.0, 0.0), orientation_xyzw=(0, 0, 0, 1)),
+        SimPoseSample(timestamp_seconds=1.0, position=(1.0, 0.0, 0.0), orientation_xyzw=(0, 0, 0, 1)),
+    ]
+
+    report = correlate_against_sim_trajectory(fused, sim_samples, max_match_dt_seconds=0.05)
+    assert report.matched_pair_count == 2
+    # Mean of 0 rad and 45 deg = 22.5 deg.
+    assert report.heading_error_mean_radians == pytest.approx(math.radians(22.5), rel=1e-6)
+    assert report.heading_error_max_radians == pytest.approx(math.radians(45.0), rel=1e-6)

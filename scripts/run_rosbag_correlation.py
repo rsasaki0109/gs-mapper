@@ -32,6 +32,8 @@ if str(SRC) not in sys.path:
 from gs_sim2real.robotics import (  # noqa: E402
     correlate_against_sim_trajectory,
     load_sim_pose_samples_jsonl,
+    merge_navsat_with_imu_orientation,
+    read_imu_orientation_stream,
     read_navsat_pose_stream,
     render_real_vs_sim_correlation_markdown,
     write_real_vs_sim_correlation_report_json,
@@ -104,6 +106,20 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Drop the per-pair entries from the JSON report (keeps only aggregate statistics).",
     )
+    parser.add_argument(
+        "--imu-topic",
+        default=None,
+        help=(
+            "Optional sensor_msgs/Imu topic; when provided, its orientation is merged "
+            "onto the NavSatFix stream so the correlator can compute heading errors."
+        ),
+    )
+    parser.add_argument(
+        "--imu-pair-dt-seconds",
+        type=float,
+        default=0.05,
+        help="Reject IMU/NavSatFix pairings whose clock skew exceeds this many seconds (default: 0.05).",
+    )
     return parser
 
 
@@ -115,6 +131,13 @@ def main() -> int:
         topic=args.topic,
         reference_origin_wgs84=args.reference_origin,
     )
+    if args.imu_topic is not None:
+        imu_orientations = read_imu_orientation_stream([args.bag], topic=args.imu_topic)
+        bag_stream = merge_navsat_with_imu_orientation(
+            bag_stream,
+            imu_orientations,
+            max_pair_dt_seconds=args.imu_pair_dt_seconds,
+        )
     report = correlate_against_sim_trajectory(
         bag_stream,
         sim_samples,
