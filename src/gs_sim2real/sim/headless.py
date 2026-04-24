@@ -21,6 +21,11 @@ from .interfaces import (
 from .footprint import RobotFootprint
 from .occupancy import OccupancyQuery, VoxelOccupancyGrid, point_to_voxel_cell
 from .policy_dynamic_obstacles import DynamicObstacleTimeline
+from .raw_sensor_noise import (
+    RawSensorNoiseProfile,
+    apply_raw_sensor_noise_to_observation,
+    raw_sensor_noise_rng,
+)
 from .rendering import ObservationRenderer
 
 
@@ -54,13 +59,17 @@ class HeadlessPhysicalAIEnvironment(PhysicalAIEnvironment):
         occupancy_grid: VoxelOccupancyGrid | None = None,
         robot_footprint: RobotFootprint | None = None,
         dynamic_obstacles: DynamicObstacleTimeline | None = None,
+        raw_sensor_noise_profile: RawSensorNoiseProfile | None = None,
     ):
         self.catalog = catalog
         self.observation_renderer = observation_renderer
         self.occupancy_grid = occupancy_grid
         self.robot_footprint = robot_footprint
         self.dynamic_obstacles = dynamic_obstacles
+        self.raw_sensor_noise_profile = raw_sensor_noise_profile
         self._state: HeadlessEnvironmentState | None = None
+        self._reset_seed: int | None = None
+        self._render_request_count: int = 0
 
     def set_occupancy_grid(self, occupancy_grid: VoxelOccupancyGrid | None) -> None:
         """Set or clear the occupancy grid used by collision queries."""
@@ -77,6 +86,11 @@ class HeadlessPhysicalAIEnvironment(PhysicalAIEnvironment):
 
         self.dynamic_obstacles = dynamic_obstacles
 
+    def set_raw_sensor_noise_profile(self, profile: RawSensorNoiseProfile | None) -> None:
+        """Set or clear the raw-sensor noise profile applied to rendered observations."""
+
+        self.raw_sensor_noise_profile = profile
+
     @property
     def state(self) -> HeadlessEnvironmentState:
         if self._state is None:
@@ -87,6 +101,8 @@ class HeadlessPhysicalAIEnvironment(PhysicalAIEnvironment):
         scene = self.catalog.scene_by_id(scene_id)
         pose = self._initial_pose(scene, seed=seed)
         self._state = HeadlessEnvironmentState(scene_id=scene.scene_id, pose=pose, step_index=0)
+        self._reset_seed = None if seed is None else int(seed)
+        self._render_request_count = 0
         return {
             "scene": scene.to_dict(),
             "state": self._state.to_dict(),
@@ -118,7 +134,8 @@ class HeadlessPhysicalAIEnvironment(PhysicalAIEnvironment):
         if unsupported:
             raise ValueError(f"unsupported outputs for sensor {request.sensor_id}: {', '.join(unsupported)}")
         if self.observation_renderer is not None and self.observation_renderer.can_render(scene, request):
-            return self.observation_renderer.render_observation(scene, request)
+            rendered = self.observation_renderer.render_observation(scene, request)
+            return self._apply_raw_sensor_noise(rendered, request)
         return Observation(
             sensor_id=request.sensor_id,
             pose=request.pose,
@@ -129,6 +146,23 @@ class HeadlessPhysicalAIEnvironment(PhysicalAIEnvironment):
                 "requestedOutputs": list(request.outputs),
             },
         )
+
+    def _apply_raw_sensor_noise(self, observation: Observation, request: ObservationRequest) -> Observation:
+        """Perturb ``observation`` with the active raw-sensor noise profile if one is set."""
+
+        profile = self.raw_sensor_noise_profile
+        if profile is None or profile.is_noise_free:
+            return observation
+        request_index = self._render_request_count
+        self._render_request_count += 1
+        rng = raw_sensor_noise_rng(
+            base_seed=self._reset_seed,
+            profile_id=profile.profile_id,
+            sensor_id=request.sensor_id,
+            request_index=request_index,
+            kind="obs",
+        )
+        return apply_raw_sensor_noise_to_observation(observation, profile, rng=rng)
 
     def query_collision(self, pose: Pose3D) -> CollisionQuery:
         scene = self.catalog.scene_by_id(self.state.scene_id)
