@@ -626,7 +626,6 @@ python3 scripts/collect_mcd_quality_runs.py --format gate --fail-on-gate
 | Task | Why | Suggested slice |
 | --- | --- | --- |
 | Scenario CI docs tightening | `physical-ai-sim.md` に実装はあるが、README からの導線は薄い | README に Physical AI benchmark section を追加 |
-| `/reviews/` Pages index | adoption-aware bundle は置けるが discover できる一覧ページがない | Pages `docs/reviews/index.html` にレビュー一覧を生成する build step を追加 |
 | Review bundle sample under docs | Synthetic fixture でもよいので Pages の `/reviews/` 例を置くか判断 | まず generated sample は commit しない方針で検討 |
 
 ### 12.2 B: Physical AI env hardening

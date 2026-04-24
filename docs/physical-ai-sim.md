@@ -1035,6 +1035,17 @@ The resulting `review.json` / `review.md` / `index.html` gain an "Adopted Workfl
 
 A minimal end-to-end recipe that walks matrix expansion all the way through the adoption-enriched review bundle lives at `scripts/smoke_route_policy_scenario_ci.py`.
 
+When multiple review bundles live side-by-side under `docs/reviews/`, rebuild the Pages index so the bundles become discoverable from a single entry point:
+
+```bash
+PYTHONPATH=src python3 scripts/build_pages_reviews_index.py \
+  --reviews-dir docs/reviews \
+  --html-output docs/reviews/index.html \
+  --json-output docs/reviews/index.json
+```
+
+The script scans the target directory for sub-directories that contain a `review.json`, loads each bundle, and writes `index.html` plus a structured `index.json` alongside them. Missing or non-bundle sub-directories are skipped; an empty reviews directory still produces a stable "no review bundles published yet" placeholder so Pages deploys never 404. Each index row carries a PASS / FAIL pill, shard / scenario / report counts, and (when the bundle was produced with `--adoption-report`) an ADOPTED / BLOCKED pill plus the promoted trigger mode.
+
 Supported actions:
 
 - `twist`: `linearX`, `linearY`, `linearZ` or `vx`, `vy`, `vz`
