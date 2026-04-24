@@ -689,6 +689,50 @@ config = RoutePolicyMatrixConfigSpec(
 
 Determinism: the noise RNG is derived from `sha256(base_seed | profile_id | episode_index | step_index | kind)` so the same scenario replay always produces identical noisy observations across Python interpreter restarts. Setting every σ to `0.0` (the default) returns the identity profile — the adapter short-circuits to the true pose.
 
+### Raw sensor noise profiles
+
+`RoutePolicySensorNoiseProfile` perturbs features the policy already sees. `RawSensorNoiseProfile` is its sibling at the observation renderer boundary — it adds Gaussian noise to RGB pixels (clipped to `[0, 255]` before JPEG re-encode), float32 depth maps (clamped to the advertised far-clip horizon and non-negative), and LiDAR ranges (clamped non-negative). The decoded arrays inside an `Observation.outputs` dict are perturbed and re-encoded in place, so downstream consumers keep reading the same base64 fields.
+
+```python
+from gs_sim2real.sim import (
+    RawSensorNoiseProfile,
+    write_raw_sensor_noise_profile_json,
+)
+
+write_raw_sensor_noise_profile_json(
+    "runs/scenarios/raw-noise/outdoor-sensor.json",
+    RawSensorNoiseProfile(
+        profile_id="outdoor-sensor",
+        rgb_intensity_std=3.0,        # 0-255 scale
+        depth_range_std_meters=0.10,  # per-pixel float32 σ
+        lidar_range_std_meters=0.05,  # per-ray σ
+    ),
+)
+```
+
+Reference the profile from a scenario spec or a matrix config axis the same way the pose-facing profile does — the field is `raw_sensor_noise_profile_path`:
+
+```python
+scenario = RoutePolicyScenarioSpec(
+    scenario_id="outdoor-near-raw-noise",
+    scene_catalog="scenes.json",
+    scene_id="outdoor-demo",
+    goal_suite_path="near-goals.json",
+    raw_sensor_noise_profile_path="raw-noise/outdoor-sensor.json",
+)
+config = RoutePolicyMatrixConfigSpec(
+    config_id="raw-noise-short",
+    episode_count=1,
+    seed_start=0,
+    max_steps=8,
+    raw_sensor_noise_profile_path="raw-noise/outdoor-sensor.json",
+)
+```
+
+Application seam: `HeadlessPhysicalAIEnvironment(..., raw_sensor_noise_profile=…)` stores the profile and, whenever `render_observation` reaches a base `ObservationRenderer` that `can_render` the request, the result is routed through `apply_raw_sensor_noise_to_observation` before being returned. The noise RNG is seeded from `sha256(reset_seed | profile_id | sensor_id | render_request_index | "obs")`, and an internal counter advances per render call so consecutive queries at the same pose still draw distinct noise. When no observation renderer is attached the env falls back to its metadata-only response and the profile is a no-op.
+
+IMU noise is out of scope for now: no observation renderer currently produces IMU readings, so there is nowhere to attach it. Scenario JSON carries `raw_sensor_noise_profile_path` today; adding IMU output is a separate piece of work tracked under §12.2 B in `docs/plan_outdoor_gs.md`.
+
 ### Dynamic obstacles
 
 Static occupancy grids collapse the gap between trivial direct-goal policies and policies that have to react to the world. `DynamicObstacleTimeline` layers on top of the static scene: each `DynamicObstacle` carries a sorted list of `(step_index, position)` waypoints plus a sphere radius, and the environment consults the timeline inside every collision query. Positions are linearly interpolated between bracketing waypoints (clamped outside the range), so a single pair of waypoints gives a constant-velocity moving obstacle for free.
