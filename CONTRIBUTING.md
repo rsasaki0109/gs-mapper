@@ -33,8 +33,8 @@ pytest tests/ -q --ignore=tests/e2e
 ```
 
 CI runs the same three commands on every PR against Python 3.10, 3.11, and
-3.12. All three suites must go green before a merge. 330+ tests usually
-complete in under 30 seconds.
+3.12. All three suites must go green before a merge. 600+ tests usually
+complete in under 90 seconds.
 
 ## Branch + PR conventions
 
@@ -57,11 +57,17 @@ complete in under 30 seconds.
 |----------------|--------------|
 | New CLI subcommand / flag | `src/gs_sim2real/cli.py` + matching handler + a parser test under `tests/test_cli.py` |
 | Pose-free backend | `src/gs_sim2real/preprocess/pose_free.py` + a `scripts/run_<name>.py` thin CLI + `tests/test_run_<name>_script.py` smoke |
+| External SLAM front-end support | `src/gs_sim2real/preprocess/external_slam_artifacts/` (profile + resolver + manifest) + `tests/test_external_slam*.py` |
 | Training / exporter | `src/gs_sim2real/train/` + `src/gs_sim2real/viewer/web_export.py` |
+| Physical AI sim contract / env / sensor rig | `src/gs_sim2real/sim/contract.py` + `interfaces.py` + `headless.py` + `rendering.py` + `tests/test_physical_ai_headless_env.py` |
+| Sensor noise profile (pose / goal / heading or raw camera / depth / LiDAR) | `src/gs_sim2real/sim/policy_sensor_noise.py` (pose-facing) or `raw_sensor_noise.py` (renderer-facing) + `tests/test_policy_sensor_noise.py` / `tests/test_raw_sensor_noise.py` |
+| Dynamic obstacle / multi-agent observation feature | `src/gs_sim2real/sim/policy_dynamic_obstacles.py` + `src/gs_sim2real/sim/gym_adapter.py` obstacle block + `tests/test_policy_dynamic_obstacles.py` |
+| Scenario spec / matrix config field | `src/gs_sim2real/sim/policy_scenario_set.py` + `policy_scenario_matrix.py` (add field → JSON round-trip → matrix expansion → shard rebase) + `tests/test_physical_ai_policy_benchmark.py` |
 | New bundled demo splat | `docs/assets/outdoor-demo/<name>.splat` + `docs/scenes-list.json` preview entry + README table/thumbnail + `tests/test_pages_assets.py` |
 | Viewer change | `docs/splat.html` / `docs/splat_spark.html` / `docs/splat_webgpu.html` + shared `docs/scene-picker.js` when adjusting picker behaviour |
 | Outdoor-pipeline current handoff / decision log | `docs/plan_outdoor_gs.md` (full 2026-04 history is linked from there) |
 | User-facing quickstart / demo story | `README.md` + `docs/images/demo-sweep/` thumbnails |
+| Launch kit copy / topics / links | `src/gs_sim2real/marketing/launch_kit.py` + regenerate `docs/launch-kit.{html,md,json}` via `scripts/generate_launch_kit.py` |
 
 ## Bundled demo splats
 
@@ -94,6 +100,15 @@ Good small first PRs:
   demo splats" checklist above.
 - A new pose-free backend (MAST3R was roughly 200 lines in `pose_free.py`
   + the symmetric `scripts/run_mast3r.py`).
+- A new `RoutePolicySensorNoiseProfile` or `DynamicObstacleTimeline`
+  fixture that plugs into an existing scenario spec — the scenario
+  wiring carries the path, the gym adapter surfaces the features, and
+  the tests under `tests/test_policy_sensor_noise.py` /
+  `tests/test_policy_dynamic_obstacles.py` show the expected shape.
+- An external SLAM artifact profile tweak (new candidate filename,
+  alias, or trajectory format) in
+  `src/gs_sim2real/preprocess/external_slam_artifacts/profiles.py` —
+  schema invariants are pinned by `tests/test_external_slam_profiles.py`.
 - README / docs clarifications where something is confusing.
 - Moving any still-experimental `docs/splat*.html` feature (e.g. LoD
   config, `?cameras=` preset) into the shared `scene-picker.js` hook so
