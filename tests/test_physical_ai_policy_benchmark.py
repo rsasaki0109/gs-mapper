@@ -1085,6 +1085,101 @@ def test_route_policy_scenario_matrix_preserves_raw_sensor_noise_profile_path() 
     assert scenario_sets[0].scenarios[0].raw_sensor_noise_profile_path == "raw-noise.json"
 
 
+def test_route_policy_scenario_set_runs_mixed_reactive_dynamic_obstacles(tmp_path: Path) -> None:
+    from gs_sim2real.sim import (
+        DynamicObstacle,
+        DynamicObstacleTimeline,
+        DynamicObstacleWaypoint,
+        RoutePolicyScenarioSet,
+        RoutePolicyScenarioSpec,
+        route_policy_scenario_set_from_dict,
+        write_route_policy_dynamic_obstacle_timeline_json,
+        write_route_policy_scenario_set_json,
+    )
+
+    catalog_path = write_unit_scene_catalog(tmp_path / "scenes.json")
+    registry_path = write_route_policy_registry_json(
+        tmp_path / "registry.json",
+        RoutePolicyRegistry(
+            registry_id="unit-mixed-reactive-registry",
+            policies=(RoutePolicyRegistryEntry(policy_name="direct", policy_type="direct-goal"),),
+        ),
+    )
+    write_route_policy_goal_suite_json(
+        tmp_path / "near-goals.json",
+        RoutePolicyGoalSuite(
+            suite_id="near-goals",
+            scene_id="unit-scene",
+            frame_id="generic_world",
+            goals=(RoutePolicyGoalSpec("near", (0.1, 0.0, 0.0)),),
+        ),
+    )
+    # Chase obstacle well outside the 0.1 m step hop so the direct-goal rollout
+    # still lands at the goal without a dynamic-obstacle collision. Flee
+    # retreats on the side; the static waypoint obstacle only contributes to
+    # the obstacle count, so the scenario passes end-to-end.
+    timeline_path = write_route_policy_dynamic_obstacle_timeline_json(
+        tmp_path / "mixed-reactive.json",
+        DynamicObstacleTimeline(
+            timeline_id="mixed-reactive",
+            obstacles=(
+                DynamicObstacle(
+                    obstacle_id="chaser",
+                    waypoints=(DynamicObstacleWaypoint(step_index=0, position=(3.0, 0.0, 0.0)),),
+                    radius_meters=0.05,
+                    chase_target_agent=True,
+                    chase_speed_m_per_step=0.05,
+                ),
+                DynamicObstacle(
+                    obstacle_id="runner",
+                    waypoints=(DynamicObstacleWaypoint(step_index=0, position=(0.0, 2.0, 0.0)),),
+                    radius_meters=0.05,
+                    flee_from_agent=True,
+                    chase_speed_m_per_step=0.05,
+                ),
+                DynamicObstacle(
+                    obstacle_id="bollard",
+                    waypoints=(DynamicObstacleWaypoint(step_index=0, position=(0.0, -5.0, 0.0)),),
+                    radius_meters=0.05,
+                ),
+            ),
+        ),
+    )
+
+    scenario_set = RoutePolicyScenarioSet(
+        scenario_set_id="unit-mixed-reactive-scenarios",
+        policy_registry_path=str(registry_path),
+        scenarios=(
+            RoutePolicyScenarioSpec(
+                scenario_id="mixed-reactive-short",
+                scene_catalog=str(catalog_path.name),
+                scene_id="unit-scene",
+                goal_suite_path="near-goals.json",
+                episode_count=1,
+                seed_start=0,
+                max_steps=4,
+                dynamic_obstacles_path=str(timeline_path.name),
+            ),
+        ),
+    )
+    scenario_set_path = write_route_policy_scenario_set_json(tmp_path / "scenario-set.json", scenario_set)
+
+    loaded_set = route_policy_scenario_set_from_dict(json.loads(scenario_set_path.read_text(encoding="utf-8")))
+    assert loaded_set.scenarios[0].dynamic_obstacles_path == str(timeline_path.name)
+
+    registry = load_route_policy_registry_json(registry_path)
+    run = run_route_policy_scenario_set(
+        loaded_set,
+        registry,
+        report_dir=tmp_path / "reports",
+        scenario_set_base_path=tmp_path,
+        registry_base_path=tmp_path,
+        policy_registry_path=registry_path,
+    )
+    assert run.scenario_count == 1
+    assert run.scenario_results[0].passed is True
+
+
 def test_route_policy_scenario_shards_cli_writes_plan_and_merge(tmp_path: Path) -> None:
     catalog_path = write_unit_scene_catalog(tmp_path / "scenes.json")
     registry_path = write_route_policy_registry_json(
