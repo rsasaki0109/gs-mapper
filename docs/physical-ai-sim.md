@@ -741,6 +741,15 @@ config = RoutePolicyMatrixConfigSpec(
 
 When the environment's collision check sees that a query pose sits inside any obstacle's sphere at the current step, it reports `dynamic-obstacle:<obstacle_id>` and lets the scenario CI chain record it the same way static occupancy collisions are recorded. Trajectory scoring steps through the trajectory pose-by-pose so each step of a multi-pose rollout is checked against the obstacle's interpolated position at that step — an obstacle crossing the path between step 3 and step 4 blocks step 3 but not step 5.
 
+**Observation features**: when the adapter's environment has a non-empty `DynamicObstacleTimeline`, the gym-style feature dict gains an obstacle-awareness block so learned policies can react without needing full scene rendering. Distances and bearings are measured from the same observed pose the policy already sees — so a sensor-noise profile perturbs obstacle observations in lock-step with pose / goal observations, keeping the feature block consistent under partial-information benchmarks. The new keys:
+
+- `dynamic-obstacle-count` — timeline cardinality (always equal to `len(timeline.obstacles)`).
+- `nearest-dynamic-obstacle-distance-meters` — minimum clearance (Euclidean distance minus radius, floored at 0) from the observed pose to any obstacle at the current step.
+- `nearest-dynamic-obstacle-bearing-radians` — XY-plane bearing from the observed pose to the nearest obstacle's centre, in `[-π, π]`.
+- `nearest-dynamic-obstacle-bearing-x`, `nearest-dynamic-obstacle-bearing-y` — unit-vector components of the same bearing (both `0.0` when the obstacle coincides with the pose).
+
+The block is omitted entirely when no timeline is configured, so existing scenario-set fixtures keep their exact feature dict.
+
 For CI-sized execution, split the generated scenario sets into shard scenario-set files. Each shard is still a normal `RoutePolicyScenarioSet`, so CI jobs can run shards with the existing `route-policy-scenario-set` command. The final merge step reads the shard run JSON files, collects every per-scenario benchmark report, and rebuilds one global history gate.
 
 ```python
