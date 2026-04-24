@@ -2043,6 +2043,95 @@ def test_route_policy_scenario_ci_workflow_adoption_blocks_when_paths_collide(tm
     assert "pull_request:" not in manual_text
 
 
+def test_route_policy_scenario_ci_workflow_adopt_cli_writes_report(tmp_path: Path) -> None:
+    from gs_sim2real.sim import (
+        write_route_policy_scenario_ci_manifest_json,
+        write_route_policy_scenario_ci_workflow_promotion_json,
+    )
+
+    manifest = build_unit_ci_workflow_manifest("unit-cli-adoption-manifest")
+    materialization = materialize_route_policy_scenario_ci_workflow(
+        manifest,
+        config=RoutePolicyScenarioCIWorkflowConfig(
+            workflow_id="unit-cli-adoption-workflow",
+            workflow_name="Unit CLI Adoption Workflow",
+            artifact_root="ci",
+        ),
+    )
+    source_path = write_route_policy_scenario_ci_workflow_yaml(
+        tmp_path / "unit-cli-adoption.generated.yml", materialization
+    )
+    validation = validate_route_policy_scenario_ci_workflow(manifest, materialization, workflow_path=source_path)
+    manual_active = tmp_path / ".github" / "workflows" / "unit-cli-adoption.yml"
+    activation = activate_route_policy_scenario_ci_workflow(
+        materialization,
+        validation,
+        source_workflow_path=source_path,
+        active_workflow_path=manual_active,
+        activation_id="unit-cli-adoption-activation",
+    )
+    review = build_route_policy_scenario_ci_review_artifact(
+        build_unit_ci_shard_merge_report(),
+        validation,
+        activation,
+        review_id="unit-cli-adoption-review",
+        pages_base_url="https://example.test/reviews/unit-cli-adoption/",
+    )
+    promotion = promote_route_policy_scenario_ci_workflow(
+        review,
+        trigger_mode="pull-request",
+        pull_request_branches=("main",),
+        review_url="https://example.test/reviews/unit-cli-adoption/",
+        promotion_id="unit-cli-adoption-promotion",
+    )
+    assert promotion.promoted is True
+
+    manifest_path = write_route_policy_scenario_ci_manifest_json(tmp_path / "ci-manifest.json", manifest)
+    workflow_index_path = write_route_policy_scenario_ci_workflow_json(tmp_path / "workflow.json", materialization)
+    promotion_path = write_route_policy_scenario_ci_workflow_promotion_json(tmp_path / "promotion.json", promotion)
+
+    adopted_source = tmp_path / "unit-cli-adoption-adopted.generated.yml"
+    adopted_active = tmp_path / ".github" / "workflows" / "unit-cli-adoption-adopted.yml"
+    output_path = tmp_path / "adoption.json"
+    markdown_path = tmp_path / "adoption.md"
+
+    args = build_parser().parse_args(
+        [
+            "route-policy-scenario-ci-workflow-adopt",
+            "--manifest",
+            str(manifest_path),
+            "--workflow-index",
+            str(workflow_index_path),
+            "--promotion",
+            str(promotion_path),
+            "--adopted-workflow-output",
+            str(adopted_source),
+            "--adopted-active-workflow-output",
+            str(adopted_active),
+            "--adoption-id",
+            "unit-cli-adoption",
+            "--output",
+            str(output_path),
+            "--markdown-output",
+            str(markdown_path),
+            "--fail-on-adoption",
+        ]
+    )
+
+    cli.cmd_route_policy_scenario_ci_workflow_adopt(args)
+    report_payload = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert report_payload["adoptionId"] == "unit-cli-adoption"
+    assert report_payload["adopted"] is True
+    assert report_payload["triggerMode"] == "pull-request"
+    assert report_payload["pullRequestBranches"] == ["main"]
+    assert report_payload["manualActiveWorkflowPath"] == manual_active.as_posix()
+    assert report_payload["adoptedActiveWorkflowPath"] == adopted_active.as_posix()
+    assert adopted_active.read_text(encoding="utf-8") != manual_active.read_text(encoding="utf-8")
+    assert "pull_request:" in adopted_active.read_text(encoding="utf-8")
+    assert "Route Policy Scenario CI Workflow Adoption: unit-cli-adoption" in markdown_path.read_text(encoding="utf-8")
+
+
 def build_unit_ci_review_artifact(
     tmp_path: Path,
     *,

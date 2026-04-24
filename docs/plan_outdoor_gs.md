@@ -298,7 +298,7 @@ registry + scenes + goal suites + configs
 | Workflow activation | `policy_scenario_ci_activation.py` | `route-policy-scenario-ci-workflow-activate` | activation JSON / Markdown / active workflow YAML |
 | Review publishing | `policy_scenario_ci_review.py` | `route-policy-scenario-ci-review` | review JSON / Markdown / HTML bundle |
 | Workflow trigger promotion | `policy_scenario_ci_promotion.py` | `route-policy-scenario-ci-workflow-promote` | promotion JSON / Markdown |
-| Trigger-enabled adoption | `policy_scenario_ci_adoption.py` | library-only (smoke script) | adoption JSON / Markdown / adopted YAML under `.github/workflows/<id>-adopted.yml` |
+| Trigger-enabled adoption | `policy_scenario_ci_adoption.py` | `route-policy-scenario-ci-workflow-adopt` | adoption JSON / Markdown / adopted YAML under `.github/workflows/<id>-adopted.yml` |
 
 ### 9.3 Important contracts
 
@@ -488,7 +488,9 @@ Promotion checks:
 - 失敗時は materialize も write もせずに blocked report を返すので、manual path を絶対に上書きしない。
 - Gate: `promotion-promoted`, `manifest-id`, `workflow-id`, `adopted-path-distinct-from-manual`, `adopted-source-path-distinct`, trigger block (`workflow-dispatch-retained`, `push-trigger-emitted`, `pull-request-trigger-emitted`), per-branch literal check (`push-branch:<name>` / `pull-request-branch:<name>`), `adopted-validation-passed`, `adopted-activation-active`。
 
-次の Claude slice は、adoption を `gs-mapper route-policy-scenario-ci-workflow-adopt` CLI として surface することと、adopted YAML の path を Pages review bundle に載せて reviewer が checkout なしで manual / trigger-enabled 両 YAML を比較できるようにすること。
+CLI surface は `gs-mapper route-policy-scenario-ci-workflow-adopt` として追加済み。manifest / workflow index / promotion JSON と adopted source / active path を渡せば同じ gate を経由する。
+
+次の Claude slice は adopted YAML の path を Pages review bundle に載せて reviewer が checkout なしで manual / trigger-enabled 両 YAML を比較できるようにすること。
 
 ## 10. Public / Launch Track
 
@@ -609,7 +611,6 @@ python3 scripts/collect_mcd_quality_runs.py --format gate --fail-on-gate
 
 | Task | Why | Suggested slice |
 | --- | --- | --- |
-| Adoption CLI surface | adoption は library-only。`gs-mapper route-policy-scenario-ci-workflow-adopt` を追加して manifest / materialization / promotion JSON 入力でも一周できるようにする | `src/gs_sim2real/cli.py` に subcommand 追加、既存 CLI テストに parity テスト |
 | Adopted YAML を Pages review bundle に露出 | reviewer が branch checkout なしで manual / trigger-enabled YAML を diff できるようにする | `policy_scenario_ci_review.py` に adoption artifact 参照を追加、`render_route_policy_scenario_ci_review_html` に diff 表示 |
 | Scenario CI docs tightening | `physical-ai-sim.md` に実装はあるが、README からの導線は薄い | README に Physical AI benchmark section を追加 |
 | Review bundle sample under docs | Synthetic fixture でもよいので Pages の `/reviews/` 例を置くか判断 | まず generated sample は commit しない方針で検討 |

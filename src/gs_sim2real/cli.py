@@ -1509,6 +1509,46 @@ def build_parser() -> argparse.ArgumentParser:
         help="Exit with status 2 when workflow trigger promotion is blocked",
     )
 
+    # route policy scenario CI workflow trigger adoption
+    rpswfad = subparsers.add_parser(
+        "route-policy-scenario-ci-workflow-adopt",
+        help="Re-materialize and activate a trigger-enabled workflow after promotion passes",
+    )
+    rpswfad.add_argument("--manifest", required=True, help="Scenario CI manifest JSON")
+    rpswfad.add_argument(
+        "--workflow-index",
+        required=True,
+        help="Manual-only workflow materialization metadata JSON",
+    )
+    rpswfad.add_argument("--promotion", required=True, help="Workflow promotion report JSON")
+    rpswfad.add_argument(
+        "--adopted-workflow-output",
+        required=True,
+        help="Generated trigger-enabled workflow YAML path (staged source)",
+    )
+    rpswfad.add_argument(
+        "--adopted-active-workflow-output",
+        required=True,
+        help="Adopted active GitHub Actions workflow path under .github/workflows",
+    )
+    rpswfad.add_argument("--adoption-id", default=None, help="Optional adoption report id")
+    rpswfad.add_argument(
+        "--output",
+        default="outputs/route_policy_scenarios/scenario_ci_workflow_adoption.json",
+        help="Workflow adoption report JSON path",
+    )
+    rpswfad.add_argument("--markdown-output", default=None, help="Optional workflow adoption Markdown path")
+    rpswfad.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite an existing adopted active workflow file",
+    )
+    rpswfad.add_argument(
+        "--fail-on-adoption",
+        action="store_true",
+        help="Exit with status 2 when workflow trigger adoption is blocked",
+    )
+
     # experiment labs — specs drive a nested `experiment` subparser plus
     # hidden top-level aliases for back-compat.
     experiment_specs: list[tuple[str, str, str]] = [
@@ -2482,6 +2522,13 @@ def cmd_route_policy_scenario_ci_workflow_promote(args: argparse.Namespace) -> N
     run_promotion_cli(args)
 
 
+def cmd_route_policy_scenario_ci_workflow_adopt(args: argparse.Namespace) -> None:
+    """Handle the route-policy-scenario-ci-workflow-adopt subcommand."""
+    from gs_sim2real.sim.policy_scenario_ci_adoption import run_adoption_cli
+
+    run_adoption_cli(args)
+
+
 def cmd_experiment(args: argparse.Namespace) -> None:
     """Handle the nested `experiment` subcommand by deferring to the legacy handler."""
     handler_map = {
@@ -2663,6 +2710,7 @@ def main(argv: list[str] | None = None) -> None:
         "route-policy-scenario-ci-manifest": cmd_route_policy_scenario_ci_manifest,
         "route-policy-scenario-ci-review": cmd_route_policy_scenario_ci_review,
         "route-policy-scenario-ci-workflow-activate": cmd_route_policy_scenario_ci_workflow_activate,
+        "route-policy-scenario-ci-workflow-adopt": cmd_route_policy_scenario_ci_workflow_adopt,
         "route-policy-scenario-ci-workflow": cmd_route_policy_scenario_ci_workflow,
         "route-policy-scenario-ci-workflow-promote": cmd_route_policy_scenario_ci_workflow_promote,
         "route-policy-scenario-ci-workflow-validate": cmd_route_policy_scenario_ci_workflow_validate,

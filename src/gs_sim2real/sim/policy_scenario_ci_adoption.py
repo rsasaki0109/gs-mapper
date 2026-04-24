@@ -26,12 +26,19 @@ from .policy_scenario_ci_activation import (
     RoutePolicyScenarioCIWorkflowActivationReport,
     activate_route_policy_scenario_ci_workflow,
 )
-from .policy_scenario_ci_manifest import RoutePolicyScenarioCIManifest
-from .policy_scenario_ci_promotion import RoutePolicyScenarioCIWorkflowPromotionReport
+from .policy_scenario_ci_manifest import (
+    RoutePolicyScenarioCIManifest,
+    load_route_policy_scenario_ci_manifest_json,
+)
+from .policy_scenario_ci_promotion import (
+    RoutePolicyScenarioCIWorkflowPromotionReport,
+    load_route_policy_scenario_ci_workflow_promotion_json,
+)
 from .policy_scenario_ci_workflow import (
     RoutePolicyScenarioCIWorkflowConfig,
     RoutePolicyScenarioCIWorkflowMaterialization,
     RoutePolicyScenarioCIWorkflowValidationReport,
+    load_route_policy_scenario_ci_workflow_json,
     materialize_route_policy_scenario_ci_workflow,
     validate_route_policy_scenario_ci_workflow,
     write_route_policy_scenario_ci_workflow_yaml,
@@ -353,6 +360,33 @@ def render_route_policy_scenario_ci_workflow_adoption_markdown(
     for check in report.checks:
         lines.append(f"| {check.check_id} | {'yes' if check.passed else 'no'} | {check.message} |")
     return "\n".join(lines) + "\n"
+
+
+def run_adoption_cli(args: Any) -> None:
+    """Run the route policy scenario-ci-workflow-adopt CLI."""
+
+    manifest = load_route_policy_scenario_ci_manifest_json(getattr(args, "manifest"))
+    materialization = load_route_policy_scenario_ci_workflow_json(getattr(args, "workflow_index"))
+    promotion_report = load_route_policy_scenario_ci_workflow_promotion_json(getattr(args, "promotion"))
+    report = adopt_route_policy_scenario_ci_workflow(
+        promotion_report,
+        manifest,
+        materialization,
+        adopted_source_workflow_path=getattr(args, "adopted_workflow_output"),
+        adopted_active_workflow_path=getattr(args, "adopted_active_workflow_output"),
+        adoption_id=getattr(args, "adoption_id", None),
+        overwrite=bool(getattr(args, "overwrite", False)),
+    )
+    write_route_policy_scenario_ci_workflow_adoption_json(getattr(args, "output"), report)
+    markdown = render_route_policy_scenario_ci_workflow_adoption_markdown(report)
+    if getattr(args, "markdown_output", None):
+        output_path = Path(getattr(args, "markdown_output"))
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(markdown, encoding="utf-8")
+    print(markdown, end="")
+    print(f"Scenario CI workflow adoption saved to: {getattr(args, 'output')}")
+    if bool(getattr(args, "fail_on_adoption", False)) and not report.adopted:
+        raise SystemExit(2)
 
 
 def _build_adopted_config(

@@ -910,6 +910,21 @@ Adoption gates:
 - Per-branch gates (`push-branch:<name>` / `pull-request-branch:<name>`): each promoted branch literally appears in the adopted YAML.
 - `adopted-validation-passed` / `adopted-activation-active`: the re-run validation and activation reports must themselves pass.
 
+The same flow is also exposed as a CLI command:
+
+```bash
+gs-mapper route-policy-scenario-ci-workflow-adopt \
+  --manifest runs/scenarios/ci-manifest.json \
+  --workflow-index runs/scenarios/ci-workflow.json \
+  --promotion runs/scenarios/ci-workflow-promotion.json \
+  --adopted-workflow-output runs/scenarios/ci-workflow-adopted.generated.yml \
+  --adopted-active-workflow-output .github/workflows/outdoor-demo-policy-shards-adopted.yml \
+  --adoption-id outdoor-demo-policy-adoption \
+  --output runs/scenarios/ci-workflow-adoption.json \
+  --markdown-output runs/scenarios/ci-workflow-adoption.md \
+  --fail-on-adoption
+```
+
 A minimal end-to-end recipe that walks matrix expansion all the way through adoption lives at `scripts/smoke_route_policy_scenario_ci.py`.
 
 Supported actions:
@@ -921,4 +936,4 @@ The backend always blocks poses outside `SceneEnvironment.bounds`. When a `Voxel
 
 ## Next Implementation Layer
 
-The scenario CI chain from matrix expansion through promotion-backed adoption is now covered by `scripts/smoke_route_policy_scenario_ci.py`. The next useful layer is surfacing the adoption gate via a dedicated CLI command (today the library API is driven from Python or the smoke script) and wiring the adopted workflow path into the Pages review bundle so reviewers can see both the manual and trigger-enabled YAMLs without checking out the branch.
+The scenario CI chain from matrix expansion through promotion-backed adoption is now covered by `scripts/smoke_route_policy_scenario_ci.py`, with both library API (`adopt_route_policy_scenario_ci_workflow`) and CLI surface (`gs-mapper route-policy-scenario-ci-workflow-adopt`) in place. The next useful layer is wiring the adopted workflow path into the Pages review bundle so reviewers can see both the manual and trigger-enabled YAMLs without checking out the branch.
