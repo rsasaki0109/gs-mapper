@@ -320,6 +320,23 @@ def test_splat_html_supports_embed_mode() -> None:
     assert "KeyP" in html, "embed mode must trigger the built-in carousel via the KeyP shortcut"
 
 
+def test_readme_quickstart_split_lists_three_entry_points() -> None:
+    """README Quickstart table must surface the photos / external SLAM / Physical AI trio."""
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    # Section heading + deep-dive section pointers
+    assert "## Quickstart — pick your entry point" in readme
+    assert "[Bring Your Own Photos](#bring-your-own-photos-one-shot-pose-free)" in readme
+    assert "[Import External SLAM Results](#import-external-slam-results)" in readme
+    assert "[Physical AI benchmark path](#physical-ai-benchmark-path)" in readme
+    # Minimum commands the Quickstart table advertises must stay runnable.
+    assert "gs-mapper photos-to-splat --images ./my_photos --output outputs/my_splat" in readme
+    assert "scripts/plan_external_slam_imports.py --format shell" in readme
+    assert "scripts/generate_sim_catalog.py --output docs/sim-scenes.json" in readme
+    # The old generic "## Quick Start" was renamed so it doesn't collide with the new entry map.
+    assert "## Quick Start\n" not in readme, "rename the legacy Quick Start to CLI reference"
+    assert "## CLI reference" in readme
+
+
 def test_index_hero_embeds_live_outdoor_splat() -> None:
     """docs/index.html hero must show the live WebGL splat viewer, not just the fallback GIF."""
     html = (REPO_ROOT / "docs" / "index.html").read_text(encoding="utf-8")

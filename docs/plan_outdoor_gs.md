@@ -669,8 +669,7 @@ Production rerun は `scripts/collect_mcd_quality_runs.py --format gate --fail-o
 | Task | Why |
 | --- | --- |
 | Launch kit cleanup | Star を増やすには短い copy と画像が必要。 |
-| README quickstart split | photos / external SLAM / physical AI benchmark の 3 入口を明確化。 |
-| Demo preview refresh | visual freshness と信頼性。 |
+| Demo preview refresh | visual freshness と信頼性。Pages hero は PR #92 で live splat に切り替え済み、thumbnail 更新はまだ残っている。 |
 
 ## 13. Scope Boundaries
 

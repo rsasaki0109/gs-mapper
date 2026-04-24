@@ -83,6 +83,23 @@ changing a `.splat` (requires Playwright + GPU-backed WebGL).
 までをつなぐツールです。Python モジュール名は `gs_sim2real` のまま維持し、
 旧 CLI の `gs-sim2real` も互換エイリアスとして残します。
 
+## Quickstart — pick your entry point
+
+The repo has three independent entry points depending on what you already have.
+Pick one and follow the linked deep-dive — they do not stack on top of each
+other, so there is no need to read the others first.
+
+| What you start with | Minimum command | Deep-dive section |
+| --- | --- | --- |
+| **A folder of photos** (no poses, no rosbag, no external SLAM) | `gs-mapper photos-to-splat --images ./my_photos --output outputs/my_splat` | [Bring Your Own Photos](#bring-your-own-photos-one-shot-pose-free) |
+| **External SLAM artifacts** from a MASt3R-SLAM / VGGT-SLAM 2.0 / Pi3 / LoGeR run | `python3 scripts/plan_external_slam_imports.py --format shell` then `gs-mapper preprocess --method external-slam …` | [Import External SLAM Results](#import-external-slam-results) |
+| **Physical AI scene + policy evaluation** (you already have splats and want benchmarks) | `python3 scripts/generate_sim_catalog.py --output docs/sim-scenes.json` then `gs-mapper route-policy-benchmark …` | [Physical AI benchmark path](#physical-ai-benchmark-path) |
+
+Full rosbag → supervised outdoor splat (Autoware Leo Drive, MCD) is a fourth
+path in [Outdoor pipeline quickstart](#outdoor-pipeline-quickstart-autoware-leo-drive).
+Generic CLI step-by-step (download / preprocess / train / export) lives in
+[CLI reference](#cli-reference) at the bottom.
+
 ## Physical AI benchmark path
 
 The public splat scenes double as versioned Physical AI simulation inputs.
@@ -516,7 +533,11 @@ docker compose run playground gs-mapper photos-to-splat --images /workspace/my_p
 
 Dataset files in `data/` and training outputs in `outputs/` are mounted as volumes, so they persist on the host.
 
-## Quick Start
+## CLI reference
+
+Generic command cheat sheet. If you are new to the repo, start from
+[Quickstart](#quickstart--pick-your-entry-point) instead — this section is the
+flat CLI surface for readers who already know which path they are on.
 
 ### One-shot (pose-free, just photos in -> splat out)
 
