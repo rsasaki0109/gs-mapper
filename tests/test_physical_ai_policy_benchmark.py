@@ -1762,8 +1762,117 @@ def test_route_policy_scenario_ci_review_cli_writes_bundle(tmp_path: Path) -> No
 
     assert review.review_id == "unit-cli-review"
     assert review.passed is True
+    assert review.adoption is None
     assert (bundle_dir / "review.md").exists()
-    assert "Route Policy Scenario CI Review" in (bundle_dir / "index.html").read_text(encoding="utf-8")
+    html_text = (bundle_dir / "index.html").read_text(encoding="utf-8")
+    assert "Route Policy Scenario CI Review" in html_text
+    assert "Adopted Workflow" not in html_text
+
+
+def test_route_policy_scenario_ci_review_cli_embeds_adoption_diff(tmp_path: Path) -> None:
+    from gs_sim2real.sim import (
+        adopt_route_policy_scenario_ci_workflow,
+        write_route_policy_scenario_ci_workflow_adoption_json,
+    )
+
+    manifest = build_unit_ci_workflow_manifest("unit-cli-review-adoption-manifest")
+    materialization = materialize_route_policy_scenario_ci_workflow(
+        manifest,
+        config=RoutePolicyScenarioCIWorkflowConfig(workflow_id="unit-cli-review-adoption-workflow", artifact_root="ci"),
+    )
+    source_path = write_route_policy_scenario_ci_workflow_yaml(tmp_path / "workflow.generated.yml", materialization)
+    validation = validate_route_policy_scenario_ci_workflow(
+        manifest,
+        materialization,
+        validation_id="unit-cli-review-adoption-validation",
+        workflow_path=source_path,
+    )
+    manual_active = tmp_path / ".github" / "workflows" / "unit-cli-review-adoption.yml"
+    activation = activate_route_policy_scenario_ci_workflow(
+        materialization,
+        validation,
+        source_workflow_path=source_path,
+        active_workflow_path=manual_active,
+        activation_id="unit-cli-review-adoption-activation",
+    )
+    review = build_route_policy_scenario_ci_review_artifact(
+        build_unit_ci_shard_merge_report(),
+        validation,
+        activation,
+        review_id="unit-cli-review-adoption-review",
+        pages_base_url="https://example.test/reviews/unit-cli-review-adoption/",
+    )
+    promotion = promote_route_policy_scenario_ci_workflow(
+        review,
+        trigger_mode="pull-request",
+        pull_request_branches=("main",),
+        review_url="https://example.test/reviews/unit-cli-review-adoption/",
+        promotion_id="unit-cli-review-adoption-promotion",
+    )
+    assert promotion.promoted is True
+    adopted_source = tmp_path / "unit-cli-review-adoption-adopted.generated.yml"
+    adopted_active = tmp_path / ".github" / "workflows" / "unit-cli-review-adoption-adopted.yml"
+    adoption = adopt_route_policy_scenario_ci_workflow(
+        promotion,
+        manifest,
+        materialization,
+        adopted_source_workflow_path=adopted_source,
+        adopted_active_workflow_path=adopted_active,
+        adoption_id="unit-cli-review-adoption",
+    )
+    assert adoption.adopted is True
+
+    merge_path = write_route_policy_scenario_shard_merge_json(
+        tmp_path / "shard-merge.json", build_unit_ci_shard_merge_report()
+    )
+    validation_path = write_route_policy_scenario_ci_workflow_validation_json(
+        tmp_path / "workflow-validation.json", validation
+    )
+    activation_path = write_route_policy_scenario_ci_workflow_activation_json(
+        tmp_path / "workflow-activation.json", activation
+    )
+    adoption_path = write_route_policy_scenario_ci_workflow_adoption_json(tmp_path / "adoption.json", adoption)
+    bundle_dir = tmp_path / "pages" / "unit-cli-review-adoption"
+
+    args = build_parser().parse_args(
+        [
+            "route-policy-scenario-ci-review",
+            "--shard-merge",
+            str(merge_path),
+            "--validation-report",
+            str(validation_path),
+            "--activation-report",
+            str(activation_path),
+            "--adoption-report",
+            str(adoption_path),
+            "--review-id",
+            "unit-cli-review-adoption",
+            "--pages-base-url",
+            "https://example.test/reviews/unit-cli-review-adoption/",
+            "--bundle-dir",
+            str(bundle_dir),
+            "--fail-on-review",
+        ]
+    )
+
+    cli.cmd_route_policy_scenario_ci_review(args)
+    loaded = load_route_policy_scenario_ci_review_json(bundle_dir / "review.json")
+
+    assert loaded.adoption is not None
+    assert loaded.adoption.adopted is True
+    assert loaded.adoption.trigger_mode == "pull-request"
+    assert loaded.adoption.pull_request_branches == ("main",)
+    assert loaded.adoption.workflow_diff is not None
+    assert "+  pull_request:" in loaded.adoption.workflow_diff
+
+    html_text = (bundle_dir / "index.html").read_text(encoding="utf-8")
+    assert "Adopted Workflow" in html_text
+    assert '<pre class="diff">' in html_text
+    assert '<span class="add">+  pull_request:</span>' in html_text
+
+    markdown_text = (bundle_dir / "review.md").read_text(encoding="utf-8")
+    assert "## Adopted Workflow" in markdown_text
+    assert "```diff" in markdown_text
 
 
 def test_route_policy_scenario_ci_workflow_promotion_passes_review_gate(tmp_path: Path) -> None:

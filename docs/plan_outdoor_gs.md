@@ -23,9 +23,9 @@
 - Valid GNSS supervised MCD demo は `ntu_day_02`。production asset は `docs/assets/outdoor-demo/mcd-ntu-day02-supervised.splat`。
 - External SLAM import は VGGT-SLAM 2.0 / MASt3R-SLAM comparison splat まで実走済み。Pi3 / LoGeR profile も artifact resolver 側に候補追加済み。
 - 2026-04-24 時点では、屋外 3DGS だけでなく **Physical AI simulation benchmark environment** を目指す方向へ拡張中。
-- Route policy benchmark 系は、dataset / imitation / registry / benchmark / history / scenario-set / matrix / sharding / CI manifest / workflow materialization / validation / activation / review bundle / workflow trigger promotion gate / promotion-backed trigger adoption まで分割済み。
-- 最新の pushed commit は `0971f1c`。scenario CI smoke recipe を追加し、local full pytest / GitHub Actions CI / Pages deploy は green。
-- adoption step (`adopt_route_policy_scenario_ci_workflow`) まで実装済み。manual-only YAML を触らず、`.github/workflows/<id>-adopted.yml` に trigger-enabled 版を別ファイルで書き出し、validation + activation を通す形。
+- Route policy benchmark 系は、dataset / imitation / registry / benchmark / history / scenario-set / matrix / sharding / CI manifest / workflow materialization / validation / activation / review bundle / workflow trigger promotion gate / promotion-backed trigger adoption / adoption-aware review bundle まで分割済み。
+- 最新の pushed commit は `33a82c8`。adoption CLI subcommand まで反映済みで local full pytest / GitHub Actions CI / Pages deploy は green。
+- adoption step + CLI (`gs-mapper route-policy-scenario-ci-workflow-adopt`) + adoption-aware review bundle まで実装済み。review には `--adoption-report` を渡すと Pages の `review.{json,md,html}` に trigger mode / branches / manual vs adopted YAML の unified diff が乗る。
 
 ## 2. 現在の主戦場
 
@@ -309,6 +309,7 @@ registry + scenes + goal suites + configs
 - `RoutePolicyScenarioCIReviewArtifact` は shard merge / validation / activation を Pages 向け review bundle にまとめる。
 - `RoutePolicyScenarioCIWorkflowPromotionReport` は review PASS、history PASS、review URL、trigger mode、allowed branches を gate 化する。
 - `RoutePolicyScenarioCIWorkflowAdoptionReport` は promotion PASS、manifest / workflow id 一致、manual path と distinct な adopted active path、adopted YAML の trigger block / branch literal 出力、再 validation / activation の PASS を gate 化する。
+- `RoutePolicyScenarioCIReviewAdoption` は review artifact の任意 sub-record で、adoption id / trigger mode / adopted active path / push・pull request branches / manual vs adopted YAML の unified diff を Pages 向けに保持する。review の `passed` gate 自体は変えず、purely additive presentation。
 
 ### 9.4 Example commands
 
@@ -490,7 +491,20 @@ Promotion checks:
 
 CLI surface は `gs-mapper route-policy-scenario-ci-workflow-adopt` として追加済み。manifest / workflow index / promotion JSON と adopted source / active path を渡せば同じ gate を経由する。
 
-次の Claude slice は adopted YAML の path を Pages review bundle に載せて reviewer が checkout なしで manual / trigger-enabled 両 YAML を比較できるようにすること。
+### 9.8 Adoption-aware review bundle
+
+review bundle は adoption の結果を任意で取り込める。`build_route_policy_scenario_ci_review_artifact(..., adoption=RoutePolicyScenarioCIReviewAdoption)`、または CLI の `--adoption-report` を渡すと、以下を追加で Pages に出す:
+
+- `adoption` sub-record に adoption_id / trigger_mode / adopted active path / push・pull_request branches を埋める。
+- manual-only と adopted YAML の unified diff (`difflib.unified_diff`) を `workflow_diff` として保持。
+- Markdown renderer は `## Adopted Workflow` セクション + \`\`\`diff ブロックを追加。
+- HTML renderer は "Adopted Workflow" セクションに trigger mode / branches / 色分け diff (`<pre class="diff">` + add / del / hunk span) を描く。
+
+review の `passed` gate 自体は shard merge / validation / activation / history のままで変わらない。adoption は purely additive presentation。
+
+smoke script は promotion + adoption 完了後に review を再 build して bundle を上書きするので、`<tmpdir>/pages/<review-id>/review.{json,md,html}` は最終 run で adoption 情報入りになる。
+
+次の Claude slice は Pages `docs/reviews/` に `index.html` を生成して、公開済み review bundle を一覧表示できるようにすること。
 
 ## 10. Public / Launch Track
 
@@ -611,8 +625,8 @@ python3 scripts/collect_mcd_quality_runs.py --format gate --fail-on-gate
 
 | Task | Why | Suggested slice |
 | --- | --- | --- |
-| Adopted YAML を Pages review bundle に露出 | reviewer が branch checkout なしで manual / trigger-enabled YAML を diff できるようにする | `policy_scenario_ci_review.py` に adoption artifact 参照を追加、`render_route_policy_scenario_ci_review_html` に diff 表示 |
 | Scenario CI docs tightening | `physical-ai-sim.md` に実装はあるが、README からの導線は薄い | README に Physical AI benchmark section を追加 |
+| `/reviews/` Pages index | adoption-aware bundle は置けるが discover できる一覧ページがない | Pages `docs/reviews/index.html` にレビュー一覧を生成する build step を追加 |
 | Review bundle sample under docs | Synthetic fixture でもよいので Pages の `/reviews/` 例を置くか判断 | まず generated sample は commit しない方針で検討 |
 
 ### 12.2 B: Physical AI env hardening

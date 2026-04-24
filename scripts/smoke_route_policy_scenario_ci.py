@@ -46,6 +46,7 @@ from gs_sim2real.sim import (
     activate_route_policy_scenario_ci_workflow,
     adopt_route_policy_scenario_ci_workflow,
     build_route_policy_scenario_ci_manifest,
+    build_route_policy_scenario_ci_review_adoption,
     build_route_policy_scenario_ci_review_artifact,
     expand_route_policy_scenario_matrix_to_directory,
     load_route_policy_registry_json,
@@ -311,6 +312,31 @@ def run_smoke(root: Path, *, log: Callable[[str], None] = print) -> dict[str, Pa
         adoption.adopted,
         f"adopted active path {adopted_active_path}",
     )
+
+    # Re-publish the review bundle with adoption info so reviewers on Pages
+    # can diff the manual-only vs. adopted YAMLs without checking out.
+    review_adoption = build_route_policy_scenario_ci_review_adoption(
+        adoption_id=adoption.adoption_id,
+        adopted=adoption.adopted,
+        trigger_mode=adoption.trigger_mode,
+        adopted_active_workflow_path=adoption.adopted_active_workflow_path,
+        adopted_source_workflow_path=adoption.adopted_source_workflow_path,
+        manual_workflow_text=active_workflow_path.read_text(encoding="utf-8"),
+        adopted_workflow_text=adopted_active_path.read_text(encoding="utf-8"),
+        push_branches=adoption.push_branches,
+        pull_request_branches=adoption.pull_request_branches,
+    )
+    review_with_adoption = build_route_policy_scenario_ci_review_artifact(
+        merge,
+        validation,
+        activation,
+        review_id=f"{SMOKE_PREFIX}-review",
+        pages_base_url=PAGES_BASE_URL,
+        adoption=review_adoption,
+    )
+    review_json_path = write_route_policy_scenario_ci_review_json(root / "ci-review.json", review_with_adoption)
+    bundle_paths = write_route_policy_scenario_ci_review_bundle(root / "pages" / SMOKE_PREFIX, review_with_adoption)
+    _gate(log, "review adoption bundle", review_with_adoption.adoption is not None)
 
     return {
         "matrix": matrix_path,

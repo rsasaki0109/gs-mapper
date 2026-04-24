@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+import difflib
 from html import escape
 import json
 from pathlib import Path
@@ -62,6 +63,51 @@ class RoutePolicyScenarioCIReviewShard:
 
 
 @dataclass(frozen=True, slots=True)
+class RoutePolicyScenarioCIReviewAdoption:
+    """Review-friendly view of a promotion-backed adoption outcome."""
+
+    adoption_id: str
+    adopted: bool
+    trigger_mode: str
+    adopted_active_workflow_path: str
+    adopted_source_workflow_path: str
+    push_branches: tuple[str, ...] = ()
+    pull_request_branches: tuple[str, ...] = ()
+    workflow_diff: str | None = None
+    metadata: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not str(self.adoption_id):
+            raise ValueError("adoption_id must not be empty")
+        if not str(self.trigger_mode):
+            raise ValueError("trigger_mode must not be empty")
+        if not str(self.adopted_active_workflow_path):
+            raise ValueError("adopted_active_workflow_path must not be empty")
+        if not str(self.adopted_source_workflow_path):
+            raise ValueError("adopted_source_workflow_path must not be empty")
+        object.__setattr__(self, "push_branches", tuple(str(branch) for branch in self.push_branches))
+        object.__setattr__(
+            self,
+            "pull_request_branches",
+            tuple(str(branch) for branch in self.pull_request_branches),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "recordType": "route-policy-scenario-ci-review-adoption",
+            "adoptionId": self.adoption_id,
+            "adopted": bool(self.adopted),
+            "triggerMode": self.trigger_mode,
+            "adoptedActiveWorkflowPath": self.adopted_active_workflow_path,
+            "adoptedSourceWorkflowPath": self.adopted_source_workflow_path,
+            "pushBranches": list(self.push_branches),
+            "pullRequestBranches": list(self.pull_request_branches),
+            "workflowDiff": self.workflow_diff,
+            "metadata": _json_mapping(self.metadata),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class RoutePolicyScenarioCIReviewArtifact:
     """Static review artifact for scenario CI workflow publication."""
 
@@ -79,6 +125,7 @@ class RoutePolicyScenarioCIReviewArtifact:
     source_workflow_path: str
     shards: tuple[RoutePolicyScenarioCIReviewShard, ...]
     history_failed_checks: tuple[str, ...] = ()
+    adoption: RoutePolicyScenarioCIReviewAdoption | None = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
     version: str = ROUTE_POLICY_SCENARIO_CI_REVIEW_VERSION
 
@@ -146,6 +193,7 @@ class RoutePolicyScenarioCIReviewArtifact:
             "reportCount": self.report_count,
             "failedShards": list(self.failed_shards),
             "shards": [shard.to_dict() for shard in self.shards],
+            "adoption": None if self.adoption is None else self.adoption.to_dict(),
             "metadata": _json_mapping(self.metadata),
         }
 
@@ -157,9 +205,17 @@ def build_route_policy_scenario_ci_review_artifact(
     *,
     review_id: str | None = None,
     pages_base_url: str | None = None,
+    adoption: RoutePolicyScenarioCIReviewAdoption | None = None,
     metadata: Mapping[str, Any] | None = None,
 ) -> RoutePolicyScenarioCIReviewArtifact:
-    """Build a compact review artifact for a scenario CI workflow change."""
+    """Build a compact review artifact for a scenario CI workflow change.
+
+    When ``adoption`` is provided, the adopted trigger mode, branches, and
+    unified diff between the manual and adopted YAMLs ride along on the
+    artifact so static Pages consumers can inspect the promotion-backed
+    adoption without checking out the branch. The ``passed`` gate is
+    unaffected — adoption presentation is purely additive.
+    """
 
     resolved_review_id = review_id or f"{activation_report.workflow_id}-review"
     if validation_report.workflow_id != activation_report.workflow_id:
@@ -181,6 +237,7 @@ def build_route_policy_scenario_ci_review_artifact(
         source_workflow_path=activation_report.source_workflow_path,
         history_failed_checks=merge_report.history.failed_checks,
         shards=tuple(_review_shard_from_run(shard_run) for shard_run in merge_report.shard_runs),
+        adoption=adoption,
         metadata={
             "pagesBaseUrl": pages_base_url,
             "historyPath": merge_report.history_path,
@@ -189,6 +246,45 @@ def build_route_policy_scenario_ci_review_artifact(
             "activationFailedChecks": list(activation_report.failed_checks),
             **_json_mapping(metadata or {}),
         },
+    )
+
+
+def build_route_policy_scenario_ci_review_adoption(
+    *,
+    adoption_id: str,
+    adopted: bool,
+    trigger_mode: str,
+    adopted_active_workflow_path: str | Path,
+    adopted_source_workflow_path: str | Path,
+    manual_workflow_text: str,
+    adopted_workflow_text: str,
+    push_branches: Sequence[str] = (),
+    pull_request_branches: Sequence[str] = (),
+    diff_context_lines: int = 3,
+    metadata: Mapping[str, Any] | None = None,
+) -> RoutePolicyScenarioCIReviewAdoption:
+    """Build a review-friendly adoption summary including a unified YAML diff."""
+
+    diff_lines = list(
+        difflib.unified_diff(
+            manual_workflow_text.splitlines(keepends=True),
+            adopted_workflow_text.splitlines(keepends=True),
+            fromfile="manual",
+            tofile="adopted",
+            n=max(0, int(diff_context_lines)),
+        )
+    )
+    workflow_diff = "".join(diff_lines) if diff_lines else None
+    return RoutePolicyScenarioCIReviewAdoption(
+        adoption_id=adoption_id,
+        adopted=adopted,
+        trigger_mode=trigger_mode,
+        adopted_active_workflow_path=Path(adopted_active_workflow_path).as_posix(),
+        adopted_source_workflow_path=Path(adopted_source_workflow_path).as_posix(),
+        push_branches=tuple(push_branches),
+        pull_request_branches=tuple(pull_request_branches),
+        workflow_diff=workflow_diff,
+        metadata=_json_mapping(metadata or {}),
     )
 
 
@@ -256,6 +352,27 @@ def route_policy_scenario_ci_review_shard_from_dict(
     )
 
 
+def route_policy_scenario_ci_review_adoption_from_dict(
+    payload: Mapping[str, Any],
+) -> RoutePolicyScenarioCIReviewAdoption:
+    """Rebuild a CI review adoption block from JSON."""
+
+    _record_type(payload, "route-policy-scenario-ci-review-adoption")
+    return RoutePolicyScenarioCIReviewAdoption(
+        adoption_id=str(payload["adoptionId"]),
+        adopted=bool(payload.get("adopted", False)),
+        trigger_mode=str(payload["triggerMode"]),
+        adopted_active_workflow_path=str(payload["adoptedActiveWorkflowPath"]),
+        adopted_source_workflow_path=str(payload["adoptedSourceWorkflowPath"]),
+        push_branches=tuple(str(item) for item in _sequence(payload.get("pushBranches", ()), "pushBranches")),
+        pull_request_branches=tuple(
+            str(item) for item in _sequence(payload.get("pullRequestBranches", ()), "pullRequestBranches")
+        ),
+        workflow_diff=None if payload.get("workflowDiff") is None else str(payload["workflowDiff"]),
+        metadata=_json_mapping(_mapping(payload.get("metadata", {}), "metadata")),
+    )
+
+
 def route_policy_scenario_ci_review_from_dict(
     payload: Mapping[str, Any],
 ) -> RoutePolicyScenarioCIReviewArtifact:
@@ -272,6 +389,12 @@ def route_policy_scenario_ci_review_from_dict(
     expected_shard_count = payload.get("shardCount")
     if expected_shard_count is not None and int(expected_shard_count) != len(shards):
         raise ValueError("shardCount does not match loaded review shards")
+    adoption_payload = payload.get("adoption")
+    adoption = (
+        None
+        if adoption_payload is None
+        else route_policy_scenario_ci_review_adoption_from_dict(_mapping(adoption_payload, "adoption"))
+    )
     return RoutePolicyScenarioCIReviewArtifact(
         review_id=str(payload["reviewId"]),
         merge_id=str(payload["mergeId"]),
@@ -289,6 +412,7 @@ def route_policy_scenario_ci_review_from_dict(
             str(item) for item in _sequence(payload.get("historyFailedChecks", ()), "historyFailedChecks")
         ),
         shards=shards,
+        adoption=adoption,
         metadata=_json_mapping(_mapping(payload.get("metadata", {}), "metadata")),
         version=version,
     )
@@ -325,6 +449,30 @@ def render_route_policy_scenario_ci_review_markdown(artifact: RoutePolicyScenari
     if artifact.history_failed_checks:
         lines.extend(["", "## History Failed Checks", ""])
         lines.extend(f"- {check}" for check in artifact.history_failed_checks)
+    if artifact.adoption is not None:
+        adoption = artifact.adoption
+        lines.extend(
+            [
+                "",
+                "## Adopted Workflow",
+                "",
+                f"- Adoption: {adoption.adoption_id} ({'ADOPTED' if adoption.adopted else 'BLOCKED'})",
+                f"- Trigger mode: {adoption.trigger_mode}",
+                f"- Adopted active path: {adoption.adopted_active_workflow_path}",
+                f"- Adopted source path: {adoption.adopted_source_workflow_path}",
+                f"- Push branches: {_display_branches(adoption.push_branches)}",
+                f"- Pull request branches: {_display_branches(adoption.pull_request_branches)}",
+            ]
+        )
+        if adoption.workflow_diff:
+            lines.extend(
+                [
+                    "",
+                    "```diff",
+                    adoption.workflow_diff.rstrip("\n"),
+                    "```",
+                ]
+            )
     return "\n".join(lines) + "\n"
 
 
@@ -348,6 +496,7 @@ def render_route_policy_scenario_ci_review_html(artifact: RoutePolicyScenarioCIR
         if artifact.history_failed_checks
         else ""
     )
+    adoption_section = _render_adoption_section_html(artifact.adoption)
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -374,6 +523,10 @@ def render_route_policy_scenario_ci_review_html(artifact: RoutePolicyScenarioCIR
     tr:last-child td {{ border-bottom: 0; }}
     a {{ color: #285b9b; }}
     code {{ background: #eef2ea; padding: 2px 5px; border-radius: 4px; }}
+    pre.diff {{ background: #ffffff; border: 1px solid #dfe4da; border-radius: 8px; padding: 12px; overflow-x: auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.45; }}
+    pre.diff .add {{ color: #1e5a2b; }}
+    pre.diff .del {{ color: #8a1f16; }}
+    pre.diff .hunk {{ color: #5b6259; }}
   </style>
 </head>
 <body>
@@ -404,6 +557,7 @@ def render_route_policy_scenario_ci_review_html(artifact: RoutePolicyScenarioCIR
       </table>
     </section>
     {failed_section}
+    {adoption_section}
   </main>
 </body>
 </html>
@@ -416,12 +570,19 @@ def run_review_cli(args: Any) -> None:
     merge_report = load_route_policy_scenario_shard_merge_json(getattr(args, "shard_merge"))
     validation_report = load_route_policy_scenario_ci_workflow_validation_json(getattr(args, "validation_report"))
     activation_report = load_route_policy_scenario_ci_workflow_activation_json(getattr(args, "activation_report"))
+    adoption = _load_review_adoption(
+        adoption_report_path=getattr(args, "adoption_report", None),
+        manual_active_workflow_path=activation_report.active_workflow_path,
+        manual_workflow_override=getattr(args, "manual_workflow", None),
+        adopted_workflow_override=getattr(args, "adopted_workflow", None),
+    )
     artifact = build_route_policy_scenario_ci_review_artifact(
         merge_report,
         validation_report,
         activation_report,
         review_id=getattr(args, "review_id", None),
         pages_base_url=getattr(args, "pages_base_url", None),
+        adoption=adoption,
     )
     bundle_dir = getattr(args, "bundle_dir", None)
     if bundle_dir:
@@ -441,6 +602,83 @@ def run_review_cli(args: Any) -> None:
     print(render_route_policy_scenario_ci_review_markdown(artifact), end="")
     if bool(getattr(args, "fail_on_review", False)) and not artifact.passed:
         raise SystemExit(2)
+
+
+def _load_review_adoption(
+    *,
+    adoption_report_path: str | Path | None,
+    manual_active_workflow_path: str,
+    manual_workflow_override: str | Path | None = None,
+    adopted_workflow_override: str | Path | None = None,
+) -> RoutePolicyScenarioCIReviewAdoption | None:
+    if adoption_report_path is None:
+        return None
+    payload = json.loads(Path(adoption_report_path).read_text(encoding="utf-8"))
+    payload = _mapping(payload, "adoptionReport")
+    manual_text_path = Path(manual_workflow_override) if manual_workflow_override else Path(manual_active_workflow_path)
+    adopted_text_path = (
+        Path(adopted_workflow_override) if adopted_workflow_override else Path(payload["adoptedActiveWorkflowPath"])
+    )
+    manual_text = manual_text_path.read_text(encoding="utf-8")
+    adopted_text = adopted_text_path.read_text(encoding="utf-8")
+    return build_route_policy_scenario_ci_review_adoption(
+        adoption_id=str(payload["adoptionId"]),
+        adopted=bool(payload.get("adopted", False)),
+        trigger_mode=str(payload["triggerMode"]),
+        adopted_active_workflow_path=str(payload["adoptedActiveWorkflowPath"]),
+        adopted_source_workflow_path=str(payload["adoptedSourceWorkflowPath"]),
+        manual_workflow_text=manual_text,
+        adopted_workflow_text=adopted_text,
+        push_branches=tuple(str(item) for item in _sequence(payload.get("pushBranches", ()), "pushBranches")),
+        pull_request_branches=tuple(
+            str(item) for item in _sequence(payload.get("pullRequestBranches", ()), "pullRequestBranches")
+        ),
+    )
+
+
+def _render_adoption_section_html(adoption: RoutePolicyScenarioCIReviewAdoption | None) -> str:
+    if adoption is None:
+        return ""
+    status_pill = "pass" if adoption.adopted else "fail"
+    status_label = "ADOPTED" if adoption.adopted else "BLOCKED"
+    push_branches = _display_branches(adoption.push_branches)
+    pr_branches = _display_branches(adoption.pull_request_branches)
+    diff_block = (
+        f'<pre class="diff">{_render_diff_html(adoption.workflow_diff)}</pre>'
+        if adoption.workflow_diff
+        else "<p>No diff available between manual and adopted workflows.</p>"
+    )
+    return f"""<section>
+      <h2>Adopted Workflow</h2>
+      <p><span class="pill {status_pill}">{status_label}</span> {escape(adoption.adoption_id)}</p>
+      <p>Trigger mode: <code>{escape(adoption.trigger_mode)}</code></p>
+      <p>Adopted active path: <code>{escape(adoption.adopted_active_workflow_path)}</code></p>
+      <p>Adopted source path: <code>{escape(adoption.adopted_source_workflow_path)}</code></p>
+      <p>Push branches: {escape(push_branches)}</p>
+      <p>Pull request branches: {escape(pr_branches)}</p>
+      {diff_block}
+    </section>"""
+
+
+def _render_diff_html(diff_text: str) -> str:
+    rendered_lines: list[str] = []
+    for raw_line in diff_text.splitlines():
+        escaped = escape(raw_line)
+        if raw_line.startswith("+++") or raw_line.startswith("---"):
+            rendered_lines.append(f'<span class="hunk">{escaped}</span>')
+        elif raw_line.startswith("@@"):
+            rendered_lines.append(f'<span class="hunk">{escaped}</span>')
+        elif raw_line.startswith("+"):
+            rendered_lines.append(f'<span class="add">{escaped}</span>')
+        elif raw_line.startswith("-"):
+            rendered_lines.append(f'<span class="del">{escaped}</span>')
+        else:
+            rendered_lines.append(escaped)
+    return "\n".join(rendered_lines)
+
+
+def _display_branches(branches: Sequence[str]) -> str:
+    return ", ".join(branches) if branches else "n/a"
 
 
 def _review_shard_from_run(shard_run: RoutePolicyScenarioShardRunSummary) -> RoutePolicyScenarioCIReviewShard:

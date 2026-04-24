@@ -1475,6 +1475,21 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Exit with status 2 when the scenario CI review does not pass",
     )
+    rpsrev.add_argument(
+        "--adoption-report",
+        default=None,
+        help="Optional scenario CI workflow adoption report JSON to embed in the review",
+    )
+    rpsrev.add_argument(
+        "--manual-workflow",
+        default=None,
+        help="Optional manual-only workflow YAML path (defaults to activation report's active path)",
+    )
+    rpsrev.add_argument(
+        "--adopted-workflow",
+        default=None,
+        help="Optional adopted workflow YAML path (defaults to adoption report's adopted active path)",
+    )
 
     # route policy scenario CI workflow trigger promotion
     rpswfp = subparsers.add_parser(

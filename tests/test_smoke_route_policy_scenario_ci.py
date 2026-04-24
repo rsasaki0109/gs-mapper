@@ -50,6 +50,7 @@ def test_run_smoke_produces_passing_chain(tmp_path: Path) -> None:
         "review artifact",
         "workflow promotion",
         "workflow adoption",
+        "review adoption bundle",
     )
     for suffix in expected_gate_suffixes:
         assert any(suffix in line for line in gate_markers), f"no PASS line for gate '{suffix}' in {gate_markers}"
@@ -92,6 +93,25 @@ def test_run_smoke_produces_passing_chain(tmp_path: Path) -> None:
     assert "workflow_dispatch" in adopted_text
     assert "pull_request:" in adopted_text
     assert "- 'main'" in adopted_text
+
+    # The Pages review bundle now carries the adoption section + diff.
+    review_payload = json.loads(artifacts["review"].read_text(encoding="utf-8"))
+    assert review_payload["adoption"] is not None
+    adoption = review_payload["adoption"]
+    assert adoption["adopted"] is True
+    assert adoption["triggerMode"] == "pull-request"
+    assert adoption["pullRequestBranches"] == ["main"]
+    diff_text = adoption["workflowDiff"]
+    assert diff_text is not None
+    assert "--- manual" in diff_text
+    assert "+++ adopted" in diff_text
+    assert "+  pull_request:" in diff_text
+
+    bundle_html = artifacts["review_bundle_html"].read_text(encoding="utf-8")
+    assert "Adopted Workflow" in bundle_html
+    assert "pull-request" in bundle_html
+    assert '<pre class="diff">' in bundle_html
+    assert '<span class="add">+  pull_request:</span>' in bundle_html
 
 
 def test_main_returns_zero_on_clean_run(tmp_path: Path) -> None:

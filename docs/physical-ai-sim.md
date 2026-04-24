@@ -925,7 +925,23 @@ gs-mapper route-policy-scenario-ci-workflow-adopt \
   --fail-on-adoption
 ```
 
-A minimal end-to-end recipe that walks matrix expansion all the way through adoption lives at `scripts/smoke_route_policy_scenario_ci.py`.
+After the adoption lands, the review bundle can be re-published with the adoption info attached so reviewers on Pages see the trigger mode, branches, and a unified diff between the manual-only and the adopted YAMLs without checking out the branch. Pass `--adoption-report` to the review CLI (and, if needed, `--manual-workflow` / `--adopted-workflow` to override which YAMLs are read):
+
+```bash
+gs-mapper route-policy-scenario-ci-review \
+  --shard-merge runs/scenarios/ci/shard-merge.json \
+  --validation-report runs/scenarios/ci-workflow-validation.json \
+  --activation-report runs/scenarios/ci-workflow-activation.json \
+  --adoption-report runs/scenarios/ci-workflow-adoption.json \
+  --review-id outdoor-demo-policy-review \
+  --pages-base-url https://example.github.io/gs-mapper/reviews/outdoor-demo-policy/ \
+  --bundle-dir docs/reviews/outdoor-demo-policy \
+  --fail-on-review
+```
+
+The resulting `review.json` / `review.md` / `index.html` gain an "Adopted Workflow" section with the trigger mode, push/pull_request branches, and a unified diff block. The diff is produced from the manual and adopted YAMLs that live under `.github/workflows/` so no extra build step is needed — by default the CLI reads the activation report's active path for the manual side and the adoption report's adopted active path for the adopted side.
+
+A minimal end-to-end recipe that walks matrix expansion all the way through the adoption-enriched review bundle lives at `scripts/smoke_route_policy_scenario_ci.py`.
 
 Supported actions:
 
@@ -936,4 +952,4 @@ The backend always blocks poses outside `SceneEnvironment.bounds`. When a `Voxel
 
 ## Next Implementation Layer
 
-The scenario CI chain from matrix expansion through promotion-backed adoption is now covered by `scripts/smoke_route_policy_scenario_ci.py`, with both library API (`adopt_route_policy_scenario_ci_workflow`) and CLI surface (`gs-mapper route-policy-scenario-ci-workflow-adopt`) in place. The next useful layer is wiring the adopted workflow path into the Pages review bundle so reviewers can see both the manual and trigger-enabled YAMLs without checking out the branch.
+The scenario CI chain from matrix expansion through promotion-backed adoption is now covered by `scripts/smoke_route_policy_scenario_ci.py`, with both library API (`adopt_route_policy_scenario_ci_workflow`) and CLI surface (`gs-mapper route-policy-scenario-ci-workflow-adopt`). The review bundle is adoption-aware: passing `--adoption-report` to the review CLI (or `adoption=` to `build_route_policy_scenario_ci_review_artifact`) embeds the trigger mode, branches, and unified manual-vs-adopted YAML diff into the Pages-hosted bundle. The next useful layer is surfacing the reviews on the `/reviews/` Pages index so discovery no longer requires knowing the bundle URL in advance.
