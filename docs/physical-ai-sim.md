@@ -1199,7 +1199,7 @@ A common task is "evaluate a route policy against noisy pose + obstacles that re
    )
    ```
 
-   Use `python3 scripts/show_dynamic_obstacle_timeline.py runs/scenarios/obstacles/mixed-reactive.json` to eyeball the Markdown summary (reactive mode + speed columns per obstacle).
+   Use `python3 scripts/show_dynamic_obstacle_timeline.py runs/scenarios/obstacles/mixed-reactive.json` to eyeball the Markdown summary (reactive mode + speed columns per obstacle). The same shape ships as a ready-to-copy reference at [`docs/fixtures/dynamic-obstacles/mixed-reactive.json`](fixtures/dynamic-obstacles/mixed-reactive.json), loadable with `load_route_policy_dynamic_obstacle_timeline_json` and pinned by `tests/test_bundled_mixed_reactive_fixture.py`.
 
 3. **Wire all three paths into the scenario spec.** `sensor_noise_profile_path`, `raw_sensor_noise_profile_path`, and `dynamic_obstacles_path` each carry independently — a scenario can set any subset.
 

@@ -1,0 +1,74 @@
+{
+  "metadata": {
+    "source": "docs/physical-ai-sim.md partial-information benchmark recipe"
+  },
+  "obstacleCount": 3,
+  "obstacles": [
+    {
+      "chaseSpeedMPerStep": 0.5,
+      "chaseTargetAgent": true,
+      "fleeFromAgent": false,
+      "metadata": {},
+      "obstacleId": "hunter",
+      "radiusMeters": 0.25,
+      "recordType": "route-policy-dynamic-obstacle",
+      "version": "gs-mapper-route-policy-dynamic-obstacle/v1",
+      "waypoints": [
+        {
+          "position": [
+            3.0,
+            0.0,
+            0.0
+          ],
+          "recordType": "route-policy-dynamic-obstacle-waypoint",
+          "stepIndex": 0
+        }
+      ]
+    },
+    {
+      "chaseSpeedMPerStep": 0.5,
+      "chaseTargetAgent": false,
+      "fleeFromAgent": true,
+      "metadata": {},
+      "obstacleId": "runner",
+      "radiusMeters": 0.25,
+      "recordType": "route-policy-dynamic-obstacle",
+      "version": "gs-mapper-route-policy-dynamic-obstacle/v1",
+      "waypoints": [
+        {
+          "position": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "recordType": "route-policy-dynamic-obstacle-waypoint",
+          "stepIndex": 0
+        }
+      ]
+    },
+    {
+      "chaseSpeedMPerStep": 0.0,
+      "chaseTargetAgent": false,
+      "fleeFromAgent": false,
+      "metadata": {},
+      "obstacleId": "bollard",
+      "radiusMeters": 0.25,
+      "recordType": "route-policy-dynamic-obstacle",
+      "version": "gs-mapper-route-policy-dynamic-obstacle/v1",
+      "waypoints": [
+        {
+          "position": [
+            0.0,
+            -2.0,
+            0.0
+          ],
+          "recordType": "route-policy-dynamic-obstacle-waypoint",
+          "stepIndex": 0
+        }
+      ]
+    }
+  ],
+  "recordType": "route-policy-dynamic-obstacle-timeline",
+  "timelineId": "mixed-reactive-demo",
+  "version": "gs-mapper-route-policy-dynamic-obstacle-timeline/v1"
+}
