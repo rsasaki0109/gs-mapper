@@ -785,6 +785,18 @@ config = RoutePolicyMatrixConfigSpec(
 
 When the environment's collision check sees that a query pose sits inside any obstacle's sphere at the current step, it reports `dynamic-obstacle:<obstacle_id>` and lets the scenario CI chain record it the same way static occupancy collisions are recorded. Trajectory scoring steps through the trajectory pose-by-pose so each step of a multi-pose rollout is checked against the obstacle's interpolated position at that step — an obstacle crossing the path between step 3 and step 4 blocks step 3 but not step 5.
 
+**Reactive chase obstacles**: a `DynamicObstacle` can also ignore later waypoints and walk toward the queried agent at a fixed speed. Set `chase_target_agent=True` and `chase_speed_m_per_step=<metres>` on the obstacle; the timeline then computes the obstacle position as `waypoints[0] + direction_to_agent * min(step * speed, distance_to_agent)`. The chase path is a pure function of the current agent position and the step index (no agent-pose history is retained), so replays stay deterministic. A chase obstacle without a queried agent (e.g. headless Markdown rendering) stays pinned at its first waypoint.
+
+```python
+hunter = DynamicObstacle(
+    obstacle_id="hunter",
+    waypoints=(DynamicObstacleWaypoint(step_index=0, position=(3.0, 0.0, 0.0)),),
+    radius_meters=0.25,
+    chase_target_agent=True,
+    chase_speed_m_per_step=0.5,  # metres per scenario step
+)
+```
+
 **Observation features**: when the adapter's environment has a non-empty `DynamicObstacleTimeline`, the gym-style feature dict gains an obstacle-awareness block so learned policies can react without needing full scene rendering. Distances and bearings are measured from the same observed pose the policy already sees — so a sensor-noise profile perturbs obstacle observations in lock-step with pose / goal observations, keeping the feature block consistent under partial-information benchmarks. The new keys:
 
 - `dynamic-obstacle-count` — timeline cardinality (always equal to `len(timeline.obstacles)`).

@@ -66,11 +66,22 @@ class DynamicObstacleWaypoint:
 
 @dataclass(frozen=True, slots=True)
 class DynamicObstacle:
-    """A moving-sphere obstacle anchored to the env's internal step index."""
+    """A moving-sphere obstacle anchored to the env's internal step index.
+
+    By default the obstacle follows its ``waypoints`` via linear interpolation.
+    When ``chase_target_agent`` is ``True``, the obstacle ignores later
+    waypoints and instead walks from ``waypoints[0].position`` toward the
+    queried agent position at up to ``chase_speed_m_per_step`` metres per
+    step, clamped at the agent once the two meet. The chase path is a pure
+    function of the current agent position and the step index, so replays
+    stay deterministic: no agent-pose history is retained.
+    """
 
     obstacle_id: str
     waypoints: tuple[DynamicObstacleWaypoint, ...]
     radius_meters: float
+    chase_target_agent: bool = False
+    chase_speed_m_per_step: float = 0.0
     metadata: Mapping[str, Any] = field(default_factory=dict)
     version: str = ROUTE_POLICY_DYNAMIC_OBSTACLE_VERSION
 
@@ -83,6 +94,10 @@ class DynamicObstacle:
         if not math.isfinite(radius) or radius <= 0.0:
             raise ValueError("radius_meters must be positive and finite")
         object.__setattr__(self, "radius_meters", radius)
+        chase_speed = float(self.chase_speed_m_per_step)
+        if not math.isfinite(chase_speed) or chase_speed < 0.0:
+            raise ValueError("chase_speed_m_per_step must be non-negative and finite")
+        object.__setattr__(self, "chase_speed_m_per_step", chase_speed)
         sorted_waypoints = tuple(sorted(self.waypoints, key=lambda point: point.step_index))
         step_indices = tuple(waypoint.step_index for waypoint in sorted_waypoints)
         if len(set(step_indices)) != len(step_indices):
@@ -93,9 +108,49 @@ class DynamicObstacle:
     def waypoint_count(self) -> int:
         return len(self.waypoints)
 
-    def position_at_step(self, step_index: int) -> tuple[float, float, float]:
-        """Return the interpolated world-frame position at ``step_index``."""
+    def position_at_step(
+        self,
+        step_index: int,
+        *,
+        agent_position: Sequence[float] | None = None,
+    ) -> tuple[float, float, float]:
+        """Return the interpolated world-frame position at ``step_index``.
 
+        When ``chase_target_agent`` is set and ``agent_position`` is provided
+        the obstacle ignores later waypoints and walks from ``waypoints[0]``
+        toward the agent, capped at ``chase_speed_m_per_step * max(0,
+        step_index)`` metres of travel. Without ``agent_position`` the chase
+        obstacle stays pinned at its first waypoint so renderers that do not
+        know the agent pose still see a stable position.
+        """
+
+        if self.chase_target_agent:
+            return self._chase_position(step_index, agent_position)
+        return self._waypoint_position(step_index)
+
+    def contains(
+        self,
+        pose_position: Sequence[float],
+        step_index: int,
+    ) -> bool:
+        """Return True when ``pose_position`` is inside the obstacle sphere at ``step_index``."""
+
+        centre = self.position_at_step(step_index, agent_position=pose_position)
+        return math.dist(tuple(float(c) for c in pose_position), centre) <= self.radius_meters
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "recordType": "route-policy-dynamic-obstacle",
+            "version": self.version,
+            "obstacleId": self.obstacle_id,
+            "radiusMeters": self.radius_meters,
+            "chaseTargetAgent": bool(self.chase_target_agent),
+            "chaseSpeedMPerStep": float(self.chase_speed_m_per_step),
+            "waypoints": [waypoint.to_dict() for waypoint in self.waypoints],
+            "metadata": _json_mapping(self.metadata),
+        }
+
+    def _waypoint_position(self, step_index: int) -> tuple[float, float, float]:
         waypoints = self.waypoints
         if step_index <= waypoints[0].step_index:
             return waypoints[0].position
@@ -117,21 +172,29 @@ class DynamicObstacle:
                 )
         return waypoints[-1].position
 
-    def contains(self, pose_position: Sequence[float], step_index: int) -> bool:
-        """Return True when ``pose_position`` is inside the obstacle sphere at ``step_index``."""
-
-        centre = self.position_at_step(step_index)
-        return math.dist(tuple(float(c) for c in pose_position), centre) <= self.radius_meters
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "recordType": "route-policy-dynamic-obstacle",
-            "version": self.version,
-            "obstacleId": self.obstacle_id,
-            "radiusMeters": self.radius_meters,
-            "waypoints": [waypoint.to_dict() for waypoint in self.waypoints],
-            "metadata": _json_mapping(self.metadata),
-        }
+    def _chase_position(
+        self,
+        step_index: int,
+        agent_position: Sequence[float] | None,
+    ) -> tuple[float, float, float]:
+        start = self.waypoints[0].position
+        if agent_position is None:
+            return start
+        target = tuple(float(c) for c in agent_position)
+        delta_x = target[0] - start[0]
+        delta_y = target[1] - start[1]
+        delta_z = target[2] - start[2]
+        gap = math.sqrt(delta_x * delta_x + delta_y * delta_y + delta_z * delta_z)
+        if gap <= 0.0:
+            return start
+        max_travel = max(0.0, float(step_index)) * self.chase_speed_m_per_step
+        distance = min(gap, max_travel)
+        fraction = 0.0 if gap <= 0.0 else distance / gap
+        return (
+            start[0] + fraction * delta_x,
+            start[1] + fraction * delta_y,
+            start[2] + fraction * delta_z,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -229,6 +292,8 @@ def route_policy_dynamic_obstacle_from_dict(payload: Mapping[str, Any]) -> Dynam
         obstacle_id=str(payload["obstacleId"]),
         waypoints=waypoints,
         radius_meters=float(payload["radiusMeters"]),
+        chase_target_agent=bool(payload.get("chaseTargetAgent", False)),
+        chase_speed_m_per_step=float(payload.get("chaseSpeedMPerStep", 0.0)),
         metadata=_json_mapping(_mapping(payload.get("metadata", {}), "metadata")),
         version=version,
     )

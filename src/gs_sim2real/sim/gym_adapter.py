@@ -243,9 +243,10 @@ class RoutePolicyGymAdapter:
         if timeline is None or timeline.obstacle_count == 0:
             return {}
         ranked: list[tuple[float, tuple[float, float, float]]] = []
+        observed_position = tuple(observed_pose.position)
         for obstacle in timeline.obstacles:
-            centre = obstacle.position_at_step(state.step_index)
-            distance = math.dist(tuple(observed_pose.position), centre)
+            centre = obstacle.position_at_step(state.step_index, agent_position=observed_position)
+            distance = math.dist(observed_position, centre)
             clearance = max(0.0, distance - float(obstacle.radius_meters))
             ranked.append((clearance, centre))
         ranked.sort(key=lambda pair: pair[0])

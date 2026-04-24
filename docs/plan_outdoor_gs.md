@@ -633,7 +633,7 @@ python3 scripts/collect_mcd_quality_runs.py --format gate --fail-on-gate
 | --- | --- |
 | Observation renderer integration | Policy が実際に scene image / depth を見る流れに近づける。`HeadlessPhysicalAIEnvironment` は `raw_sensor_noise_profile` 引数 + `render_observation()` での auto-wrap まで着地。残りは gym adapter 側で observation を policy feature に通す seam、および scene bundle に input 可能な sensor を増やすこと。 |
 | Sensor noise profiles (raw sensors) | Pose / goal / heading 用の `RoutePolicySensorNoiseProfile` + RGB / depth / LiDAR 用の `RawSensorNoiseProfile` + headless env 自動適用 + scenario spec / matrix config への `raw_sensor_noise_profile_path` wiring 着地済み。残りは IMU output を observation renderer に追加すること、および route policy benchmark から observation 経由で feature を引く seam。 |
-| Dynamic obstacles (multi-agent) | シングル moving obstacle は scenario config に入った。Gym adapter の observation block は nearest + second-nearest を surface 済み (multi-obstacle scenarios で policy が flanking 脅威を識別できる)。残りは reactive response (obstacle 側が agent pose に応じて次 waypoint を選ぶ)、および obstacle 側も policy を持つ状況。 |
+| Dynamic obstacles (multi-agent) | シングル moving obstacle は scenario config に入った。Gym adapter の observation block は nearest + second-nearest を surface 済み。Reactive behavior は `chase_target_agent` + `chase_speed_m_per_step` による chase 型が着地済み (obstacle が agent pose に向かって pure-function で進む)。残りは flee-from-agent のような対称的な reactive behavior、obstacle 側も policy を持つ状況、scenario に複数 reactive obstacle を並べた stress test。 |
 | Route policy replay viewer | Policy trajectory と scene を Pages で inspect したい。 |
 | Real-vs-sim correlation report | rosbag replay と headless benchmark の差を見る。 |
 
