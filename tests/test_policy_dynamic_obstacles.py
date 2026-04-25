@@ -1027,3 +1027,79 @@ def test_headless_env_set_dynamic_obstacles_resets_peer_cache() -> None:
     blocked_after_swap = env.query_collision(Pose3D(position=(0.45, 0.0, 0.0), orientation_xyzw=(0.0, 0.0, 0.0, 1.0)))
     assert blocked_after_swap.collides is True
     assert blocked_after_swap.reason == "dynamic-obstacle:new-blocker"
+
+
+def test_score_trajectory_threads_peer_cache_into_obstacle_policy() -> None:
+    """score_trajectory must hand each step's policy the previous step's resolved peer layout."""
+    seen_peer_steps: list[tuple[int, Mapping[str, tuple[float, float, float]]]] = []
+
+    class _RecordingPolicy:
+        def __call__(self, context: ObstaclePolicyContext) -> ObstaclePolicyDecision:
+            seen_peer_steps.append((context.step_index, dict(context.peer_positions)))
+            return ObstaclePolicyDecision(next_position=context.current_position)
+
+    timeline = DynamicObstacleTimeline(
+        timeline_id="score-peer",
+        obstacles=(
+            DynamicObstacle(
+                obstacle_id="watcher",
+                waypoints=(DynamicObstacleWaypoint(step_index=0, position=(0.6, 0.0, 0.0)),),
+                radius_meters=0.05,
+                policy=_RecordingPolicy(),
+            ),
+            DynamicObstacle(
+                obstacle_id="peer",
+                waypoints=(DynamicObstacleWaypoint(step_index=0, position=(0.65, 0.0, 0.0)),),
+                radius_meters=0.05,
+            ),
+        ),
+    )
+    env = HeadlessPhysicalAIEnvironment(_unit_catalog(), dynamic_obstacles=timeline)
+    env.reset("unit-scene")
+    seen_peer_steps.clear()
+
+    from gs_sim2real.sim import Pose3D
+
+    trajectory = (
+        Pose3D(position=(0.0, 0.0, 0.0), orientation_xyzw=(0.0, 0.0, 0.0, 1.0)),
+        Pose3D(position=(0.1, 0.0, 0.0), orientation_xyzw=(0.0, 0.0, 0.0, 1.0)),
+        Pose3D(position=(0.2, 0.0, 0.0), orientation_xyzw=(0.0, 0.0, 0.0, 1.0)),
+    )
+    env.score_trajectory("unit-scene", trajectory)
+
+    # Step 0 sees an empty peer cache (nothing resolved yet for that step
+    # by the local rebuild loop). Step 1 onward must observe the peer's
+    # resolved step-(N-1) position via the local cache rebuild.
+    step_to_peers: dict[int, Mapping[str, tuple[float, float, float]]] = {}
+    for step_index, peers in seen_peer_steps:
+        step_to_peers.setdefault(step_index, peers)
+    assert step_to_peers[0] == {}
+    assert "peer" in step_to_peers[1]
+    assert step_to_peers[1]["peer"] == pytest.approx((0.65, 0.0, 0.0))
+
+
+def test_score_trajectory_peer_cache_does_not_leak_into_env_state() -> None:
+    """The local cache used by score_trajectory must not mutate the env's stepwise cache."""
+    timeline = DynamicObstacleTimeline(
+        timeline_id="score-isolation",
+        obstacles=(
+            DynamicObstacle(
+                obstacle_id="anchor",
+                waypoints=(DynamicObstacleWaypoint(step_index=0, position=(0.4, 0.0, 0.0)),),
+                radius_meters=0.05,
+            ),
+        ),
+    )
+    env = HeadlessPhysicalAIEnvironment(_unit_catalog(), dynamic_obstacles=timeline)
+    env.reset("unit-scene")
+    cache_before = dict(env._dynamic_obstacle_positions)
+
+    from gs_sim2real.sim import Pose3D
+
+    trajectory = tuple(
+        Pose3D(position=(0.05 * step, 0.0, 0.0), orientation_xyzw=(0.0, 0.0, 0.0, 1.0)) for step in range(5)
+    )
+    env.score_trajectory("unit-scene", trajectory)
+
+    # The env's per-step cache reflects state.step_index (still 0 after reset).
+    assert env._dynamic_obstacle_positions == cache_before
