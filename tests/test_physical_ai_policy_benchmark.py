@@ -101,6 +101,13 @@ from gs_sim2real.sim import (
     write_route_policy_scenario_shards_from_expansion,
     write_route_policy_transitions_jsonl,
 )
+from gs_sim2real.robotics import (
+    BagPoseSample,
+    BagPoseStream,
+    SimPoseSample,
+    correlate_against_sim_trajectory,
+    write_real_vs_sim_correlation_report_json,
+)
 
 
 def test_run_route_policy_imitation_benchmark_compares_direct_baseline() -> None:
@@ -578,6 +585,91 @@ def test_route_policy_scenario_set_runs_registry_across_goal_suites(tmp_path: Pa
     assert all(Path(result.report_path).exists() for result in loaded.scenario_results)
     assert (tmp_path / "history.json").exists()
     assert "Route Policy Scenario Set: unit-scenarios" in render_route_policy_scenario_set_markdown(loaded)
+
+
+def _write_unit_correlation_report_json(path: Path) -> Path:
+    """Write a tiny pre-computed real-vs-sim correlation report at ``path``."""
+
+    bag_stream = BagPoseStream(
+        samples=(
+            BagPoseSample(timestamp_seconds=0.0, position=(0.0, 0.0, 0.0)),
+            BagPoseSample(timestamp_seconds=1.0, position=(1.0, 0.0, 0.0)),
+        ),
+        frame_id="enu",
+        source_topic="/gnss/fix",
+        source_msgtype="sensor_msgs/msg/NavSatFix",
+        reference_origin_wgs84=(35.0, 139.0, 10.0),
+    )
+    sim_samples = (
+        SimPoseSample(timestamp_seconds=0.01, position=(0.05, 0.0, 0.0), orientation_xyzw=(0, 0, 0, 1)),
+        SimPoseSample(timestamp_seconds=1.01, position=(1.05, 0.0, 0.0), orientation_xyzw=(0, 0, 0, 1)),
+    )
+    report = correlate_against_sim_trajectory(bag_stream, sim_samples, max_match_dt_seconds=0.05)
+    return write_real_vs_sim_correlation_report_json(path, report)
+
+
+def test_route_policy_scenario_set_attaches_correlation_reports(tmp_path: Path) -> None:
+    """Pre-computed correlation reports must round-trip through the run report and surface in Markdown."""
+
+    catalog_path = write_unit_scene_catalog(tmp_path / "scenes.json")
+    registry_path = write_route_policy_registry_json(
+        tmp_path / "registry.json",
+        RoutePolicyRegistry(
+            registry_id="unit-correlation-registry",
+            policies=(RoutePolicyRegistryEntry(policy_name="direct", policy_type="direct-goal"),),
+        ),
+    )
+    near_goals = write_route_policy_goal_suite_json(
+        tmp_path / "near-goals.json",
+        RoutePolicyGoalSuite(
+            suite_id="near-goals",
+            scene_id="unit-scene",
+            frame_id="generic_world",
+            goals=(RoutePolicyGoalSpec("near", (0.25, 0.0, 0.0)),),
+        ),
+    )
+    scenario_set = RoutePolicyScenarioSet(
+        scenario_set_id="unit-correlation",
+        policy_registry_path=registry_path.name,
+        episode_count=1,
+        seed_start=0,
+        max_steps=4,
+        scenarios=(
+            RoutePolicyScenarioSpec(
+                scenario_id="near",
+                scene_catalog=catalog_path.name,
+                goal_suite_path=near_goals.name,
+            ),
+        ),
+    )
+    registry = load_route_policy_registry_json(registry_path)
+    correlation_path = _write_unit_correlation_report_json(tmp_path / "correlation.json")
+
+    report = run_route_policy_scenario_set(
+        scenario_set,
+        registry,
+        report_dir=tmp_path / "reports",
+        scenario_set_base_path=tmp_path,
+        registry_base_path=tmp_path,
+        policy_registry_path=registry_path,
+        history_output=tmp_path / "history.json",
+        correlation_report_paths=[correlation_path.name],
+    )
+
+    assert report.correlation_report_count == 1
+    assert report.correlation_reports[0].matched_pair_count == 2
+    assert report.correlation_report_paths[0] == str(tmp_path / "correlation.json")
+
+    run_path = write_route_policy_scenario_set_run_json(tmp_path / "scenario-run.json", report)
+    loaded = load_route_policy_scenario_set_run_json(run_path)
+    assert loaded.correlation_report_count == 1
+    assert loaded.correlation_reports[0].bag_source.source_topic == "/gnss/fix"
+    assert loaded.correlation_reports[0].translation_error_mean_meters == pytest.approx(0.05, rel=1e-6)
+    assert loaded.correlation_report_paths == report.correlation_report_paths
+
+    markdown = render_route_policy_scenario_set_markdown(loaded)
+    assert "Real-vs-sim correlation" in markdown
+    assert "/gnss/fix" in markdown
 
 
 def test_route_policy_scenario_set_cli_writes_reports_and_history(tmp_path: Path) -> None:

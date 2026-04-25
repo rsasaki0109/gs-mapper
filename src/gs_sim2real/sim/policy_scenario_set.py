@@ -34,6 +34,11 @@ from .policy_dynamic_obstacles import load_route_policy_dynamic_obstacle_timelin
 from .policy_quality import RoutePolicyQualityThresholds
 from .policy_sensor_noise import load_route_policy_sensor_noise_profile_json
 from .raw_sensor_noise import load_raw_sensor_noise_profile_json
+from ..robotics.rosbag_correlation import (
+    RealVsSimCorrelationReport,
+    load_real_vs_sim_correlation_report_json,
+    real_vs_sim_correlation_report_from_dict,
+)
 
 
 ROUTE_POLICY_SCENARIO_SET_VERSION = "gs-mapper-route-policy-scenario-set/v1"
@@ -177,7 +182,15 @@ class RoutePolicyScenarioRunResult:
 
 @dataclass(frozen=True, slots=True)
 class RoutePolicyScenarioSetRunReport:
-    """Top-level report for a scenario-set execution plus its history gate."""
+    """Top-level report for a scenario-set execution plus its history gate.
+
+    Optional ``correlation_reports`` carry pre-computed real-vs-sim
+    correlation reports (one per source rosbag) so scenario CI artifacts
+    can show drift between the headless rollout and the recorded bag
+    next to the benchmark history. Each entry is paired with the JSON
+    path it was loaded from in ``correlation_report_paths`` so the
+    review bundle can hyperlink back to the full report.
+    """
 
     scenario_set_id: str
     scenario_results: tuple[RoutePolicyScenarioRunResult, ...]
@@ -185,8 +198,18 @@ class RoutePolicyScenarioSetRunReport:
     policy_registry_path: str
     history_path: str | None = None
     history_markdown_path: str | None = None
+    correlation_reports: tuple[RealVsSimCorrelationReport, ...] = ()
+    correlation_report_paths: tuple[str, ...] = ()
     metadata: Mapping[str, Any] = field(default_factory=dict)
     version: str = ROUTE_POLICY_SCENARIO_SET_RUN_VERSION
+
+    def __post_init__(self) -> None:
+        reports = tuple(self.correlation_reports)
+        paths = tuple(str(item) for item in self.correlation_report_paths)
+        if paths and len(paths) != len(reports):
+            raise ValueError("correlation_report_paths must have the same length as correlation_reports when provided")
+        object.__setattr__(self, "correlation_reports", reports)
+        object.__setattr__(self, "correlation_report_paths", paths)
 
     @property
     def passed(self) -> bool:
@@ -196,8 +219,12 @@ class RoutePolicyScenarioSetRunReport:
     def scenario_count(self) -> int:
         return len(self.scenario_results)
 
+    @property
+    def correlation_report_count(self) -> int:
+        return len(self.correlation_reports)
+
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "recordType": "route-policy-scenario-set-run",
             "version": self.version,
             "scenarioSetId": self.scenario_set_id,
@@ -210,6 +237,11 @@ class RoutePolicyScenarioSetRunReport:
             "history": self.history.to_dict(),
             "metadata": _json_mapping(self.metadata),
         }
+        if self.correlation_reports:
+            payload["correlationReports"] = [report.to_dict() for report in self.correlation_reports]
+            if self.correlation_report_paths:
+                payload["correlationReportPaths"] = list(self.correlation_report_paths)
+        return payload
 
 
 def run_route_policy_scenario_set(
@@ -225,9 +257,18 @@ def run_route_policy_scenario_set(
     history_markdown_output: str | Path | None = None,
     history_thresholds: RoutePolicyBenchmarkRegressionThresholds | None = None,
     write_markdown: bool = True,
+    correlation_report_paths: Sequence[str | Path] | None = None,
     metadata: Mapping[str, Any] | None = None,
 ) -> RoutePolicyScenarioSetRunReport:
-    """Run one policy registry across every scenario in a scenario-set artifact."""
+    """Run one policy registry across every scenario in a scenario-set artifact.
+
+    ``correlation_report_paths`` is an optional sequence of pre-computed
+    real-vs-sim correlation report JSON paths (typically produced by
+    ``scripts/run_rosbag_correlation.py``). Each is loaded and attached
+    to the resulting :class:`RoutePolicyScenarioSetRunReport` so the
+    scenario-set run JSON / Markdown / review bundle can show the
+    headless-vs-bag drift alongside the benchmark history.
+    """
 
     base_path = Path(scenario_set_base_path) if scenario_set_base_path is not None else Path(".")
     output_dir = Path(report_dir)
@@ -263,6 +304,17 @@ def run_route_policy_scenario_set(
         markdown_path = Path(history_markdown_output)
         markdown_path.parent.mkdir(parents=True, exist_ok=True)
         markdown_path.write_text(render_route_policy_benchmark_history_markdown(history), encoding="utf-8")
+    correlation_paths_resolved: tuple[str, ...] = ()
+    correlation_reports: tuple[RealVsSimCorrelationReport, ...] = ()
+    if correlation_report_paths:
+        loaded = []
+        kept_paths: list[str] = []
+        for raw_path in correlation_report_paths:
+            resolved = _resolve_path(base_path, raw_path)
+            loaded.append(load_real_vs_sim_correlation_report_json(resolved))
+            kept_paths.append(str(resolved))
+        correlation_reports = tuple(loaded)
+        correlation_paths_resolved = tuple(kept_paths)
     return RoutePolicyScenarioSetRunReport(
         scenario_set_id=scenario_set.scenario_set_id,
         scenario_results=tuple(scenario_results),
@@ -270,6 +322,8 @@ def run_route_policy_scenario_set(
         policy_registry_path="" if policy_registry_path is None else str(policy_registry_path),
         history_path=None if history_output is None else str(history_output),
         history_markdown_path=None if history_markdown_output is None else str(history_markdown_output),
+        correlation_reports=correlation_reports,
+        correlation_report_paths=correlation_paths_resolved,
         metadata={
             "registryId": registry.registry_id,
             **_json_mapping(metadata or {}),
@@ -380,6 +434,13 @@ def route_policy_scenario_set_run_from_dict(payload: Mapping[str, Any]) -> Route
     version = str(payload.get("version", ROUTE_POLICY_SCENARIO_SET_RUN_VERSION))
     if version != ROUTE_POLICY_SCENARIO_SET_RUN_VERSION:
         raise ValueError(f"unsupported route policy scenario-set run version: {version}")
+    correlation_reports = tuple(
+        real_vs_sim_correlation_report_from_dict(_mapping(item, "correlationReport"))
+        for item in _sequence(payload.get("correlationReports", ()), "correlationReports")
+    )
+    correlation_report_paths = tuple(
+        str(item) for item in _sequence(payload.get("correlationReportPaths", ()), "correlationReportPaths")
+    )
     return RoutePolicyScenarioSetRunReport(
         scenario_set_id=str(payload["scenarioSetId"]),
         scenario_results=tuple(
@@ -392,6 +453,8 @@ def route_policy_scenario_set_run_from_dict(payload: Mapping[str, Any]) -> Route
         history_markdown_path=None
         if payload.get("historyMarkdownPath") is None
         else str(payload["historyMarkdownPath"]),
+        correlation_reports=correlation_reports,
+        correlation_report_paths=correlation_report_paths,
         metadata=_json_mapping(_mapping(payload.get("metadata", {}), "metadata")),
         version=version,
     )
@@ -440,6 +503,36 @@ def render_route_policy_scenario_set_markdown(report: RoutePolicyScenarioSetRunR
             f"{result.episode_count} | "
             f"{result.report_path} |"
         )
+    if report.correlation_reports:
+        lines.extend(
+            [
+                "",
+                "## Real-vs-sim correlation",
+                "",
+                "| Bag topic | Matched pairs | Translation mean (m) | Translation p95 (m) | Translation max (m) | Heading mean (rad) | Report |",
+                "| --- | ---: | ---: | ---: | ---: | ---: | --- |",
+            ]
+        )
+        for index, correlation in enumerate(report.correlation_reports):
+            bag = correlation.bag_source
+            heading = (
+                f"{correlation.heading_error_mean_radians:.4f}"
+                if correlation.heading_error_mean_radians is not None
+                else "n/a"
+            )
+            path_cell = (
+                report.correlation_report_paths[index] if index < len(report.correlation_report_paths) else "n/a"
+            )
+            lines.append(
+                "| "
+                f"`{bag.source_topic}` | "
+                f"{correlation.matched_pair_count} | "
+                f"{correlation.translation_error_mean_meters:.4f} | "
+                f"{correlation.translation_error_p95_meters:.4f} | "
+                f"{correlation.translation_error_max_meters:.4f} | "
+                f"{heading} | "
+                f"{path_cell} |"
+            )
     return "\n".join(lines) + "\n"
 
 
@@ -459,6 +552,7 @@ def run_cli(args: Any) -> None:
         require_baseline_policies=not bool(getattr(args, "allow_missing_policies", False)),
         fail_on_report_failure=not bool(getattr(args, "allow_report_failures", False)),
     )
+    correlation_report_paths = tuple(getattr(args, "correlation_report", None) or ())
     report = run_route_policy_scenario_set(
         scenario_set,
         registry,
@@ -471,6 +565,7 @@ def run_cli(args: Any) -> None:
         history_markdown_output=getattr(args, "history_markdown_output", None),
         history_thresholds=history_thresholds,
         write_markdown=not bool(getattr(args, "no_markdown", False)),
+        correlation_report_paths=correlation_report_paths,
         metadata={
             "scenarioSetPath": str(scenario_set_path),
             "policyRegistryPath": str(registry_path),

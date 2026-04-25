@@ -1202,6 +1202,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     rps.add_argument("--no-markdown", action="store_true", help="Skip per-scenario Markdown benchmark summaries")
     rps.add_argument(
+        "--correlation-report",
+        action="append",
+        default=None,
+        help=(
+            "Pre-computed real-vs-sim correlation report JSON to attach to the scenario-set run "
+            "report (can be passed multiple times)"
+        ),
+    )
+    rps.add_argument(
         "--fail-on-regression",
         action="store_true",
         help="Exit with status 2 when a scenario or history regression gate fails",

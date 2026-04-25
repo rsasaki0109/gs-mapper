@@ -70,6 +70,37 @@ class BagPoseSample:
 
 
 @dataclass(frozen=True, slots=True)
+class BagPoseStreamMetadata:
+    """Round-trippable provenance + sizing metadata for a bag pose stream.
+
+    The stream's actual samples are too heavy to ship inside a CI
+    artifact, so :class:`RealVsSimCorrelationReport` keeps only the
+    metadata view. :meth:`BagPoseStream.metadata` builds one of these
+    from a live stream; :func:`bag_pose_stream_metadata_from_dict`
+    recovers it from a JSON payload.
+    """
+
+    frame_id: str
+    source_topic: str
+    source_msgtype: str
+    sample_count: int
+    duration_seconds: float
+    reference_origin_wgs84: tuple[float, float, float] | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "frameId": self.frame_id,
+            "sourceTopic": self.source_topic,
+            "sourceMsgtype": self.source_msgtype,
+            "sampleCount": int(self.sample_count),
+            "durationSeconds": float(self.duration_seconds),
+        }
+        if self.reference_origin_wgs84 is not None:
+            payload["referenceOriginWgs84"] = list(self.reference_origin_wgs84)
+        return payload
+
+
+@dataclass(frozen=True, slots=True)
 class BagPoseStream:
     """Ordered bag pose samples plus provenance metadata."""
 
@@ -94,17 +125,20 @@ class BagPoseStream:
     def duration_seconds(self) -> float:
         return float(self.samples[-1].timestamp_seconds - self.samples[0].timestamp_seconds)
 
+    def metadata(self) -> BagPoseStreamMetadata:
+        """Return the round-trippable metadata view of this stream."""
+
+        return BagPoseStreamMetadata(
+            frame_id=self.frame_id,
+            source_topic=self.source_topic,
+            source_msgtype=self.source_msgtype,
+            sample_count=self.sample_count,
+            duration_seconds=self.duration_seconds,
+            reference_origin_wgs84=self.reference_origin_wgs84,
+        )
+
     def to_dict(self) -> dict[str, Any]:
-        payload: dict[str, Any] = {
-            "frameId": self.frame_id,
-            "sourceTopic": self.source_topic,
-            "sourceMsgtype": self.source_msgtype,
-            "sampleCount": self.sample_count,
-            "durationSeconds": self.duration_seconds,
-        }
-        if self.reference_origin_wgs84 is not None:
-            payload["referenceOriginWgs84"] = list(self.reference_origin_wgs84)
-        return payload
+        return self.metadata().to_dict()
 
 
 @dataclass(frozen=True, slots=True)
@@ -156,7 +190,7 @@ class CorrelatedPosePair:
 class RealVsSimCorrelationReport:
     """Aggregate statistics for one real-vs-sim correlation run."""
 
-    bag_source: BagPoseStream
+    bag_source: BagPoseStreamMetadata
     sim_sample_count: int
     matched_pair_count: int
     matched_seconds: float
@@ -480,7 +514,7 @@ def correlate_against_sim_trajectory(
 
     if not pairs:
         return RealVsSimCorrelationReport(
-            bag_source=bag_stream,
+            bag_source=bag_stream.metadata(),
             sim_sample_count=sim_sample_count,
             matched_pair_count=0,
             matched_seconds=0.0,
@@ -499,7 +533,7 @@ def correlate_against_sim_trajectory(
     kept = _stride_sample(pairs, max_pairs_kept) if keep_pairs else ()
 
     return RealVsSimCorrelationReport(
-        bag_source=bag_stream,
+        bag_source=bag_stream.metadata(),
         sim_sample_count=sim_sample_count,
         matched_pair_count=len(pairs),
         matched_seconds=float(matched_seconds),
@@ -527,6 +561,95 @@ def write_real_vs_sim_correlation_report_json(
         encoding="utf-8",
     )
     return output_path
+
+
+def load_real_vs_sim_correlation_report_json(path: str | Path) -> RealVsSimCorrelationReport:
+    """Load a correlation report JSON artifact."""
+
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(payload, Mapping):
+        raise ValueError("correlation report root must be a JSON object")
+    return real_vs_sim_correlation_report_from_dict(payload)
+
+
+def real_vs_sim_correlation_report_from_dict(payload: Mapping[str, Any]) -> RealVsSimCorrelationReport:
+    """Rebuild a :class:`RealVsSimCorrelationReport` from its JSON payload."""
+
+    record_type = payload.get("recordType")
+    if record_type != "real-vs-sim-correlation-report":
+        raise ValueError(f"unexpected recordType for correlation report: {record_type!r}")
+    version = str(payload.get("version", REAL_VS_SIM_CORRELATION_REPORT_VERSION))
+    if version != REAL_VS_SIM_CORRELATION_REPORT_VERSION:
+        raise ValueError(f"unsupported real-vs-sim correlation report version: {version}")
+    bag_payload = payload.get("bagSource")
+    if not isinstance(bag_payload, Mapping):
+        raise ValueError("correlation report bagSource must be a mapping")
+    translation_payload = payload.get("translationErrorMeters")
+    if not isinstance(translation_payload, Mapping):
+        raise ValueError("correlation report translationErrorMeters must be a mapping")
+    heading_payload = payload.get("headingErrorRadians")
+    heading_mean: float | None = None
+    heading_max: float | None = None
+    if isinstance(heading_payload, Mapping):
+        heading_mean = float(heading_payload["mean"]) if "mean" in heading_payload else None
+        heading_max = float(heading_payload["max"]) if "max" in heading_payload else None
+    pair_items = payload.get("pairs", ())
+    if not isinstance(pair_items, Sequence):
+        raise ValueError("correlation report pairs must be a sequence")
+    pairs = tuple(correlated_pose_pair_from_dict(item) for item in pair_items if isinstance(item, Mapping))
+    return RealVsSimCorrelationReport(
+        bag_source=bag_pose_stream_metadata_from_dict(bag_payload),
+        sim_sample_count=int(payload["simSampleCount"]),
+        matched_pair_count=int(payload["matchedPairCount"]),
+        matched_seconds=float(payload["matchedSeconds"]),
+        translation_error_min_meters=float(translation_payload["min"]),
+        translation_error_mean_meters=float(translation_payload["mean"]),
+        translation_error_max_meters=float(translation_payload["max"]),
+        translation_error_p50_meters=float(translation_payload["p50"]),
+        translation_error_p95_meters=float(translation_payload["p95"]),
+        heading_error_mean_radians=heading_mean,
+        heading_error_max_radians=heading_max,
+        pairs=pairs,
+        version=version,
+    )
+
+
+def bag_pose_stream_metadata_from_dict(payload: Mapping[str, Any]) -> BagPoseStreamMetadata:
+    """Rebuild :class:`BagPoseStreamMetadata` from its JSON payload."""
+
+    origin_payload = payload.get("referenceOriginWgs84")
+    origin: tuple[float, float, float] | None = None
+    if origin_payload is not None:
+        origin_seq = tuple(float(component) for component in origin_payload)
+        if len(origin_seq) != 3:
+            raise ValueError("bag pose stream referenceOriginWgs84 must have three elements")
+        origin = origin_seq
+    return BagPoseStreamMetadata(
+        frame_id=str(payload["frameId"]),
+        source_topic=str(payload["sourceTopic"]),
+        source_msgtype=str(payload["sourceMsgtype"]),
+        sample_count=int(payload["sampleCount"]),
+        duration_seconds=float(payload["durationSeconds"]),
+        reference_origin_wgs84=origin,
+    )
+
+
+def correlated_pose_pair_from_dict(payload: Mapping[str, Any]) -> CorrelatedPosePair:
+    """Rebuild a :class:`CorrelatedPosePair` from its JSON payload."""
+
+    bag_position = tuple(float(component) for component in payload["bagPosition"])
+    sim_position = tuple(float(component) for component in payload["simPosition"])
+    if len(bag_position) != 3 or len(sim_position) != 3:
+        raise ValueError("correlation pair positions must have three elements")
+    heading = payload.get("headingErrorRadians")
+    return CorrelatedPosePair(
+        bag_timestamp_seconds=float(payload["bagTimestampSeconds"]),
+        sim_timestamp_seconds=float(payload["simTimestampSeconds"]),
+        bag_position=bag_position,
+        sim_position=sim_position,
+        translation_error_meters=float(payload["translationErrorMeters"]),
+        heading_error_radians=None if heading is None else float(heading),
+    )
 
 
 def render_real_vs_sim_correlation_markdown(report: RealVsSimCorrelationReport) -> str:

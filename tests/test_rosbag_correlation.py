@@ -13,12 +13,15 @@ import pytest
 from gs_sim2real.robotics import (
     BagPoseSample,
     BagPoseStream,
+    BagPoseStreamMetadata,
     CorrelatedPosePair,
     REAL_VS_SIM_CORRELATION_REPORT_VERSION,
     SimPoseSample,
     correlate_against_sim_trajectory,
+    load_real_vs_sim_correlation_report_json,
     load_sim_pose_samples_jsonl,
     merge_navsat_with_imu_orientation,
+    real_vs_sim_correlation_report_from_dict,
     render_real_vs_sim_correlation_markdown,
     wgs84_to_ecef,
     wgs84_to_local_enu,
@@ -455,3 +458,53 @@ def test_correlator_emits_heading_error_on_imu_merged_stream() -> None:
     # Mean of 0 rad and 45 deg = 22.5 deg.
     assert report.heading_error_mean_radians == pytest.approx(math.radians(22.5), rel=1e-6)
     assert report.heading_error_max_radians == pytest.approx(math.radians(45.0), rel=1e-6)
+
+
+def test_real_vs_sim_correlation_report_round_trips_through_json(tmp_path: Path) -> None:
+    """to_dict -> from_dict (and disk round-trip) must rebuild an identical report."""
+    bag_samples = [
+        BagPoseSample(timestamp_seconds=0.0, position=(0.0, 0.0, 0.0)),
+        BagPoseSample(
+            timestamp_seconds=1.0,
+            position=(1.0, 0.0, 0.0),
+            orientation_xyzw=(0.0, 0.0, 0.0, 1.0),
+        ),
+    ]
+    sim_samples = [
+        SimPoseSample(timestamp_seconds=0.01, position=(0.05, 0.0, 0.0), orientation_xyzw=(0, 0, 0, 1)),
+        SimPoseSample(timestamp_seconds=1.01, position=(1.05, 0.0, 0.0), orientation_xyzw=(0, 0, 0, 1)),
+    ]
+    report = correlate_against_sim_trajectory(
+        _make_bag_stream(bag_samples),
+        sim_samples,
+        max_match_dt_seconds=0.05,
+    )
+    assert isinstance(report.bag_source, BagPoseStreamMetadata)
+
+    rebuilt = real_vs_sim_correlation_report_from_dict(report.to_dict())
+    assert rebuilt.to_dict() == report.to_dict()
+
+    output_path = tmp_path / "correlation.json"
+    write_real_vs_sim_correlation_report_json(output_path, report)
+    loaded = load_real_vs_sim_correlation_report_json(output_path)
+    assert loaded.to_dict() == report.to_dict()
+    assert loaded.bag_source.source_topic == "/gnss/fix"
+    assert loaded.matched_pair_count == 2
+
+
+def test_real_vs_sim_correlation_report_from_dict_rejects_bad_record_type() -> None:
+    bag_samples = [
+        BagPoseSample(timestamp_seconds=0.0, position=(0.0, 0.0, 0.0)),
+        BagPoseSample(timestamp_seconds=1.0, position=(1.0, 0.0, 0.0)),
+    ]
+    sim_samples = [
+        SimPoseSample(timestamp_seconds=0.0, position=(0.0, 0.0, 0.0), orientation_xyzw=(0, 0, 0, 1)),
+        SimPoseSample(timestamp_seconds=1.0, position=(1.0, 0.0, 0.0), orientation_xyzw=(0, 0, 0, 1)),
+    ]
+    payload = correlate_against_sim_trajectory(
+        _make_bag_stream(bag_samples),
+        sim_samples,
+    ).to_dict()
+    payload["recordType"] = "not-a-correlation-report"
+    with pytest.raises(ValueError, match="recordType"):
+        real_vs_sim_correlation_report_from_dict(payload)
