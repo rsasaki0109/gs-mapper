@@ -83,6 +83,7 @@ class RoutePolicyGymAdapter:
         self._episode_index = -1
         self._state: RoutePolicyEnvState | None = None
         self._reset_seed: int | None = None
+        self._previous_obstacle_positions: dict[str, tuple[float, float, float]] = {}
 
     @property
     def state(self) -> RoutePolicyEnvState:
@@ -107,6 +108,7 @@ class RoutePolicyGymAdapter:
         resolved_goal = self._resolve_goal(resolved_scene_id, pose=pose, seed=seed, goal=goal, options=reset_options)
         self._episode_index += 1
         self._reset_seed = None if seed is None else int(seed)
+        self._previous_obstacle_positions = {}
         self._state = RoutePolicyEnvState(
             scene_id=resolved_scene_id,
             episode_index=self._episode_index,
@@ -281,17 +283,41 @@ class RoutePolicyGymAdapter:
         policy can tell apart a lane with one obstacle in it from a lane with
         two obstacles at similar clearance; the second-nearest block stays
         empty when fewer than two obstacles are present.
+
+        Obstacle positions are resolved through
+        :meth:`DynamicObstacleTimeline.step_positions`, threading the
+        previous step's resolved positions in as ``previous_positions``. For
+        policy-driven obstacles this means the ``ObstaclePolicyContext`` they
+        receive carries up-to-date peer locations (so a
+        ``MaintainSeparationObstaclePolicy`` actually sees its siblings),
+        and a new ``peer-min-separation-meters`` feature surfaces the
+        minimum pair-wise clearance between obstacle spheres so a learned
+        policy can tell apart a tight cluster from a spread-out swarm.
+        Policyless obstacles fall through to the legacy chase / flee /
+        waypoint behaviour, so this code is a no-op for v1 scenario JSON.
         """
 
         timeline = getattr(self.environment, "dynamic_obstacles", None)
         if timeline is None or timeline.obstacle_count == 0:
+            self._previous_obstacle_positions = {}
             return {}
-        ranked: list[tuple[float, tuple[float, float, float], float]] = []
+
         observed_position = tuple(observed_pose.position)
+        resolved_positions = timeline.step_positions(
+            state.step_index,
+            agent_position=observed_position,
+            previous_positions=self._previous_obstacle_positions,
+        )
+        self._previous_obstacle_positions = dict(resolved_positions)
+
+        ranked: list[tuple[float, tuple[float, float, float], float]] = []
+        radii_by_id: dict[str, float] = {}
         for obstacle in timeline.obstacles:
-            centre = obstacle.position_at_step(state.step_index, agent_position=observed_position)
+            centre = resolved_positions[obstacle.obstacle_id]
+            radius = float(obstacle.radius_meters)
+            radii_by_id[obstacle.obstacle_id] = radius
             distance = math.dist(observed_position, centre)
-            clearance = max(0.0, distance - float(obstacle.radius_meters))
+            clearance = max(0.0, distance - radius)
             ranked.append((clearance, centre, _obstacle_reactive_mode(obstacle)))
         ranked.sort(key=lambda entry: entry[0])
 
@@ -299,6 +325,9 @@ class RoutePolicyGymAdapter:
         features.update(_obstacle_block("nearest-dynamic-obstacle", ranked[0], observed_pose))
         if len(ranked) >= 2:
             features.update(_obstacle_block("second-nearest-dynamic-obstacle", ranked[1], observed_pose))
+            features["peer-min-separation-meters"] = _peer_min_separation_meters(
+                timeline.obstacles, resolved_positions, radii_by_id
+            )
         return features
 
     def _apply_sensor_noise(self, state: RoutePolicyEnvState) -> tuple[Pose3D, Pose3D]:
@@ -558,6 +587,33 @@ def _pose_distance(source: Pose3D, target: Pose3D) -> float:
 
 def _bool_feature(value: bool) -> float:
     return 1.0 if value else 0.0
+
+
+def _peer_min_separation_meters(
+    obstacles: Sequence[Any],
+    resolved_positions: Mapping[str, tuple[float, float, float]],
+    radii_by_id: Mapping[str, float],
+) -> float:
+    """Minimum centre-to-centre clearance over all obstacle pairs (sphere-aware).
+
+    Each pair contributes ``max(0, distance(centre_i, centre_j) - radius_i - radius_j)``
+    so two overlapping obstacles read as zero rather than a negative value.
+    Caller guarantees at least two obstacles when calling this helper, so the
+    return is always finite.
+    """
+
+    minimum = math.inf
+    for index, first in enumerate(obstacles):
+        first_id = first.obstacle_id
+        first_centre = resolved_positions[first_id]
+        first_radius = radii_by_id[first_id]
+        for second in obstacles[index + 1 :]:
+            second_id = second.obstacle_id
+            distance = math.dist(first_centre, resolved_positions[second_id])
+            separation = distance - first_radius - radii_by_id[second_id]
+            if separation < minimum:
+                minimum = separation
+    return max(0.0, minimum)
 
 
 def _decode_imu_vector_block(block: Any, base64_key: str) -> tuple[float, float, float] | None:

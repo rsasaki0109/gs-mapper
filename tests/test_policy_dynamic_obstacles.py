@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 import json
 import math
 from pathlib import Path
@@ -13,9 +14,13 @@ from gs_sim2real.sim import (
     DynamicObstacleTimeline,
     DynamicObstacleWaypoint,
     HeadlessPhysicalAIEnvironment,
+    MaintainSeparationObstaclePolicy,
+    ObstaclePolicyContext,
+    ObstaclePolicyDecision,
     RoutePolicyEnvConfig,
     RoutePolicyEnvState,
     RoutePolicyGymAdapter,
+    WaypointInterpolationObstaclePolicy,
     build_simulation_catalog,
     load_route_policy_dynamic_obstacle_timeline_json,
     render_route_policy_dynamic_obstacle_timeline_markdown,
@@ -761,3 +766,180 @@ def test_trajectory_score_uses_per_step_obstacle_positions() -> None:
 
     # Collision count tracks dynamic obstacle presence per step.
     assert score.metrics["collision-count"] == 1.0
+
+
+def test_gym_adapter_emits_peer_min_separation_with_two_obstacles() -> None:
+    """peer-min-separation-meters surfaces the smallest pair-wise sphere clearance."""
+    timeline = DynamicObstacleTimeline(
+        timeline_id="pair",
+        obstacles=(
+            DynamicObstacle(
+                obstacle_id="left",
+                waypoints=(DynamicObstacleWaypoint(step_index=0, position=(1.0, 0.0, 0.0)),),
+                radius_meters=0.1,
+            ),
+            DynamicObstacle(
+                obstacle_id="right",
+                waypoints=(DynamicObstacleWaypoint(step_index=0, position=(1.5, 0.0, 0.0)),),
+                radius_meters=0.1,
+            ),
+        ),
+    )
+    env = HeadlessPhysicalAIEnvironment(_unit_catalog(), dynamic_obstacles=timeline)
+    adapter = RoutePolicyGymAdapter(
+        env,
+        RoutePolicyEnvConfig(scene_id="unit-scene", max_steps=4, goal_tolerance_meters=0.02),
+    )
+    observation, _ = adapter.reset(seed=42, goal=(0.3, 0.0, 0.0))
+
+    # Centres are 0.5 m apart; each radius is 0.1 m, so clearance = 0.5 - 0.2 = 0.3 m.
+    assert observation["dynamic-obstacle-count"] == 2.0
+    assert observation["peer-min-separation-meters"] == pytest.approx(0.3, abs=1e-9)
+
+
+def test_gym_adapter_clamps_peer_min_separation_when_obstacles_overlap() -> None:
+    """Overlapping obstacle spheres clamp peer-min-separation-meters to zero, not negative."""
+    timeline = DynamicObstacleTimeline(
+        timeline_id="overlap",
+        obstacles=(
+            DynamicObstacle(
+                obstacle_id="big",
+                waypoints=(DynamicObstacleWaypoint(step_index=0, position=(1.0, 0.0, 0.0)),),
+                radius_meters=0.5,
+            ),
+            DynamicObstacle(
+                obstacle_id="other",
+                waypoints=(DynamicObstacleWaypoint(step_index=0, position=(1.1, 0.0, 0.0)),),
+                radius_meters=0.5,
+            ),
+        ),
+    )
+    env = HeadlessPhysicalAIEnvironment(_unit_catalog(), dynamic_obstacles=timeline)
+    adapter = RoutePolicyGymAdapter(
+        env,
+        RoutePolicyEnvConfig(scene_id="unit-scene", max_steps=4, goal_tolerance_meters=0.02),
+    )
+    observation, _ = adapter.reset(seed=42, goal=(0.3, 0.0, 0.0))
+
+    assert observation["peer-min-separation-meters"] == pytest.approx(0.0)
+
+
+def test_gym_adapter_omits_peer_min_separation_with_single_obstacle() -> None:
+    """Single-obstacle timelines must not emit a peer-min-separation feature."""
+    timeline = DynamicObstacleTimeline(
+        timeline_id="solo",
+        obstacles=(
+            DynamicObstacle(
+                obstacle_id="solo",
+                waypoints=(DynamicObstacleWaypoint(step_index=0, position=(1.0, 0.0, 0.0)),),
+                radius_meters=0.1,
+            ),
+        ),
+    )
+    env = HeadlessPhysicalAIEnvironment(_unit_catalog(), dynamic_obstacles=timeline)
+    adapter = RoutePolicyGymAdapter(
+        env,
+        RoutePolicyEnvConfig(scene_id="unit-scene", max_steps=4, goal_tolerance_meters=0.02),
+    )
+    observation, _ = adapter.reset(seed=42, goal=(0.3, 0.0, 0.0))
+
+    assert observation["dynamic-obstacle-count"] == 1.0
+    assert "peer-min-separation-meters" not in observation
+
+
+def test_gym_adapter_threads_previous_positions_into_obstacle_policy() -> None:
+    """Policy-driven obstacles must receive previous-step peer positions via step_positions."""
+    seen_peer_positions: list[Mapping[str, tuple[float, float, float]]] = []
+
+    class _RecordingPolicy:
+        def __call__(self, context: ObstaclePolicyContext) -> ObstaclePolicyDecision:
+            seen_peer_positions.append(dict(context.peer_positions))
+            return ObstaclePolicyDecision(next_position=context.current_position)
+
+    timeline = DynamicObstacleTimeline(
+        timeline_id="peer-aware",
+        obstacles=(
+            DynamicObstacle(
+                obstacle_id="watcher",
+                waypoints=(DynamicObstacleWaypoint(step_index=0, position=(1.0, 0.0, 0.0)),),
+                radius_meters=0.1,
+                policy=_RecordingPolicy(),
+            ),
+            DynamicObstacle(
+                obstacle_id="peer",
+                waypoints=(DynamicObstacleWaypoint(step_index=0, position=(1.5, 0.0, 0.0)),),
+                radius_meters=0.1,
+            ),
+        ),
+    )
+    env = HeadlessPhysicalAIEnvironment(_unit_catalog(), dynamic_obstacles=timeline)
+    adapter = RoutePolicyGymAdapter(
+        env,
+        RoutePolicyEnvConfig(
+            scene_id="unit-scene",
+            max_steps=4,
+            goal_tolerance_meters=0.02,
+            action_type="twist",
+            segment_duration_seconds=1.0,
+        ),
+    )
+
+    adapter.reset(seed=99, goal=(0.5, 0.0, 0.0))
+    # Reset resolves obstacles with empty previous_positions.
+    assert seen_peer_positions[0] == {}
+
+    adapter.step({"target": {"x": 0.05, "y": 0.0, "z": 0.0}})
+    # The next step's policy call must see the peer's resolved step-0 position.
+    latest_peers = seen_peer_positions[-1]
+    assert "peer" in latest_peers
+    assert latest_peers["peer"] == pytest.approx((1.5, 0.0, 0.0))
+
+
+def test_maintain_separation_obstacle_policy_pushes_outward_via_gym_adapter() -> None:
+    """MaintainSeparationObstaclePolicy nudges its obstacle outward when peers crowd it."""
+    inner_policy = WaypointInterpolationObstaclePolicy(
+        waypoints=(
+            (0, (1.0, 0.0, 0.0)),
+            (2, (1.0, 0.0, 0.0)),
+        ),
+    )
+    timeline = DynamicObstacleTimeline(
+        timeline_id="separation",
+        obstacles=(
+            DynamicObstacle(
+                obstacle_id="defender",
+                waypoints=(DynamicObstacleWaypoint(step_index=0, position=(1.0, 0.0, 0.0)),),
+                radius_meters=0.05,
+                policy=MaintainSeparationObstaclePolicy(inner_policy, min_separation_meters=1.0),
+            ),
+            DynamicObstacle(
+                obstacle_id="crowder",
+                waypoints=(
+                    DynamicObstacleWaypoint(step_index=0, position=(1.5, 0.0, 0.0)),
+                    DynamicObstacleWaypoint(step_index=1, position=(1.2, 0.0, 0.0)),
+                ),
+                radius_meters=0.05,
+            ),
+        ),
+    )
+    env = HeadlessPhysicalAIEnvironment(_unit_catalog(), dynamic_obstacles=timeline)
+    adapter = RoutePolicyGymAdapter(
+        env,
+        RoutePolicyEnvConfig(
+            scene_id="unit-scene",
+            max_steps=4,
+            goal_tolerance_meters=0.02,
+            action_type="twist",
+            segment_duration_seconds=1.0,
+        ),
+    )
+    obs_step_0, _ = adapter.reset(seed=11, goal=(2.5, 0.0, 0.0))
+    sep_step_0 = obs_step_0["peer-min-separation-meters"]
+
+    # Step 0 already had peers within 1.0 m — the defender's policy pushes it
+    # outward. Step 1 brings the crowder closer (1.2 m vs 1.5 m) so the
+    # defender must push out further; min separation cannot decrease.
+    adapter.step({"target": {"x": 0.05, "y": 0.0, "z": 0.0}})
+    obs_step_1 = adapter._observation_features(adapter.state)
+    sep_step_1 = obs_step_1["peer-min-separation-meters"]
+    assert sep_step_1 + 1e-9 >= sep_step_0
