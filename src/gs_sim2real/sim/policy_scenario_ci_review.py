@@ -23,6 +23,11 @@ from .policy_scenario_sharding import (
     RoutePolicyScenarioShardRunSummary,
     load_route_policy_scenario_shard_merge_json,
 )
+from .policy_scenario_set import load_route_policy_scenario_set_run_json
+from ..robotics.rosbag_correlation import (
+    RealVsSimCorrelationReport,
+    real_vs_sim_correlation_report_from_dict,
+)
 
 
 ROUTE_POLICY_SCENARIO_CI_REVIEW_VERSION = "gs-mapper-route-policy-scenario-ci-review/v1"
@@ -126,6 +131,8 @@ class RoutePolicyScenarioCIReviewArtifact:
     shards: tuple[RoutePolicyScenarioCIReviewShard, ...]
     history_failed_checks: tuple[str, ...] = ()
     adoption: RoutePolicyScenarioCIReviewAdoption | None = None
+    correlation_reports: tuple[RealVsSimCorrelationReport, ...] = ()
+    correlation_report_paths: tuple[str, ...] = ()
     metadata: Mapping[str, Any] = field(default_factory=dict)
     version: str = ROUTE_POLICY_SCENARIO_CI_REVIEW_VERSION
 
@@ -149,6 +156,12 @@ class RoutePolicyScenarioCIReviewArtifact:
         if not self.shards:
             raise ValueError("review artifact must contain at least one shard")
         object.__setattr__(self, "history_failed_checks", tuple(str(check) for check in self.history_failed_checks))
+        reports = tuple(self.correlation_reports)
+        paths = tuple(str(item) for item in self.correlation_report_paths)
+        if paths and len(paths) != len(reports):
+            raise ValueError("correlation_report_paths must have the same length as correlation_reports when provided")
+        object.__setattr__(self, "correlation_reports", reports)
+        object.__setattr__(self, "correlation_report_paths", paths)
 
     @property
     def passed(self) -> bool:
@@ -170,8 +183,12 @@ class RoutePolicyScenarioCIReviewArtifact:
     def failed_shards(self) -> tuple[str, ...]:
         return tuple(shard.shard_id for shard in self.shards if not shard.passed)
 
+    @property
+    def correlation_report_count(self) -> int:
+        return len(self.correlation_reports)
+
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "recordType": "route-policy-scenario-ci-review",
             "version": self.version,
             "reviewId": self.review_id,
@@ -196,6 +213,11 @@ class RoutePolicyScenarioCIReviewArtifact:
             "adoption": None if self.adoption is None else self.adoption.to_dict(),
             "metadata": _json_mapping(self.metadata),
         }
+        if self.correlation_reports:
+            payload["correlationReports"] = [report.to_dict() for report in self.correlation_reports]
+            if self.correlation_report_paths:
+                payload["correlationReportPaths"] = list(self.correlation_report_paths)
+        return payload
 
 
 def build_route_policy_scenario_ci_review_artifact(
@@ -206,6 +228,8 @@ def build_route_policy_scenario_ci_review_artifact(
     review_id: str | None = None,
     pages_base_url: str | None = None,
     adoption: RoutePolicyScenarioCIReviewAdoption | None = None,
+    correlation_reports: Sequence[RealVsSimCorrelationReport] = (),
+    correlation_report_paths: Sequence[str | Path] = (),
     metadata: Mapping[str, Any] | None = None,
 ) -> RoutePolicyScenarioCIReviewArtifact:
     """Build a compact review artifact for a scenario CI workflow change.
@@ -215,6 +239,15 @@ def build_route_policy_scenario_ci_review_artifact(
     artifact so static Pages consumers can inspect the promotion-backed
     adoption without checking out the branch. The ``passed`` gate is
     unaffected — adoption presentation is purely additive.
+
+    When ``correlation_reports`` is provided (typically aggregated from the
+    shard runs' :class:`RoutePolicyScenarioSetRunReport.correlation_reports`),
+    each entry is embedded into the review artifact and surfaced in the
+    Markdown / HTML so reviewers can see headless-vs-bag drift alongside
+    the workflow gate. ``correlation_report_paths`` carries the on-disk
+    paths so the rendered tables can hyperlink back to the full JSON.
+    Both default to empty so existing scenario-set fixtures keep their
+    exact review JSON unchanged.
     """
 
     resolved_review_id = review_id or f"{activation_report.workflow_id}-review"
@@ -238,6 +271,8 @@ def build_route_policy_scenario_ci_review_artifact(
         history_failed_checks=merge_report.history.failed_checks,
         shards=tuple(_review_shard_from_run(shard_run) for shard_run in merge_report.shard_runs),
         adoption=adoption,
+        correlation_reports=tuple(correlation_reports),
+        correlation_report_paths=tuple(str(item) for item in correlation_report_paths),
         metadata={
             "pagesBaseUrl": pages_base_url,
             "historyPath": merge_report.history_path,
@@ -247,6 +282,42 @@ def build_route_policy_scenario_ci_review_artifact(
             **_json_mapping(metadata or {}),
         },
     )
+
+
+def collect_correlation_reports_from_shard_runs(
+    merge_report: RoutePolicyScenarioShardMergeReport,
+) -> tuple[tuple[RealVsSimCorrelationReport, ...], tuple[str, ...]]:
+    """Gather correlation reports embedded in each shard's run JSON.
+
+    Every :class:`RoutePolicyScenarioShardRunSummary` whose ``run_path`` is
+    set and loadable is parsed back as a
+    :class:`RoutePolicyScenarioSetRunReport`, and its embedded
+    :class:`RealVsSimCorrelationReport` entries are collected in shard
+    order. Shard summaries without a ``run_path`` (or whose ``run_path``
+    cannot be opened — e.g. unit-test fixtures that point at fictional
+    paths to keep the merge report self-contained) are skipped silently
+    so the review CLI keeps working without correlation reports
+    available, mirroring the upstream pre-#121 behaviour.
+    """
+
+    reports: list[RealVsSimCorrelationReport] = []
+    paths: list[str] = []
+    for shard_run in merge_report.shard_runs:
+        if shard_run.run_path is None:
+            continue
+        try:
+            loaded = load_route_policy_scenario_set_run_json(shard_run.run_path)
+        except (FileNotFoundError, ValueError, json.JSONDecodeError):
+            continue
+        for index, report in enumerate(loaded.correlation_reports):
+            reports.append(report)
+            if index < len(loaded.correlation_report_paths):
+                paths.append(loaded.correlation_report_paths[index])
+    if len(paths) != len(reports):
+        # Fall back to no paths when only some shards published them — the
+        # review artifact accepts an empty paths tuple in that case.
+        return tuple(reports), ()
+    return tuple(reports), tuple(paths)
 
 
 def build_route_policy_scenario_ci_review_adoption(
@@ -395,6 +466,13 @@ def route_policy_scenario_ci_review_from_dict(
         if adoption_payload is None
         else route_policy_scenario_ci_review_adoption_from_dict(_mapping(adoption_payload, "adoption"))
     )
+    correlation_reports = tuple(
+        real_vs_sim_correlation_report_from_dict(_mapping(item, "correlationReport"))
+        for item in _sequence(payload.get("correlationReports", ()), "correlationReports")
+    )
+    correlation_report_paths = tuple(
+        str(item) for item in _sequence(payload.get("correlationReportPaths", ()), "correlationReportPaths")
+    )
     return RoutePolicyScenarioCIReviewArtifact(
         review_id=str(payload["reviewId"]),
         merge_id=str(payload["mergeId"]),
@@ -413,6 +491,8 @@ def route_policy_scenario_ci_review_from_dict(
         ),
         shards=shards,
         adoption=adoption,
+        correlation_reports=correlation_reports,
+        correlation_report_paths=correlation_report_paths,
         metadata=_json_mapping(_mapping(payload.get("metadata", {}), "metadata")),
         version=version,
     )
@@ -449,6 +529,36 @@ def render_route_policy_scenario_ci_review_markdown(artifact: RoutePolicyScenari
     if artifact.history_failed_checks:
         lines.extend(["", "## History Failed Checks", ""])
         lines.extend(f"- {check}" for check in artifact.history_failed_checks)
+    if artifact.correlation_reports:
+        lines.extend(
+            [
+                "",
+                "## Real-vs-sim correlation",
+                "",
+                "| Bag topic | Matched pairs | Translation mean (m) | Translation p95 (m) | Translation max (m) | Heading mean (rad) | Report |",
+                "| --- | ---: | ---: | ---: | ---: | ---: | --- |",
+            ]
+        )
+        for index, correlation in enumerate(artifact.correlation_reports):
+            bag = correlation.bag_source
+            heading = (
+                f"{correlation.heading_error_mean_radians:.4f}"
+                if correlation.heading_error_mean_radians is not None
+                else "n/a"
+            )
+            path_cell = (
+                artifact.correlation_report_paths[index] if index < len(artifact.correlation_report_paths) else "n/a"
+            )
+            lines.append(
+                "| "
+                f"`{bag.source_topic}` | "
+                f"{correlation.matched_pair_count} | "
+                f"{correlation.translation_error_mean_meters:.4f} | "
+                f"{correlation.translation_error_p95_meters:.4f} | "
+                f"{correlation.translation_error_max_meters:.4f} | "
+                f"{heading} | "
+                f"{path_cell} |"
+            )
     if artifact.adoption is not None:
         adoption = artifact.adoption
         lines.extend(
@@ -496,6 +606,7 @@ def render_route_policy_scenario_ci_review_html(artifact: RoutePolicyScenarioCIR
         if artifact.history_failed_checks
         else ""
     )
+    correlation_section = _render_correlation_section_html(artifact)
     adoption_section = _render_adoption_section_html(artifact.adoption)
     return f"""<!doctype html>
 <html lang="en">
@@ -557,6 +668,7 @@ def render_route_policy_scenario_ci_review_html(artifact: RoutePolicyScenarioCIR
       </table>
     </section>
     {failed_section}
+    {correlation_section}
     {adoption_section}
   </main>
 </body>
@@ -576,6 +688,11 @@ def run_review_cli(args: Any) -> None:
         manual_workflow_override=getattr(args, "manual_workflow", None),
         adopted_workflow_override=getattr(args, "adopted_workflow", None),
     )
+    if bool(getattr(args, "no_correlation_reports", False)):
+        correlation_reports: tuple[RealVsSimCorrelationReport, ...] = ()
+        correlation_report_paths: tuple[str, ...] = ()
+    else:
+        correlation_reports, correlation_report_paths = collect_correlation_reports_from_shard_runs(merge_report)
     artifact = build_route_policy_scenario_ci_review_artifact(
         merge_report,
         validation_report,
@@ -583,6 +700,8 @@ def run_review_cli(args: Any) -> None:
         review_id=getattr(args, "review_id", None),
         pages_base_url=getattr(args, "pages_base_url", None),
         adoption=adoption,
+        correlation_reports=correlation_reports,
+        correlation_report_paths=correlation_report_paths,
     )
     bundle_dir = getattr(args, "bundle_dir", None)
     if bundle_dir:
@@ -633,6 +752,45 @@ def _load_review_adoption(
         pull_request_branches=tuple(
             str(item) for item in _sequence(payload.get("pullRequestBranches", ()), "pullRequestBranches")
         ),
+    )
+
+
+def _render_correlation_section_html(artifact: RoutePolicyScenarioCIReviewArtifact) -> str:
+    if not artifact.correlation_reports:
+        return ""
+    rows: list[str] = []
+    for index, correlation in enumerate(artifact.correlation_reports):
+        bag = correlation.bag_source
+        heading = (
+            f"{correlation.heading_error_mean_radians:.4f}"
+            if correlation.heading_error_mean_radians is not None
+            else "n/a"
+        )
+        path_cell = artifact.correlation_report_paths[index] if index < len(artifact.correlation_report_paths) else None
+        rows.append(
+            "<tr>"
+            f"<td><code>{escape(bag.source_topic)}</code></td>"
+            f"<td>{correlation.matched_pair_count}</td>"
+            f"<td>{correlation.translation_error_mean_meters:.4f}</td>"
+            f"<td>{correlation.translation_error_p95_meters:.4f}</td>"
+            f"<td>{correlation.translation_error_max_meters:.4f}</td>"
+            f"<td>{heading}</td>"
+            f"<td>{_optional_link(path_cell)}</td>"
+            "</tr>"
+        )
+    body = "\n".join(rows)
+    return (
+        "<section>"
+        "<h2>Real-vs-sim correlation</h2>"
+        "<table>"
+        "<thead><tr>"
+        "<th>Bag topic</th><th>Matched pairs</th>"
+        "<th>Translation mean (m)</th><th>Translation p95 (m)</th><th>Translation max (m)</th>"
+        "<th>Heading mean (rad)</th><th>Report</th>"
+        "</tr></thead>"
+        f"<tbody>{body}</tbody>"
+        "</table>"
+        "</section>"
     )
 
 
