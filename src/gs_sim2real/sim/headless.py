@@ -427,11 +427,29 @@ class HeadlessPhysicalAIEnvironment(PhysicalAIEnvironment):
         inside = sum(scene.bounds.contains(Vec3.from_sequence(pose.position)) for pose in trajectory)
         inside_rate = inside / len(trajectory)
         path_length = _path_length(trajectory)
-        collision_summary = summarize_collision_queries(
-            tuple(
-                self._query_collision_for_scene(scene, pose, step_index=index) for index, pose in enumerate(trajectory)
+        # Build a stepwise peer-position cache so policy-driven obstacles
+        # consulting their peers see the previous step's resolved layout
+        # — same invariant the env keeps for query_collision on a real
+        # rollout, but rebuilt locally because score_trajectory evaluates
+        # a hypothetical pose sequence outside the env's stepwise state.
+        local_peer_cache: dict[str, tuple[float, float, float]] = {}
+        collision_queries: list[CollisionQuery] = []
+        for index, pose in enumerate(trajectory):
+            if self.dynamic_obstacles is not None:
+                local_peer_cache = self._resolve_dynamic_obstacle_positions(
+                    step_index=index,
+                    agent_position=tuple(pose.position),
+                    previous_positions=local_peer_cache,
+                )
+            collision_queries.append(
+                self._query_collision_for_scene(
+                    scene,
+                    pose,
+                    step_index=index,
+                    peer_positions=local_peer_cache if self.dynamic_obstacles is not None else None,
+                )
             )
-        )
+        collision_summary = summarize_collision_queries(tuple(collision_queries))
         metrics = {
             "inside-bounds-rate": inside_rate,
             "path-length": path_length,
