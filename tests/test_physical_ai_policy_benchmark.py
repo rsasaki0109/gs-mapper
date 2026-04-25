@@ -2405,6 +2405,169 @@ def test_route_policy_scenario_ci_review_surfaces_correlation_reports_from_shard
     assert "/gnss/fix" in html_text
 
 
+def test_route_policy_scenario_ci_review_correlation_gate_fails_review_when_threshold_exceeded(
+    tmp_path: Path,
+) -> None:
+    """Passing --max-correlation-translation-mean-meters flips the review gate when drift exceeds it."""
+    # Reuse the same shard run + correlation setup as the surfacing test.
+    catalog_path = write_unit_scene_catalog(tmp_path / "scenes.json")
+    registry_path = write_route_policy_registry_json(
+        tmp_path / "registry.json",
+        RoutePolicyRegistry(
+            registry_id="unit-correlation-gate-registry",
+            policies=(RoutePolicyRegistryEntry(policy_name="direct", policy_type="direct-goal"),),
+        ),
+    )
+    near_goals = write_route_policy_goal_suite_json(
+        tmp_path / "near-goals.json",
+        RoutePolicyGoalSuite(
+            suite_id="near-goals",
+            scene_id="unit-scene",
+            frame_id="generic_world",
+            goals=(RoutePolicyGoalSpec("near", (0.25, 0.0, 0.0)),),
+        ),
+    )
+    scenario_set = RoutePolicyScenarioSet(
+        scenario_set_id="unit-correlation-gate",
+        policy_registry_path=registry_path.name,
+        episode_count=1,
+        seed_start=0,
+        max_steps=4,
+        scenarios=(
+            RoutePolicyScenarioSpec(
+                scenario_id="near",
+                scene_catalog=catalog_path.name,
+                goal_suite_path=near_goals.name,
+            ),
+        ),
+    )
+    registry = load_route_policy_registry_json(registry_path)
+
+    bag_stream = BagPoseStream(
+        samples=(
+            BagPoseSample(timestamp_seconds=0.0, position=(0.0, 0.0, 0.0)),
+            BagPoseSample(timestamp_seconds=1.0, position=(1.0, 0.0, 0.0)),
+        ),
+        frame_id="enu",
+        source_topic="/gnss/fix",
+        source_msgtype="sensor_msgs/msg/NavSatFix",
+        reference_origin_wgs84=(35.0, 139.0, 10.0),
+    )
+    # Sim trajectory drifts by 0.5 m on average from the bag, so the gate set
+    # at 0.1 m must fail.
+    sim_samples = (
+        SimPoseSample(timestamp_seconds=0.01, position=(0.5, 0.0, 0.0), orientation_xyzw=(0, 0, 0, 1)),
+        SimPoseSample(timestamp_seconds=1.01, position=(1.5, 0.0, 0.0), orientation_xyzw=(0, 0, 0, 1)),
+    )
+    correlation_report = correlate_against_sim_trajectory(bag_stream, sim_samples, max_match_dt_seconds=0.05)
+    correlation_path = write_real_vs_sim_correlation_report_json(tmp_path / "correlation.json", correlation_report)
+
+    run_report = run_route_policy_scenario_set(
+        scenario_set,
+        registry,
+        report_dir=tmp_path / "reports",
+        scenario_set_base_path=tmp_path,
+        registry_base_path=tmp_path,
+        policy_registry_path=registry_path,
+        history_output=tmp_path / "history.json",
+        correlation_report_paths=[correlation_path.name],
+    )
+    run_path = write_route_policy_scenario_set_run_json(tmp_path / "scenario-run.json", run_report)
+
+    history = RoutePolicyBenchmarkHistoryReport(
+        history_id="unit-correlation-gate-history",
+        reports=(
+            RoutePolicyBenchmarkSnapshot(
+                benchmark_id="unit-correlation-gate",
+                passed=True,
+                best_policy_name="direct",
+                policies=(
+                    RoutePolicyBenchmarkPolicySnapshot(
+                        policy_name="direct",
+                        passed=True,
+                        metrics={"successRate": 1.0, "collisionRate": 0.0},
+                    ),
+                ),
+                source_path=str(run_report.scenario_results[0].report_path),
+            ),
+        ),
+    )
+    merge_report = RoutePolicyScenarioShardMergeReport(
+        merge_id="unit-correlation-gate-merge",
+        shard_runs=(
+            RoutePolicyScenarioShardRunSummary(
+                shard_id="unit-correlation-gate-shard",
+                scenario_set_id="unit-correlation-gate",
+                passed=True,
+                scenario_count=1,
+                report_paths=(str(run_report.scenario_results[0].report_path),),
+                run_path=str(run_path),
+                history_path=None,
+            ),
+        ),
+        history=history,
+    )
+    merge_path = write_route_policy_scenario_shard_merge_json(tmp_path / "shard-merge.json", merge_report)
+
+    manifest = build_unit_ci_workflow_manifest("unit-correlation-gate-manifest")
+    materialization = materialize_route_policy_scenario_ci_workflow(
+        manifest,
+        config=RoutePolicyScenarioCIWorkflowConfig(workflow_id="unit-correlation-gate-workflow", artifact_root="ci"),
+    )
+    source_path = write_route_policy_scenario_ci_workflow_yaml(tmp_path / "workflow.generated.yml", materialization)
+    validation = validate_route_policy_scenario_ci_workflow(
+        manifest,
+        materialization,
+        validation_id="unit-correlation-gate-validation",
+        workflow_path=source_path,
+    )
+    activation = activate_route_policy_scenario_ci_workflow(
+        materialization,
+        validation,
+        source_workflow_path=source_path,
+        active_workflow_path=tmp_path / ".github" / "workflows" / "unit-correlation-gate.yml",
+        activation_id="unit-correlation-gate-activation",
+    )
+    validation_path = write_route_policy_scenario_ci_workflow_validation_json(
+        tmp_path / "workflow-validation.json", validation
+    )
+    activation_path = write_route_policy_scenario_ci_workflow_activation_json(
+        tmp_path / "workflow-activation.json", activation
+    )
+
+    bundle_dir = tmp_path / "pages" / "unit-correlation-gate"
+    args = build_parser().parse_args(
+        [
+            "route-policy-scenario-ci-review",
+            "--shard-merge",
+            str(merge_path),
+            "--validation-report",
+            str(validation_path),
+            "--activation-report",
+            str(activation_path),
+            "--review-id",
+            "unit-correlation-gate",
+            "--bundle-dir",
+            str(bundle_dir),
+            "--max-correlation-translation-mean-meters",
+            "0.1",
+        ]
+    )
+    with pytest.raises(SystemExit) as excinfo:
+        cli.cmd_route_policy_scenario_ci_review(type("Args", (), {**vars(args), "fail_on_review": True})())
+    assert excinfo.value.code == 2
+
+    review = load_route_policy_scenario_ci_review_json(bundle_dir / "review.json")
+    assert review.correlation_passed is False
+    assert review.passed is False  # gate fail propagates to overall pass
+    failed_checks = {check for _, _, checks in review.correlation_failed_reports for check in checks}
+    assert "translation-mean" in failed_checks
+
+    markdown_text = (bundle_dir / "review.md").read_text(encoding="utf-8")
+    assert "Correlation gate failures" in markdown_text
+    assert "translation-mean" in markdown_text
+
+
 def test_route_policy_scenario_ci_review_omits_correlation_when_flag_set(tmp_path: Path) -> None:
     """--no-correlation-reports must drop the correlation block even if shard runs carry them."""
     # Reuse the unit shard merge fixture (its run_path points at a fictional file

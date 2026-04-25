@@ -229,6 +229,101 @@ class RealVsSimCorrelationReport:
         return payload
 
 
+@dataclass(frozen=True, slots=True)
+class RealVsSimCorrelationThresholds:
+    """Optional regression thresholds for a real-vs-sim correlation gate.
+
+    Each threshold is a hard upper bound on the corresponding statistic
+    of one :class:`RealVsSimCorrelationReport`. ``None`` (the default)
+    means \"do not check this stat\". When a report exceeds any
+    populated threshold, :func:`evaluate_real_vs_sim_correlation_thresholds`
+    returns ``passed=False`` along with a list of failure tags
+    (``translation-mean`` / ``translation-p95`` / ``translation-max`` /
+    ``heading-mean``) so callers can route the failure into a CI gate
+    or a review bundle annotation.
+    """
+
+    max_translation_error_mean_meters: float | None = None
+    max_translation_error_p95_meters: float | None = None
+    max_translation_error_max_meters: float | None = None
+    max_heading_error_mean_radians: float | None = None
+
+    @property
+    def is_empty(self) -> bool:
+        return (
+            self.max_translation_error_mean_meters is None
+            and self.max_translation_error_p95_meters is None
+            and self.max_translation_error_max_meters is None
+            and self.max_heading_error_mean_radians is None
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        if self.max_translation_error_mean_meters is not None:
+            payload["maxTranslationErrorMeanMeters"] = float(self.max_translation_error_mean_meters)
+        if self.max_translation_error_p95_meters is not None:
+            payload["maxTranslationErrorP95Meters"] = float(self.max_translation_error_p95_meters)
+        if self.max_translation_error_max_meters is not None:
+            payload["maxTranslationErrorMaxMeters"] = float(self.max_translation_error_max_meters)
+        if self.max_heading_error_mean_radians is not None:
+            payload["maxHeadingErrorMeanRadians"] = float(self.max_heading_error_mean_radians)
+        return payload
+
+
+def real_vs_sim_correlation_thresholds_from_dict(payload: Mapping[str, Any]) -> RealVsSimCorrelationThresholds:
+    """Rebuild :class:`RealVsSimCorrelationThresholds` from its JSON payload."""
+
+    def _optional(key: str) -> float | None:
+        value = payload.get(key)
+        return None if value is None else float(value)
+
+    return RealVsSimCorrelationThresholds(
+        max_translation_error_mean_meters=_optional("maxTranslationErrorMeanMeters"),
+        max_translation_error_p95_meters=_optional("maxTranslationErrorP95Meters"),
+        max_translation_error_max_meters=_optional("maxTranslationErrorMaxMeters"),
+        max_heading_error_mean_radians=_optional("maxHeadingErrorMeanRadians"),
+    )
+
+
+def evaluate_real_vs_sim_correlation_thresholds(
+    report: RealVsSimCorrelationReport,
+    thresholds: RealVsSimCorrelationThresholds,
+) -> tuple[bool, tuple[str, ...]]:
+    """Return ``(passed, failed_checks)`` for ``report`` against ``thresholds``.
+
+    Empty thresholds always pass with no failed checks. Otherwise each
+    populated bound is compared against the corresponding statistic; the
+    failure tag (``translation-mean`` / ``translation-p95`` /
+    ``translation-max`` / ``heading-mean``) is added to ``failed_checks``
+    when the report exceeds the bound. Reports without heading data
+    skip the ``heading-mean`` check (no failure recorded).
+    """
+
+    failed: list[str] = []
+    if (
+        thresholds.max_translation_error_mean_meters is not None
+        and float(report.translation_error_mean_meters) > thresholds.max_translation_error_mean_meters
+    ):
+        failed.append("translation-mean")
+    if (
+        thresholds.max_translation_error_p95_meters is not None
+        and float(report.translation_error_p95_meters) > thresholds.max_translation_error_p95_meters
+    ):
+        failed.append("translation-p95")
+    if (
+        thresholds.max_translation_error_max_meters is not None
+        and float(report.translation_error_max_meters) > thresholds.max_translation_error_max_meters
+    ):
+        failed.append("translation-max")
+    if (
+        thresholds.max_heading_error_mean_radians is not None
+        and report.heading_error_mean_radians is not None
+        and float(report.heading_error_mean_radians) > thresholds.max_heading_error_mean_radians
+    ):
+        failed.append("heading-mean")
+    return (not failed, tuple(failed))
+
+
 _NAVSAT_MSGTYPES: frozenset[str] = frozenset({"sensor_msgs/msg/NavSatFix", "sensor_msgs/NavSatFix"})
 _IMU_MSGTYPES: frozenset[str] = frozenset({"sensor_msgs/msg/Imu", "sensor_msgs/Imu"})
 _WGS84_A = 6378137.0

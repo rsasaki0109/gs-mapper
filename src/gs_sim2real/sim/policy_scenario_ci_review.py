@@ -26,7 +26,10 @@ from .policy_scenario_sharding import (
 from .policy_scenario_set import load_route_policy_scenario_set_run_json
 from ..robotics.rosbag_correlation import (
     RealVsSimCorrelationReport,
+    RealVsSimCorrelationThresholds,
+    evaluate_real_vs_sim_correlation_thresholds,
     real_vs_sim_correlation_report_from_dict,
+    real_vs_sim_correlation_thresholds_from_dict,
 )
 
 
@@ -133,6 +136,8 @@ class RoutePolicyScenarioCIReviewArtifact:
     adoption: RoutePolicyScenarioCIReviewAdoption | None = None
     correlation_reports: tuple[RealVsSimCorrelationReport, ...] = ()
     correlation_report_paths: tuple[str, ...] = ()
+    correlation_thresholds: RealVsSimCorrelationThresholds | None = None
+    correlation_failed_reports: tuple[tuple[int, str, tuple[str, ...]], ...] = ()
     metadata: Mapping[str, Any] = field(default_factory=dict)
     version: str = ROUTE_POLICY_SCENARIO_CI_REVIEW_VERSION
 
@@ -162,10 +167,25 @@ class RoutePolicyScenarioCIReviewArtifact:
             raise ValueError("correlation_report_paths must have the same length as correlation_reports when provided")
         object.__setattr__(self, "correlation_reports", reports)
         object.__setattr__(self, "correlation_report_paths", paths)
+        normalised_failures: tuple[tuple[int, str, tuple[str, ...]], ...] = tuple(
+            (int(index), str(topic), tuple(str(check) for check in checks))
+            for index, topic, checks in self.correlation_failed_reports
+        )
+        object.__setattr__(self, "correlation_failed_reports", normalised_failures)
+
+    @property
+    def correlation_passed(self) -> bool:
+        return not self.correlation_failed_reports
 
     @property
     def passed(self) -> bool:
-        return self.validation_passed and self.activation_activated and self.shard_merge_passed and self.history_passed
+        return (
+            self.validation_passed
+            and self.activation_activated
+            and self.shard_merge_passed
+            and self.history_passed
+            and self.correlation_passed
+        )
 
     @property
     def shard_count(self) -> int:
@@ -217,6 +237,18 @@ class RoutePolicyScenarioCIReviewArtifact:
             payload["correlationReports"] = [report.to_dict() for report in self.correlation_reports]
             if self.correlation_report_paths:
                 payload["correlationReportPaths"] = list(self.correlation_report_paths)
+        if self.correlation_thresholds is not None and not self.correlation_thresholds.is_empty:
+            payload["correlationThresholds"] = self.correlation_thresholds.to_dict()
+            payload["correlationPassed"] = self.correlation_passed
+            if self.correlation_failed_reports:
+                payload["correlationFailedReports"] = [
+                    {
+                        "index": int(index),
+                        "bagSourceTopic": str(topic),
+                        "failedChecks": list(checks),
+                    }
+                    for index, topic, checks in self.correlation_failed_reports
+                ]
         return payload
 
 
@@ -230,6 +262,7 @@ def build_route_policy_scenario_ci_review_artifact(
     adoption: RoutePolicyScenarioCIReviewAdoption | None = None,
     correlation_reports: Sequence[RealVsSimCorrelationReport] = (),
     correlation_report_paths: Sequence[str | Path] = (),
+    correlation_thresholds: RealVsSimCorrelationThresholds | None = None,
     metadata: Mapping[str, Any] | None = None,
 ) -> RoutePolicyScenarioCIReviewArtifact:
     """Build a compact review artifact for a scenario CI workflow change.
@@ -255,6 +288,14 @@ def build_route_policy_scenario_ci_review_artifact(
         raise ValueError("validation and activation reports must reference the same workflow")
     if validation_report.manifest_id != activation_report.manifest_id:
         raise ValueError("validation and activation reports must reference the same manifest")
+    correlation_failed_reports: tuple[tuple[int, str, tuple[str, ...]], ...] = ()
+    if correlation_thresholds is not None and not correlation_thresholds.is_empty:
+        failed: list[tuple[int, str, tuple[str, ...]]] = []
+        for index, report in enumerate(correlation_reports):
+            _, failed_checks = evaluate_real_vs_sim_correlation_thresholds(report, correlation_thresholds)
+            if failed_checks:
+                failed.append((index, report.bag_source.source_topic, failed_checks))
+        correlation_failed_reports = tuple(failed)
     return RoutePolicyScenarioCIReviewArtifact(
         review_id=resolved_review_id,
         merge_id=merge_report.merge_id,
@@ -273,6 +314,8 @@ def build_route_policy_scenario_ci_review_artifact(
         adoption=adoption,
         correlation_reports=tuple(correlation_reports),
         correlation_report_paths=tuple(str(item) for item in correlation_report_paths),
+        correlation_thresholds=correlation_thresholds,
+        correlation_failed_reports=correlation_failed_reports,
         metadata={
             "pagesBaseUrl": pages_base_url,
             "historyPath": merge_report.history_path,
@@ -473,6 +516,21 @@ def route_policy_scenario_ci_review_from_dict(
     correlation_report_paths = tuple(
         str(item) for item in _sequence(payload.get("correlationReportPaths", ()), "correlationReportPaths")
     )
+    thresholds_payload = payload.get("correlationThresholds")
+    correlation_thresholds = (
+        real_vs_sim_correlation_thresholds_from_dict(_mapping(thresholds_payload, "correlationThresholds"))
+        if isinstance(thresholds_payload, Mapping)
+        else None
+    )
+    correlation_failed_reports = tuple(
+        (
+            int(item.get("index", 0)),
+            str(item.get("bagSourceTopic", "")),
+            tuple(str(check) for check in _sequence(item.get("failedChecks", ()), "failedChecks")),
+        )
+        for item in _sequence(payload.get("correlationFailedReports", ()), "correlationFailedReports")
+        if isinstance(item, Mapping)
+    )
     return RoutePolicyScenarioCIReviewArtifact(
         review_id=str(payload["reviewId"]),
         merge_id=str(payload["mergeId"]),
@@ -493,6 +551,8 @@ def route_policy_scenario_ci_review_from_dict(
         adoption=adoption,
         correlation_reports=correlation_reports,
         correlation_report_paths=correlation_report_paths,
+        correlation_thresholds=correlation_thresholds,
+        correlation_failed_reports=correlation_failed_reports,
         metadata=_json_mapping(_mapping(payload.get("metadata", {}), "metadata")),
         version=version,
     )
@@ -530,10 +590,14 @@ def render_route_policy_scenario_ci_review_markdown(artifact: RoutePolicyScenari
         lines.extend(["", "## History Failed Checks", ""])
         lines.extend(f"- {check}" for check in artifact.history_failed_checks)
     if artifact.correlation_reports:
+        lines.append("")
+        lines.append("## Real-vs-sim correlation")
+        if artifact.correlation_thresholds is not None and not artifact.correlation_thresholds.is_empty:
+            lines.append(
+                f"- Gate: {'PASS' if artifact.correlation_passed else 'FAIL'}  ({_describe_correlation_thresholds(artifact.correlation_thresholds)})"
+            )
         lines.extend(
             [
-                "",
-                "## Real-vs-sim correlation",
                 "",
                 "| Bag topic | Matched pairs | Translation mean (m) | Translation p95 (m) | Translation max (m) | Heading mean (rad) | Report |",
                 "| --- | ---: | ---: | ---: | ---: | ---: | --- |",
@@ -559,6 +623,10 @@ def render_route_policy_scenario_ci_review_markdown(artifact: RoutePolicyScenari
                 f"{heading} | "
                 f"{path_cell} |"
             )
+        if artifact.correlation_failed_reports:
+            lines.extend(["", "### Correlation gate failures", ""])
+            for index, topic, checks in artifact.correlation_failed_reports:
+                lines.append(f"- `{topic}` (report #{index}): {', '.join(checks)}")
     if artifact.adoption is not None:
         adoption = artifact.adoption
         lines.extend(
@@ -693,6 +761,14 @@ def run_review_cli(args: Any) -> None:
         correlation_report_paths: tuple[str, ...] = ()
     else:
         correlation_reports, correlation_report_paths = collect_correlation_reports_from_shard_runs(merge_report)
+    correlation_thresholds = RealVsSimCorrelationThresholds(
+        max_translation_error_mean_meters=getattr(args, "max_correlation_translation_mean_meters", None),
+        max_translation_error_p95_meters=getattr(args, "max_correlation_translation_p95_meters", None),
+        max_translation_error_max_meters=getattr(args, "max_correlation_translation_max_meters", None),
+        max_heading_error_mean_radians=getattr(args, "max_correlation_heading_mean_radians", None),
+    )
+    if correlation_thresholds.is_empty:
+        correlation_thresholds = None
     artifact = build_route_policy_scenario_ci_review_artifact(
         merge_report,
         validation_report,
@@ -702,6 +778,7 @@ def run_review_cli(args: Any) -> None:
         adoption=adoption,
         correlation_reports=correlation_reports,
         correlation_report_paths=correlation_report_paths,
+        correlation_thresholds=correlation_thresholds,
     )
     bundle_dir = getattr(args, "bundle_dir", None)
     if bundle_dir:
@@ -755,6 +832,21 @@ def _load_review_adoption(
     )
 
 
+def _describe_correlation_thresholds(thresholds: RealVsSimCorrelationThresholds) -> str:
+    """Return a compact human-readable description of the populated thresholds."""
+
+    parts: list[str] = []
+    if thresholds.max_translation_error_mean_meters is not None:
+        parts.append(f"translation mean ≤ {thresholds.max_translation_error_mean_meters:g} m")
+    if thresholds.max_translation_error_p95_meters is not None:
+        parts.append(f"translation p95 ≤ {thresholds.max_translation_error_p95_meters:g} m")
+    if thresholds.max_translation_error_max_meters is not None:
+        parts.append(f"translation max ≤ {thresholds.max_translation_error_max_meters:g} m")
+    if thresholds.max_heading_error_mean_radians is not None:
+        parts.append(f"heading mean ≤ {thresholds.max_heading_error_mean_radians:g} rad")
+    return ", ".join(parts) if parts else "no thresholds configured"
+
+
 def _render_correlation_section_html(artifact: RoutePolicyScenarioCIReviewArtifact) -> str:
     if not artifact.correlation_reports:
         return ""
@@ -779,9 +871,25 @@ def _render_correlation_section_html(artifact: RoutePolicyScenarioCIReviewArtifa
             "</tr>"
         )
     body = "\n".join(rows)
+    gate_html = ""
+    if artifact.correlation_thresholds is not None and not artifact.correlation_thresholds.is_empty:
+        gate_pill = "pass" if artifact.correlation_passed else "fail"
+        gate_label = "PASS" if artifact.correlation_passed else "FAIL"
+        gate_html = (
+            f'<p>Gate <span class="pill {gate_pill}">{gate_label}</span> '
+            f"({escape(_describe_correlation_thresholds(artifact.correlation_thresholds))})</p>"
+        )
+    failures_html = ""
+    if artifact.correlation_failed_reports:
+        failure_items = "".join(
+            f"<li><code>{escape(topic)}</code> (report #{index}): {escape(', '.join(checks))}</li>"
+            for index, topic, checks in artifact.correlation_failed_reports
+        )
+        failures_html = f"<h3>Correlation gate failures</h3><ul>{failure_items}</ul>"
     return (
         "<section>"
         "<h2>Real-vs-sim correlation</h2>"
+        f"{gate_html}"
         "<table>"
         "<thead><tr>"
         "<th>Bag topic</th><th>Matched pairs</th>"
@@ -790,6 +898,7 @@ def _render_correlation_section_html(artifact: RoutePolicyScenarioCIReviewArtifa
         "</tr></thead>"
         f"<tbody>{body}</tbody>"
         "</table>"
+        f"{failures_html}"
         "</section>"
     )
 

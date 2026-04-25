@@ -1494,6 +1494,42 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     rpsrev.add_argument(
+        "--max-correlation-translation-mean-meters",
+        type=float,
+        default=None,
+        help=(
+            "Optional regression gate: fail the review when any embedded correlation report's "
+            "translation_error_mean_meters exceeds this bound"
+        ),
+    )
+    rpsrev.add_argument(
+        "--max-correlation-translation-p95-meters",
+        type=float,
+        default=None,
+        help=(
+            "Optional regression gate: fail the review when any embedded correlation report's "
+            "translation_error_p95_meters exceeds this bound"
+        ),
+    )
+    rpsrev.add_argument(
+        "--max-correlation-translation-max-meters",
+        type=float,
+        default=None,
+        help=(
+            "Optional regression gate: fail the review when any embedded correlation report's "
+            "translation_error_max_meters exceeds this bound"
+        ),
+    )
+    rpsrev.add_argument(
+        "--max-correlation-heading-mean-radians",
+        type=float,
+        default=None,
+        help=(
+            "Optional regression gate: fail the review when any embedded correlation report's "
+            "heading_error_mean_radians (when present) exceeds this bound"
+        ),
+    )
+    rpsrev.add_argument(
         "--adoption-report",
         default=None,
         help="Optional scenario CI workflow adoption report JSON to embed in the review",

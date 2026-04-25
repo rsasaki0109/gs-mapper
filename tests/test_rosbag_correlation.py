@@ -16,12 +16,15 @@ from gs_sim2real.robotics import (
     BagPoseStreamMetadata,
     CorrelatedPosePair,
     REAL_VS_SIM_CORRELATION_REPORT_VERSION,
+    RealVsSimCorrelationThresholds,
     SimPoseSample,
     correlate_against_sim_trajectory,
+    evaluate_real_vs_sim_correlation_thresholds,
     load_real_vs_sim_correlation_report_json,
     load_sim_pose_samples_jsonl,
     merge_navsat_with_imu_orientation,
     real_vs_sim_correlation_report_from_dict,
+    real_vs_sim_correlation_thresholds_from_dict,
     render_real_vs_sim_correlation_markdown,
     wgs84_to_ecef,
     wgs84_to_local_enu,
@@ -508,3 +511,88 @@ def test_real_vs_sim_correlation_report_from_dict_rejects_bad_record_type() -> N
     payload["recordType"] = "not-a-correlation-report"
     with pytest.raises(ValueError, match="recordType"):
         real_vs_sim_correlation_report_from_dict(payload)
+
+
+def _correlation_report_with(
+    *,
+    translation_mean: float,
+    translation_p95: float,
+    translation_max: float,
+    heading_mean: float | None = None,
+):
+    """Build a synthetic two-pair report with the requested error statistics."""
+    bag_samples = [
+        BagPoseSample(timestamp_seconds=0.0, position=(0.0, 0.0, 0.0)),
+        BagPoseSample(timestamp_seconds=1.0, position=(translation_mean * 2.0, 0.0, 0.0)),
+    ]
+    sim_samples = [
+        SimPoseSample(timestamp_seconds=0.0, position=(0.0, 0.0, 0.0), orientation_xyzw=(0, 0, 0, 1)),
+        SimPoseSample(timestamp_seconds=1.0, position=(0.0, 0.0, 0.0), orientation_xyzw=(0, 0, 0, 1)),
+    ]
+    report = correlate_against_sim_trajectory(_make_bag_stream(bag_samples), sim_samples)
+    # Inject the requested statistics deterministically (the synthetic pairs above
+    # already produce a known mean/max but the test wants exact control).
+    return type(report)(
+        bag_source=report.bag_source,
+        sim_sample_count=report.sim_sample_count,
+        matched_pair_count=report.matched_pair_count,
+        matched_seconds=report.matched_seconds,
+        translation_error_min_meters=0.0,
+        translation_error_mean_meters=translation_mean,
+        translation_error_max_meters=translation_max,
+        translation_error_p50_meters=translation_mean,
+        translation_error_p95_meters=translation_p95,
+        heading_error_mean_radians=heading_mean,
+        heading_error_max_radians=None if heading_mean is None else heading_mean,
+        pairs=report.pairs,
+    )
+
+
+def test_evaluate_real_vs_sim_correlation_thresholds_passes_when_empty() -> None:
+    """Empty thresholds always pass with no failed checks."""
+    report = _correlation_report_with(translation_mean=10.0, translation_p95=20.0, translation_max=30.0)
+    passed, failed = evaluate_real_vs_sim_correlation_thresholds(report, RealVsSimCorrelationThresholds())
+    assert passed is True
+    assert failed == ()
+
+
+def test_evaluate_real_vs_sim_correlation_thresholds_flags_each_exceeded_stat() -> None:
+    """Each populated threshold contributes its own failure tag when exceeded."""
+    report = _correlation_report_with(
+        translation_mean=0.5,
+        translation_p95=2.0,
+        translation_max=5.0,
+        heading_mean=0.6,
+    )
+    thresholds = RealVsSimCorrelationThresholds(
+        max_translation_error_mean_meters=0.4,
+        max_translation_error_p95_meters=1.0,
+        max_translation_error_max_meters=4.0,
+        max_heading_error_mean_radians=0.3,
+    )
+    passed, failed = evaluate_real_vs_sim_correlation_thresholds(report, thresholds)
+    assert passed is False
+    assert set(failed) == {"translation-mean", "translation-p95", "translation-max", "heading-mean"}
+
+
+def test_evaluate_real_vs_sim_correlation_thresholds_skips_heading_when_absent() -> None:
+    """A report without heading data must not synthesise a heading-mean failure."""
+    report = _correlation_report_with(
+        translation_mean=0.05, translation_p95=0.05, translation_max=0.05, heading_mean=None
+    )
+    thresholds = RealVsSimCorrelationThresholds(max_heading_error_mean_radians=0.001)
+    passed, failed = evaluate_real_vs_sim_correlation_thresholds(report, thresholds)
+    assert passed is True
+    assert failed == ()
+
+
+def test_real_vs_sim_correlation_thresholds_round_trip_through_json() -> None:
+    """to_dict / from_dict must preserve the populated bounds and skip the empty ones."""
+    thresholds = RealVsSimCorrelationThresholds(
+        max_translation_error_mean_meters=1.5,
+        max_translation_error_p95_meters=3.0,
+    )
+    rebuilt = real_vs_sim_correlation_thresholds_from_dict(thresholds.to_dict())
+    assert rebuilt == thresholds
+    assert "maxTranslationErrorMaxMeters" not in thresholds.to_dict()
+    assert real_vs_sim_correlation_thresholds_from_dict({}) == RealVsSimCorrelationThresholds()
