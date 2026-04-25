@@ -1485,6 +1485,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Exit with status 2 when the scenario CI review does not pass",
     )
     rpsrev.add_argument(
+        "--no-correlation-reports",
+        action="store_true",
+        help=(
+            "Skip embedding real-vs-sim correlation reports gathered from each shard's run JSON "
+            "(default: any correlation reports attached via gs-mapper route-policy-scenario-set "
+            "--correlation-report flow into the review artifact)"
+        ),
+    )
+    rpsrev.add_argument(
         "--adoption-report",
         default=None,
         help="Optional scenario CI workflow adoption report JSON to embed in the review",
