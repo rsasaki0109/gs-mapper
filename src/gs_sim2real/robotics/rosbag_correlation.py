@@ -50,7 +50,7 @@ from typing import Any
 
 REAL_VS_SIM_CORRELATION_REPORT_VERSION = "gs-mapper-real-vs-sim-correlation-report/v1"
 
-_PAIR_DISTRIBUTION_STRATA_MODES: frozenset[str] = frozenset({"equal-duration", "equal-pair-count"})
+_PAIR_DISTRIBUTION_STRATA_MODES: frozenset[str] = frozenset({"equal-duration", "equal-pair-count", "event-aligned"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -264,18 +264,48 @@ class RealVsSimCorrelationThresholds:
     max_exceeding_heading_pair_fraction: float | None = None
     pair_distribution_strata: int | None = None
     pair_distribution_strata_mode: str = "equal-duration"
+    pair_distribution_strata_event_timestamps_seconds: tuple[float, ...] | None = None
 
     def __post_init__(self) -> None:
-        if self.pair_distribution_strata is not None:
-            if int(self.pair_distribution_strata) < 1:
-                raise ValueError("pair_distribution_strata must be >= 1 when set")
-            object.__setattr__(self, "pair_distribution_strata", int(self.pair_distribution_strata))
         mode = str(self.pair_distribution_strata_mode)
         if mode not in _PAIR_DISTRIBUTION_STRATA_MODES:
             raise ValueError(
                 f"pair_distribution_strata_mode must be one of {sorted(_PAIR_DISTRIBUTION_STRATA_MODES)}; got {mode!r}"
             )
         object.__setattr__(self, "pair_distribution_strata_mode", mode)
+
+        events = self.pair_distribution_strata_event_timestamps_seconds
+        if events is not None:
+            event_tuple = tuple(float(t) for t in events)
+            if any(b < a for a, b in zip(event_tuple, event_tuple[1:])):
+                raise ValueError("pair_distribution_strata_event_timestamps_seconds must be sorted ascending")
+            if mode != "event-aligned":
+                raise ValueError(
+                    "pair_distribution_strata_event_timestamps_seconds is only valid with "
+                    "pair_distribution_strata_mode='event-aligned'"
+                )
+            if not event_tuple:
+                raise ValueError("pair_distribution_strata_mode='event-aligned' requires at least one event timestamp")
+            object.__setattr__(self, "pair_distribution_strata_event_timestamps_seconds", event_tuple)
+            derived_strata = len(event_tuple) + 1
+            if self.pair_distribution_strata is None:
+                object.__setattr__(self, "pair_distribution_strata", derived_strata)
+            elif int(self.pair_distribution_strata) != derived_strata:
+                raise ValueError(
+                    "pair_distribution_strata must equal "
+                    f"len(event_timestamps_seconds)+1={derived_strata} when "
+                    f"pair_distribution_strata_mode='event-aligned'; got {int(self.pair_distribution_strata)}"
+                )
+        elif mode == "event-aligned":
+            raise ValueError(
+                "pair_distribution_strata_mode='event-aligned' requires "
+                "pair_distribution_strata_event_timestamps_seconds to be set"
+            )
+
+        if self.pair_distribution_strata is not None:
+            if int(self.pair_distribution_strata) < 1:
+                raise ValueError("pair_distribution_strata must be >= 1 when set")
+            object.__setattr__(self, "pair_distribution_strata", int(self.pair_distribution_strata))
 
     @property
     def is_empty(self) -> bool:
@@ -312,6 +342,10 @@ class RealVsSimCorrelationThresholds:
             payload["pairDistributionStrata"] = int(self.pair_distribution_strata)
             if self.pair_distribution_strata_mode != "equal-duration":
                 payload["pairDistributionStrataMode"] = self.pair_distribution_strata_mode
+        if self.pair_distribution_strata_event_timestamps_seconds is not None:
+            payload["pairDistributionStrataEventTimestampsSeconds"] = [
+                float(t) for t in self.pair_distribution_strata_event_timestamps_seconds
+            ]
         return payload
 
 
@@ -324,6 +358,7 @@ def real_vs_sim_correlation_thresholds_from_dict(payload: Mapping[str, Any]) -> 
 
     strata_value = payload.get("pairDistributionStrata")
     mode_value = payload.get("pairDistributionStrataMode")
+    events_value = payload.get("pairDistributionStrataEventTimestampsSeconds")
     return RealVsSimCorrelationThresholds(
         max_translation_error_mean_meters=_optional("maxTranslationErrorMeanMeters"),
         max_translation_error_p95_meters=_optional("maxTranslationErrorP95Meters"),
@@ -335,6 +370,9 @@ def real_vs_sim_correlation_thresholds_from_dict(payload: Mapping[str, Any]) -> 
         max_exceeding_heading_pair_fraction=_optional("maxExceedingHeadingPairFraction"),
         pair_distribution_strata=None if strata_value is None else int(strata_value),
         pair_distribution_strata_mode="equal-duration" if mode_value is None else str(mode_value),
+        pair_distribution_strata_event_timestamps_seconds=(
+            None if events_value is None else tuple(float(t) for t in events_value)
+        ),
     )
 
 
@@ -400,13 +438,16 @@ def evaluate_real_vs_sim_correlation_thresholds(
     failed: list[str] = []
     strata = thresholds.pair_distribution_strata
     strata_mode = thresholds.pair_distribution_strata_mode
+    strata_events = thresholds.pair_distribution_strata_event_timestamps_seconds
     aggregate_stratified = strata is not None and strata > 1 and bool(report.pairs)
     if aggregate_stratified:
         # Stratified mode replaces the report-level aggregate checks with
         # per-window aggregates computed from report.pairs (the strided
         # sample). Empty windows skip silently. Aggregates from heading
         # use the heading-bearing subset of the window.
-        for window_index, window_pairs in enumerate(_split_pairs(report.pairs, int(strata), strata_mode)):
+        for window_index, window_pairs in enumerate(
+            _split_pairs(report.pairs, int(strata), strata_mode, strata_events)
+        ):
             if not window_pairs:
                 continue
             translation_errors = [float(pair.translation_error_meters) for pair in window_pairs]
@@ -470,7 +511,7 @@ def evaluate_real_vs_sim_correlation_thresholds(
             if exceeding / len(report.pairs) > limit:
                 failed.append("translation-pair-distribution")
         else:
-            for window_index, window_pairs in enumerate(_split_pairs(report.pairs, strata, strata_mode)):
+            for window_index, window_pairs in enumerate(_split_pairs(report.pairs, strata, strata_mode, strata_events)):
                 if not window_pairs:
                     continue
                 exceeding = sum(1 for pair in window_pairs if float(pair.translation_error_meters) > bound)
@@ -490,7 +531,7 @@ def evaluate_real_vs_sim_correlation_thresholds(
                 if exceeding / len(with_heading) > limit:
                     failed.append("heading-pair-distribution")
         else:
-            for window_index, window_pairs in enumerate(_split_pairs(report.pairs, strata, strata_mode)):
+            for window_index, window_pairs in enumerate(_split_pairs(report.pairs, strata, strata_mode, strata_events)):
                 with_heading = [pair for pair in window_pairs if pair.heading_error_radians is not None]
                 if not with_heading:
                     continue
@@ -561,18 +602,21 @@ def compute_per_window_correlation_stats(
     *,
     strata: int,
     mode: str = "equal-duration",
+    event_timestamps_seconds: Sequence[float] | None = None,
 ) -> tuple[RealVsSimCorrelationWindowStats, ...]:
     """Return per-window aggregate stats for ``report.pairs``.
 
     Empty windows (no pairs landed) are dropped from the returned tuple.
     Heading mean is ``None`` when no pair in the window carries heading
     data. The bag-time span fields describe the actual min/max
-    ``bag_timestamp_seconds`` of the pairs in each window.
+    ``bag_timestamp_seconds`` of the pairs in each window. When ``mode``
+    is ``"event-aligned"`` the caller must supply ``event_timestamps_seconds``;
+    ``strata`` is then expected to equal ``len(event_timestamps_seconds) + 1``.
     """
 
     if strata <= 1 or not report.pairs:
         return ()
-    windows = _split_pairs(report.pairs, strata, mode)
+    windows = _split_pairs(report.pairs, strata, mode, event_timestamps_seconds)
     stats: list[RealVsSimCorrelationWindowStats] = []
     for window_index, window_pairs in enumerate(windows):
         if not window_pairs:
@@ -655,13 +699,48 @@ def _split_pairs_by_count(
     return windows
 
 
+def _split_pairs_by_event(
+    pairs: Sequence[CorrelatedPosePair],
+    event_timestamps_seconds: Sequence[float],
+) -> list[list[CorrelatedPosePair]]:
+    """Partition ``pairs`` into windows separated by external event boundaries.
+
+    With ``K`` event timestamps (sorted ascending), returns ``K+1`` windows:
+
+    - window ``0`` holds pairs with ``bag_timestamp_seconds < event[0]``
+    - window ``i`` (``1 <= i <= K-1``) holds pairs with
+      ``event[i-1] <= bag_timestamp_seconds < event[i]``
+    - window ``K`` holds pairs with ``bag_timestamp_seconds >= event[K-1]``
+
+    Useful when window boundaries should align with scenario phase
+    transitions or bag chapter markers rather than equal-duration /
+    equal-count slices.
+    """
+
+    boundaries = [float(t) for t in event_timestamps_seconds]
+    windows: list[list[CorrelatedPosePair]] = [[] for _ in range(len(boundaries) + 1)]
+    if not pairs or not boundaries:
+        if pairs:
+            windows[0].extend(pairs)
+        return windows
+    for pair in pairs:
+        index = bisect.bisect_right(boundaries, float(pair.bag_timestamp_seconds))
+        windows[index].append(pair)
+    return windows
+
+
 def _split_pairs(
     pairs: Sequence[CorrelatedPosePair],
     strata: int,
     mode: str,
+    event_timestamps_seconds: Sequence[float] | None = None,
 ) -> list[list[CorrelatedPosePair]]:
     """Dispatch to the requested stratification splitter."""
 
+    if mode == "event-aligned":
+        if event_timestamps_seconds is None:
+            raise ValueError("_split_pairs(mode='event-aligned', ...) requires event_timestamps_seconds")
+        return _split_pairs_by_event(pairs, event_timestamps_seconds)
     if mode == "equal-pair-count":
         return _split_pairs_by_count(pairs, strata)
     return _split_pairs_by_time(pairs, strata)

@@ -1579,12 +1579,26 @@ def build_parser() -> argparse.ArgumentParser:
     )
     rpsrev.add_argument(
         "--correlation-pair-distribution-strata-mode",
-        choices=("equal-duration", "equal-pair-count"),
+        choices=("equal-duration", "equal-pair-count", "event-aligned"),
         default="equal-duration",
         help=(
             "Stratification mode for --correlation-pair-distribution-strata: 'equal-duration' splits "
             "by bag_timestamp_seconds (default), 'equal-pair-count' splits by pair index so windows hold "
-            "near-equal pair counts even when bag sample density is uneven"
+            "near-equal pair counts even when bag sample density is uneven, 'event-aligned' splits at "
+            "external event timestamps supplied via "
+            "--correlation-pair-distribution-strata-event-timestamps (K boundaries -> K+1 windows; "
+            "--correlation-pair-distribution-strata is then derived from the boundary count and may be omitted)"
+        ),
+    )
+    rpsrev.add_argument(
+        "--correlation-pair-distribution-strata-event-timestamps",
+        default=None,
+        help=(
+            "Comma-separated list of bag_timestamp_seconds boundaries (or a path to a JSON file holding "
+            "a list of floats) used by 'event-aligned' stratification mode. Each boundary marks the end "
+            "of one phase and the start of the next; K boundaries define K+1 windows. Per-topic event "
+            "lists can also be supplied via --correlation-thresholds-config under "
+            "'pairDistributionStrataEventTimestampsSeconds'."
         ),
     )
     rpsrev.add_argument(

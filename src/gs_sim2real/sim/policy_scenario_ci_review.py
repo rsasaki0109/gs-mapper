@@ -348,6 +348,7 @@ def build_route_policy_scenario_ci_review_artifact(
                     report,
                     strata=int(applied.pair_distribution_strata),
                     mode=applied.pair_distribution_strata_mode,
+                    event_timestamps_seconds=applied.pair_distribution_strata_event_timestamps_seconds,
                 )
                 if window_stats:
                     per_window.append((index, report.bag_source.source_topic, window_stats))
@@ -873,6 +874,8 @@ def run_review_cli(args: Any) -> None:
         correlation_report_paths: tuple[str, ...] = ()
     else:
         correlation_reports, correlation_report_paths = collect_correlation_reports_from_shard_runs(merge_report)
+    event_timestamps_arg = getattr(args, "correlation_pair_distribution_strata_event_timestamps", None)
+    event_timestamps = _parse_correlation_event_timestamps_arg(event_timestamps_arg)
     correlation_thresholds = RealVsSimCorrelationThresholds(
         max_translation_error_mean_meters=getattr(args, "max_correlation_translation_mean_meters", None),
         max_translation_error_p95_meters=getattr(args, "max_correlation_translation_p95_meters", None),
@@ -884,6 +887,7 @@ def run_review_cli(args: Any) -> None:
         max_exceeding_heading_pair_fraction=getattr(args, "max_correlation_heading_pair_fraction", None),
         pair_distribution_strata=getattr(args, "correlation_pair_distribution_strata", None),
         pair_distribution_strata_mode=getattr(args, "correlation_pair_distribution_strata_mode", "equal-duration"),
+        pair_distribution_strata_event_timestamps_seconds=event_timestamps,
     )
     if correlation_thresholds.is_empty:
         correlation_thresholds = None
@@ -957,6 +961,28 @@ def _load_review_adoption(
     )
 
 
+def _parse_correlation_event_timestamps_arg(value: str | None) -> tuple[float, ...] | None:
+    """Parse the --correlation-pair-distribution-strata-event-timestamps CLI value.
+
+    Accepts either a comma-separated list of floats (e.g. ``"1.0,3.5,7.2"``)
+    or a path to a JSON file holding a list of floats. Returns ``None`` when
+    the argument is not set so the threshold dataclass keeps its default.
+    """
+
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    candidate = Path(text)
+    if candidate.is_file():
+        payload = json.loads(candidate.read_text(encoding="utf-8"))
+        if not isinstance(payload, list):
+            raise ValueError(f"event timestamps JSON file {text!r} must hold a list of floats")
+        return tuple(float(item) for item in payload)
+    return tuple(float(item) for item in text.split(",") if item.strip())
+
+
 def _describe_correlation_thresholds(thresholds: RealVsSimCorrelationThresholds) -> str:
     """Return a compact human-readable description of the populated thresholds."""
 
@@ -986,10 +1012,20 @@ def _describe_correlation_thresholds(thresholds: RealVsSimCorrelationThresholds)
             f"of pairs above {thresholds.max_pair_heading_error_radians:g} rad"
         )
     if thresholds.pair_distribution_strata is not None and thresholds.pair_distribution_strata > 1:
-        parts.append(
-            f"pair distribution stratified into {thresholds.pair_distribution_strata} "
-            f"{thresholds.pair_distribution_strata_mode} windows"
-        )
+        if (
+            thresholds.pair_distribution_strata_mode == "event-aligned"
+            and thresholds.pair_distribution_strata_event_timestamps_seconds is not None
+        ):
+            event_summary = ", ".join(f"{t:g}" for t in thresholds.pair_distribution_strata_event_timestamps_seconds)
+            parts.append(
+                f"pair distribution stratified into {thresholds.pair_distribution_strata} "
+                f"event-aligned windows at boundaries [{event_summary}] s"
+            )
+        else:
+            parts.append(
+                f"pair distribution stratified into {thresholds.pair_distribution_strata} "
+                f"{thresholds.pair_distribution_strata_mode} windows"
+            )
     return ", ".join(parts) if parts else "no thresholds configured"
 
 

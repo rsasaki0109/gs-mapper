@@ -26,7 +26,7 @@
 - Route policy benchmark 系は、dataset / imitation / registry / benchmark / history / scenario-set / matrix / sharding / CI manifest / workflow materialization / validation / activation / review bundle / workflow trigger promotion gate / promotion-backed trigger adoption / adoption-aware review bundle まで分割済み。
 - 最新の pushed commit は `2262f22`。Tier 2 chain (#121–#134) で env-hardening + correlation gate plumbing が完成。local full pytest / GitHub Actions CI / Pages deploy は green。
 - adoption step + CLI (`gs-mapper route-policy-scenario-ci-workflow-adopt`) + adoption-aware review bundle まで実装済み。review には `--adoption-report` を渡すと Pages の `review.{json,md,html}` に trigger mode / branches / manual vs adopted YAML の unified diff が乗る。
-- 2026-04-25 〜 26 の Tier 2 rollup で、real-vs-sim correlation library (#113/#115) → scenario-set run report への attach (#121) → review bundle への surface (#125) → regression gate (#126) → per-bag overrides (#128) → translation/heading pair-distribution gates (#129/#130) → time stratification (#131/#132) + equal-pair-count mode (#133) + per-window stats (#134) まで一気に完成。`gs-mapper route-policy-scenario-ci-review` の correlation gate は実用 production rollout で使える状態。
+- 2026-04-25 〜 26 の Tier 2 rollup で、real-vs-sim correlation library (#113/#115) → scenario-set run report への attach (#121) → review bundle への surface (#125) → regression gate (#126) → per-bag overrides (#128) → translation/heading pair-distribution gates (#129/#130) → time stratification (#131/#132) + equal-pair-count mode (#133) + per-window stats (#134) + event-aligned mode (#135-OOS rollup) まで一気に完成。`gs-mapper route-policy-scenario-ci-review` の correlation gate は実用 production rollout で使える状態。
 - 同時に env-hardening 側も IMU finite-diff renderer (#111) → ObstaclePolicy protocol (#112) → IMU + peer-aware features を gym adapter feature dict へ surface (#122/#123) → query_collision / score_trajectory に per-step peer cache を threading (#124/#127) で multi-agent サポートが整った。
 
 ## 2. 現在の主戦場
@@ -49,6 +49,7 @@
 
 | Commit | 内容 |
 | --- | --- |
+| _next_ | `pair_distribution_strata_mode='event-aligned'`: scenario phase boundary を外部 event timestamp 列 (`pair_distribution_strata_event_timestamps_seconds`) で受け取り、K boundaries → K+1 windows に分割。`--correlation-pair-distribution-strata-event-timestamps` で inline `t1,t2,...` または JSON file path を受け付ける。 |
 | `2262f22` | Per-window correlation stats (mean/p95/max/heading + bag-time span) を review bundle の Markdown / HTML に surface。 |
 | `95f1ea4` | `pair_distribution_strata_mode` で `equal-pair-count` を選べるように。スパース bag でも各 window を統計的に成立させる。 |
 | `cef2659` | aggregate-statistic (mean/p95/max/heading-mean) を per-window 評価に切り替え可能に。stratified 時は aggregate tag を suppress。 |
@@ -81,15 +82,16 @@
   - `python3 -m ruff check src/ tests/ scripts/`
   - `python3 -m ruff format --check src/ tests/ scripts/`
   - `git diff --check`
-  - `python3 -m pytest tests/ -q --ignore=tests/e2e` => `738 passed`
+  - `python3 -m pytest tests/ -q --ignore=tests/e2e` => `744 passed`
 - mypy note:
   - `python3 -m mypy src/gs_sim2real/sim/policy_scenario_ci_promotion.py` は pass。
   - `src/gs_sim2real/cli.py` を含む mypy は Waymo / MCD 周辺の既知型不整合で落ちる。Tier 2 chain は regression を入れていない。
 - Tier 1 MCD rerun (`scripts/plan_mcd_quality_runs.py`) の 2/3 profile (`single_400_depth_long` L1=0.1951 / `single_800_ba` L1=0.2699) が gate pass。Profile 3 (`multi_3cam_300each_ba`) は手元 bag に `d455t` / `d435i` topics が無いので data-blocked。
 - Claude が次に触るときの推奨 starting point:
-  1. **event-aligned stratification** (#133 OOS): scenario phase boundary を外部 event timestamp 列で受け取る stratification mode。
-  2. **Pi3 / LoGeR production comparison asset** (§12.3): GPU run + asset bundle、external SLAM comparison surface を厚くする。
-  3. **`read_gsof_ins_pose_stream`** (#113 OOS): applanix custom msg schema の vendor が必要なので外部依存あり。
+  1. **Pi3 / LoGeR production comparison asset** (§12.3): GPU run + asset bundle、external SLAM comparison surface を厚くする。
+  2. **`read_gsof_ins_pose_stream`** (#113 OOS): applanix custom msg schema の vendor が必要なので外部依存あり。
+  3. **Route policy replay viewer** (§12.2 残): Pages-based viewer 新設、frontend 中心。
+  4. **Profile 3 MCDVIRAL bag download + retry**: 帯域 + GPU、夜間 kick 可能。
 
 ## 4. System Map
 
@@ -645,7 +647,7 @@ python3 scripts/collect_mcd_quality_runs.py --format gate --fail-on-gate
 | Sensor noise profiles (raw sensors) | ✅ 完了。env-side noise + IMU kinematic finite-diff renderer (#111) が実装され、gym adapter feature dict に流れる (#122) ので route policy benchmark から observation 経由で σ が乗る。physics / rosbag-replay 由来の IMU renderer は引き続き OOS。 |
 | Dynamic obstacles (multi-agent) | ✅ 完了。`ObstaclePolicy` protocol + 4 reference impls (#112)、env / gym adapter に per-step peer cache (#123/#124/#127)、`MaintainSeparationObstaclePolicy` 等の policy obstacle が rollout 中に peer を観測可能。残課題は Pi3-style 大規模 multi-agent scenario の production 配信 — Tier 3 候補。 |
 | Route policy replay viewer | 引き続き OOS。Policy trajectory と scene を Pages で inspect する viewer は未着手。 |
-| Real-vs-sim correlation report | ✅ 完了。`scripts/run_rosbag_correlation.py` (#113/#115) → scenario-set run report への attach (#121) → review bundle への surface + regression gate (#125/#126) → per-bag overrides (#128) → translation/heading per-pair distribution + time stratification (#129〜#134) まで実装済み。`gs-mapper route-policy-scenario-ci-review --max-correlation-* --correlation-thresholds-config --correlation-pair-distribution-strata` が production rollout で使える。残課題は event-aligned stratification (#133 OOS、外部 event timestamp が必要)。 |
+| Real-vs-sim correlation report | ✅ 完了。`scripts/run_rosbag_correlation.py` (#113/#115) → scenario-set run report への attach (#121) → review bundle への surface + regression gate (#125/#126) → per-bag overrides (#128) → translation/heading per-pair distribution + time stratification (#129〜#134) + event-aligned stratification (`pair_distribution_strata_mode='event-aligned'`、`--correlation-pair-distribution-strata-event-timestamps` で inline list / JSON file を受け付ける) まで実装済み。`gs-mapper route-policy-scenario-ci-review --max-correlation-* --correlation-thresholds-config --correlation-pair-distribution-strata` が production rollout で使える。 |
 
 ### 12.3 B: Outdoor asset quality
 

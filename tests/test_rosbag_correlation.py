@@ -1100,6 +1100,138 @@ def test_compute_per_window_correlation_stats_returns_empty_when_strata_le_one()
     assert compute_per_window_correlation_stats(report, strata=0, mode="equal-duration") == ()
 
 
+def test_parse_correlation_event_timestamps_arg_supports_inline_and_json_file(tmp_path: Path) -> None:
+    """The CLI parser must accept both inline 'a,b,c' lists and JSON file paths."""
+    from gs_sim2real.sim.policy_scenario_ci_review import _parse_correlation_event_timestamps_arg
+
+    assert _parse_correlation_event_timestamps_arg(None) is None
+    assert _parse_correlation_event_timestamps_arg("") is None
+    assert _parse_correlation_event_timestamps_arg("1.0,3.5,7.25") == (1.0, 3.5, 7.25)
+    file_path = tmp_path / "events.json"
+    file_path.write_text(json.dumps([2.5, 4.75]), encoding="utf-8")
+    assert _parse_correlation_event_timestamps_arg(str(file_path)) == (2.5, 4.75)
+    bad_path = tmp_path / "bad.json"
+    bad_path.write_text(json.dumps({"events": [1.0]}), encoding="utf-8")
+    with pytest.raises(ValueError, match="must hold a list of floats"):
+        _parse_correlation_event_timestamps_arg(str(bad_path))
+
+
+def test_correlation_strata_mode_event_aligned_partitions_at_event_boundaries() -> None:
+    """event-aligned mode must split pairs at the supplied phase boundaries."""
+    # 9 pairs at t = 0, 1, 2, ..., 8. Boundaries at [3.0, 6.0] => 3 windows:
+    # window 0: t < 3.0 -> pairs at t = 0, 1, 2 (clean, error 0)
+    # window 1: 3.0 <= t < 6.0 -> pairs at t = 3, 4, 5 (dirty, error 1)
+    # window 2: t >= 6.0 -> pairs at t = 6, 7, 8 (clean, error 0)
+    pairs_timeline = [
+        (0.0, 0.0),
+        (1.0, 0.0),
+        (2.0, 0.0),
+        (3.0, 1.0),
+        (4.0, 1.0),
+        (5.0, 1.0),
+        (6.0, 0.0),
+        (7.0, 0.0),
+        (8.0, 0.0),
+    ]
+    report = _correlation_report_with_pair_timeline(pairs_timeline)
+    thresholds = RealVsSimCorrelationThresholds(
+        max_pair_translation_error_meters=0.5,
+        max_exceeding_translation_pair_fraction=0.2,
+        pair_distribution_strata_mode="event-aligned",
+        pair_distribution_strata_event_timestamps_seconds=(3.0, 6.0),
+    )
+    # Strata is auto-derived from len(events)+1 = 3.
+    assert thresholds.pair_distribution_strata == 3
+    _, failed = evaluate_real_vs_sim_correlation_thresholds(report, thresholds)
+    # Window 1 holds the dirty pairs only -> only its window tag fires.
+    assert "translation-pair-distribution-window-1" in failed
+    assert "translation-pair-distribution-window-0" not in failed
+    assert "translation-pair-distribution-window-2" not in failed
+
+
+def test_correlation_strata_mode_event_aligned_drops_window_when_no_pairs_land() -> None:
+    """Empty event-aligned windows must skip silently rather than raise."""
+    # Only one pair at t=5; with boundaries [1.0, 9.0] window 1 holds the pair
+    # while windows 0 and 2 are empty and must be ignored.
+    pairs_timeline = [(5.0, 0.0)]
+    report = _correlation_report_with_pair_timeline(pairs_timeline)
+    thresholds = RealVsSimCorrelationThresholds(
+        max_pair_translation_error_meters=999.0,
+        max_exceeding_translation_pair_fraction=0.5,
+        pair_distribution_strata_mode="event-aligned",
+        pair_distribution_strata_event_timestamps_seconds=(1.0, 9.0),
+    )
+    passed, failed = evaluate_real_vs_sim_correlation_thresholds(report, thresholds)
+    assert passed is True
+    assert failed == ()
+
+
+def test_correlation_strata_mode_event_aligned_round_trips_through_json() -> None:
+    """event-aligned mode + boundaries must round-trip through the threshold JSON payload."""
+    thresholds = RealVsSimCorrelationThresholds(
+        max_pair_translation_error_meters=0.4,
+        max_exceeding_translation_pair_fraction=0.1,
+        pair_distribution_strata_mode="event-aligned",
+        pair_distribution_strata_event_timestamps_seconds=(2.5, 4.75),
+    )
+    payload = thresholds.to_dict()
+    assert payload["pairDistributionStrata"] == 3
+    assert payload["pairDistributionStrataMode"] == "event-aligned"
+    assert payload["pairDistributionStrataEventTimestampsSeconds"] == [2.5, 4.75]
+    rebuilt = real_vs_sim_correlation_thresholds_from_dict(payload)
+    assert rebuilt == thresholds
+
+
+def test_correlation_strata_mode_event_aligned_validates_inputs() -> None:
+    """event-aligned mode must reject missing, unsorted, or mismatched event lists."""
+    # Missing events when mode is event-aligned.
+    with pytest.raises(ValueError, match="requires pair_distribution_strata_event_timestamps_seconds"):
+        RealVsSimCorrelationThresholds(pair_distribution_strata_mode="event-aligned")
+    # Events without the matching mode.
+    with pytest.raises(ValueError, match="only valid with pair_distribution_strata_mode='event-aligned'"):
+        RealVsSimCorrelationThresholds(
+            pair_distribution_strata_event_timestamps_seconds=(1.0, 2.0),
+        )
+    # Unsorted boundaries.
+    with pytest.raises(ValueError, match="must be sorted ascending"):
+        RealVsSimCorrelationThresholds(
+            pair_distribution_strata_mode="event-aligned",
+            pair_distribution_strata_event_timestamps_seconds=(3.0, 1.0),
+        )
+    # Explicit strata that does not match len(events)+1.
+    with pytest.raises(ValueError, match="must equal len\\(event_timestamps_seconds\\)\\+1"):
+        RealVsSimCorrelationThresholds(
+            pair_distribution_strata=4,
+            pair_distribution_strata_mode="event-aligned",
+            pair_distribution_strata_event_timestamps_seconds=(1.0, 2.0),
+        )
+
+
+def test_compute_per_window_correlation_stats_supports_event_aligned_mode() -> None:
+    """compute_per_window_correlation_stats must follow the event boundaries when given them."""
+    # 6 pairs at t = 0..5; boundary at t=2.0 splits them into [0,1] and [2,3,4,5].
+    pairs_timeline = [(float(i), float(i)) for i in range(6)]
+    report = _correlation_report_with_pair_timeline(pairs_timeline)
+    stats = compute_per_window_correlation_stats(
+        report,
+        strata=2,
+        mode="event-aligned",
+        event_timestamps_seconds=(2.0,),
+    )
+    assert len(stats) == 2
+    window0, window1 = stats
+    assert window0.window_index == 0
+    assert window0.pair_count == 2
+    assert window0.bag_time_start_seconds == pytest.approx(0.0)
+    assert window0.bag_time_end_seconds == pytest.approx(1.0)
+    assert window0.translation_error_max_meters == pytest.approx(1.0)
+    assert window1.window_index == 1
+    assert window1.pair_count == 4
+    assert window1.bag_time_start_seconds == pytest.approx(2.0)
+    assert window1.bag_time_end_seconds == pytest.approx(5.0)
+    assert window1.translation_error_max_meters == pytest.approx(5.0)
+
+
 def test_real_vs_sim_correlation_window_stats_round_trips_through_json() -> None:
     """Window stats round-trip through to_dict/from_dict including the optional heading mean."""
     stats = RealVsSimCorrelationWindowStats(
