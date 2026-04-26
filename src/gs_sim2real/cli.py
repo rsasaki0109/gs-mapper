@@ -1549,6 +1549,25 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     rpsrev.add_argument(
+        "--max-correlation-pair-heading-radians",
+        type=float,
+        default=None,
+        help=(
+            "Per-pair heading distribution gate (paired with --max-correlation-heading-pair-fraction): "
+            "the heading_error_radians above which a CorrelatedPosePair counts as exceeding"
+        ),
+    )
+    rpsrev.add_argument(
+        "--max-correlation-heading-pair-fraction",
+        type=float,
+        default=None,
+        help=(
+            "Per-pair heading distribution gate (paired with --max-correlation-pair-heading-radians): "
+            "fail the review when more than this fraction of pairs with heading data in any embedded "
+            "correlation report exceed the per-pair heading bound (0.05 = 5%%)"
+        ),
+    )
+    rpsrev.add_argument(
         "--correlation-thresholds-config",
         default=None,
         help=(

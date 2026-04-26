@@ -258,6 +258,8 @@ class RealVsSimCorrelationThresholds:
     max_heading_error_mean_radians: float | None = None
     max_pair_translation_error_meters: float | None = None
     max_exceeding_translation_pair_fraction: float | None = None
+    max_pair_heading_error_radians: float | None = None
+    max_exceeding_heading_pair_fraction: float | None = None
 
     @property
     def is_empty(self) -> bool:
@@ -268,6 +270,8 @@ class RealVsSimCorrelationThresholds:
             and self.max_heading_error_mean_radians is None
             and self.max_pair_translation_error_meters is None
             and self.max_exceeding_translation_pair_fraction is None
+            and self.max_pair_heading_error_radians is None
+            and self.max_exceeding_heading_pair_fraction is None
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -284,6 +288,10 @@ class RealVsSimCorrelationThresholds:
             payload["maxPairTranslationErrorMeters"] = float(self.max_pair_translation_error_meters)
         if self.max_exceeding_translation_pair_fraction is not None:
             payload["maxExceedingTranslationPairFraction"] = float(self.max_exceeding_translation_pair_fraction)
+        if self.max_pair_heading_error_radians is not None:
+            payload["maxPairHeadingErrorRadians"] = float(self.max_pair_heading_error_radians)
+        if self.max_exceeding_heading_pair_fraction is not None:
+            payload["maxExceedingHeadingPairFraction"] = float(self.max_exceeding_heading_pair_fraction)
         return payload
 
 
@@ -301,6 +309,8 @@ def real_vs_sim_correlation_thresholds_from_dict(payload: Mapping[str, Any]) -> 
         max_heading_error_mean_radians=_optional("maxHeadingErrorMeanRadians"),
         max_pair_translation_error_meters=_optional("maxPairTranslationErrorMeters"),
         max_exceeding_translation_pair_fraction=_optional("maxExceedingTranslationPairFraction"),
+        max_pair_heading_error_radians=_optional("maxPairHeadingErrorRadians"),
+        max_exceeding_heading_pair_fraction=_optional("maxExceedingHeadingPairFraction"),
     )
 
 
@@ -395,6 +405,18 @@ def evaluate_real_vs_sim_correlation_thresholds(
         fraction = exceeding / len(report.pairs)
         if fraction > float(thresholds.max_exceeding_translation_pair_fraction):
             failed.append("translation-pair-distribution")
+    if (
+        thresholds.max_pair_heading_error_radians is not None
+        and thresholds.max_exceeding_heading_pair_fraction is not None
+        and report.pairs
+    ):
+        bound = float(thresholds.max_pair_heading_error_radians)
+        with_heading = [pair for pair in report.pairs if pair.heading_error_radians is not None]
+        if with_heading:
+            exceeding = sum(1 for pair in with_heading if float(pair.heading_error_radians) > bound)
+            fraction = exceeding / len(with_heading)
+            if fraction > float(thresholds.max_exceeding_heading_pair_fraction):
+                failed.append("heading-pair-distribution")
     return (not failed, tuple(failed))
 
 
