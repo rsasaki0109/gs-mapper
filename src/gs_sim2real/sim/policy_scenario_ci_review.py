@@ -27,11 +27,14 @@ from .policy_scenario_set import load_route_policy_scenario_set_run_json
 from ..robotics.rosbag_correlation import (
     RealVsSimCorrelationReport,
     RealVsSimCorrelationThresholds,
+    RealVsSimCorrelationWindowStats,
+    compute_per_window_correlation_stats,
     correlation_threshold_overrides_from_dict,
     correlation_threshold_overrides_to_dict,
     evaluate_real_vs_sim_correlation_thresholds,
     real_vs_sim_correlation_report_from_dict,
     real_vs_sim_correlation_thresholds_from_dict,
+    real_vs_sim_correlation_window_stats_from_dict,
 )
 
 
@@ -141,6 +144,7 @@ class RoutePolicyScenarioCIReviewArtifact:
     correlation_thresholds: RealVsSimCorrelationThresholds | None = None
     correlation_threshold_overrides: Mapping[str, RealVsSimCorrelationThresholds] = field(default_factory=dict)
     correlation_failed_reports: tuple[tuple[int, str, tuple[str, ...]], ...] = ()
+    correlation_per_window_stats: tuple[tuple[int, str, tuple[RealVsSimCorrelationWindowStats, ...]], ...] = ()
     metadata: Mapping[str, Any] = field(default_factory=dict)
     version: str = ROUTE_POLICY_SCENARIO_CI_REVIEW_VERSION
 
@@ -181,6 +185,11 @@ class RoutePolicyScenarioCIReviewArtifact:
             if not thresholds.is_empty
         }
         object.__setattr__(self, "correlation_threshold_overrides", normalised_overrides)
+        normalised_window_stats: tuple[tuple[int, str, tuple[RealVsSimCorrelationWindowStats, ...]], ...] = tuple(
+            (int(report_index), str(topic), tuple(stats))
+            for report_index, topic, stats in self.correlation_per_window_stats
+        )
+        object.__setattr__(self, "correlation_per_window_stats", normalised_window_stats)
 
     @property
     def correlation_passed(self) -> bool:
@@ -266,6 +275,15 @@ class RoutePolicyScenarioCIReviewArtifact:
                     }
                     for index, topic, checks in self.correlation_failed_reports
                 ]
+        if self.correlation_per_window_stats:
+            payload["correlationPerWindowStats"] = [
+                {
+                    "index": int(report_index),
+                    "bagSourceTopic": str(topic),
+                    "windows": [stat.to_dict() for stat in stats],
+                }
+                for report_index, topic, stats in self.correlation_per_window_stats
+            ]
         return payload
 
 
@@ -307,6 +325,7 @@ def build_route_policy_scenario_ci_review_artifact(
     if validation_report.manifest_id != activation_report.manifest_id:
         raise ValueError("validation and activation reports must reference the same manifest")
     correlation_failed_reports: tuple[tuple[int, str, tuple[str, ...]], ...] = ()
+    correlation_per_window_stats: tuple[tuple[int, str, tuple[RealVsSimCorrelationWindowStats, ...]], ...] = ()
     overrides_map: dict[str, RealVsSimCorrelationThresholds] = {
         str(topic): thresholds
         for topic, thresholds in (correlation_threshold_overrides or {}).items()
@@ -316,6 +335,7 @@ def build_route_policy_scenario_ci_review_artifact(
     gate_active = (default_thresholds is not None and not default_thresholds.is_empty) or bool(overrides_map)
     if gate_active:
         failed: list[tuple[int, str, tuple[str, ...]]] = []
+        per_window: list[tuple[int, str, tuple[RealVsSimCorrelationWindowStats, ...]]] = []
         for index, report in enumerate(correlation_reports):
             applied = overrides_map.get(report.bag_source.source_topic, default_thresholds)
             if applied is None or applied.is_empty:
@@ -323,7 +343,16 @@ def build_route_policy_scenario_ci_review_artifact(
             _, failed_checks = evaluate_real_vs_sim_correlation_thresholds(report, applied)
             if failed_checks:
                 failed.append((index, report.bag_source.source_topic, failed_checks))
+            if applied.pair_distribution_strata is not None and applied.pair_distribution_strata > 1:
+                window_stats = compute_per_window_correlation_stats(
+                    report,
+                    strata=int(applied.pair_distribution_strata),
+                    mode=applied.pair_distribution_strata_mode,
+                )
+                if window_stats:
+                    per_window.append((index, report.bag_source.source_topic, window_stats))
         correlation_failed_reports = tuple(failed)
+        correlation_per_window_stats = tuple(per_window)
     return RoutePolicyScenarioCIReviewArtifact(
         review_id=resolved_review_id,
         merge_id=merge_report.merge_id,
@@ -345,6 +374,7 @@ def build_route_policy_scenario_ci_review_artifact(
         correlation_thresholds=correlation_thresholds,
         correlation_threshold_overrides=overrides_map,
         correlation_failed_reports=correlation_failed_reports,
+        correlation_per_window_stats=correlation_per_window_stats,
         metadata={
             "pagesBaseUrl": pages_base_url,
             "historyPath": merge_report.history_path,
@@ -566,6 +596,18 @@ def route_policy_scenario_ci_review_from_dict(
         for item in _sequence(payload.get("correlationFailedReports", ()), "correlationFailedReports")
         if isinstance(item, Mapping)
     )
+    correlation_per_window_stats = tuple(
+        (
+            int(item.get("index", 0)),
+            str(item.get("bagSourceTopic", "")),
+            tuple(
+                real_vs_sim_correlation_window_stats_from_dict(_mapping(window, "correlationWindowStat"))
+                for window in _sequence(item.get("windows", ()), "windows")
+            ),
+        )
+        for item in _sequence(payload.get("correlationPerWindowStats", ()), "correlationPerWindowStats")
+        if isinstance(item, Mapping)
+    )
     return RoutePolicyScenarioCIReviewArtifact(
         review_id=str(payload["reviewId"]),
         merge_id=str(payload["mergeId"]),
@@ -589,6 +631,7 @@ def route_policy_scenario_ci_review_from_dict(
         correlation_thresholds=correlation_thresholds,
         correlation_threshold_overrides=correlation_threshold_overrides,
         correlation_failed_reports=correlation_failed_reports,
+        correlation_per_window_stats=correlation_per_window_stats,
         metadata=_json_mapping(_mapping(payload.get("metadata", {}), "metadata")),
         version=version,
     )
@@ -671,6 +714,31 @@ def render_route_policy_scenario_ci_review_markdown(artifact: RoutePolicyScenari
             lines.extend(["", "### Correlation gate failures", ""])
             for index, topic, checks in artifact.correlation_failed_reports:
                 lines.append(f"- `{topic}` (report #{index}): {', '.join(checks)}")
+        if artifact.correlation_per_window_stats:
+            lines.extend(["", "### Per-window correlation stats", ""])
+            for report_index, topic, windows in artifact.correlation_per_window_stats:
+                lines.append(f"- `{topic}` (report #{report_index}):")
+                lines.append("")
+                lines.append(
+                    "| Window | Bag time (s) | Pairs | Translation mean (m) | Translation p95 (m) | Translation max (m) | Heading mean (rad) |"
+                )
+                lines.append("| ---: | --- | ---: | ---: | ---: | ---: | ---: |")
+                for stat in windows:
+                    heading = (
+                        f"{stat.heading_error_mean_radians:.4f}"
+                        if stat.heading_error_mean_radians is not None
+                        else "n/a"
+                    )
+                    lines.append(
+                        f"| {stat.window_index} | "
+                        f"{stat.bag_time_start_seconds:.2f} – {stat.bag_time_end_seconds:.2f} | "
+                        f"{stat.pair_count} | "
+                        f"{stat.translation_error_mean_meters:.4f} | "
+                        f"{stat.translation_error_p95_meters:.4f} | "
+                        f"{stat.translation_error_max_meters:.4f} | "
+                        f"{heading} |"
+                    )
+                lines.append("")
     if artifact.adoption is not None:
         adoption = artifact.adoption
         lines.extend(
@@ -969,6 +1037,34 @@ def _render_correlation_section_html(artifact: RoutePolicyScenarioCIReviewArtifa
             for index, topic, checks in artifact.correlation_failed_reports
         )
         failures_html = f"<h3>Correlation gate failures</h3><ul>{failure_items}</ul>"
+    per_window_html = ""
+    if artifact.correlation_per_window_stats:
+        groups: list[str] = []
+        for report_index, topic, windows in artifact.correlation_per_window_stats:
+            window_rows = "\n".join(
+                "<tr>"
+                f"<td>{stat.window_index}</td>"
+                f"<td>{stat.bag_time_start_seconds:.2f} – {stat.bag_time_end_seconds:.2f}</td>"
+                f"<td>{stat.pair_count}</td>"
+                f"<td>{stat.translation_error_mean_meters:.4f}</td>"
+                f"<td>{stat.translation_error_p95_meters:.4f}</td>"
+                f"<td>{stat.translation_error_max_meters:.4f}</td>"
+                f"<td>{f'{stat.heading_error_mean_radians:.4f}' if stat.heading_error_mean_radians is not None else 'n/a'}</td>"
+                "</tr>"
+                for stat in windows
+            )
+            groups.append(
+                f"<h4><code>{escape(topic)}</code> (report #{report_index})</h4>"
+                "<table>"
+                "<thead><tr>"
+                "<th>Window</th><th>Bag time (s)</th><th>Pairs</th>"
+                "<th>Translation mean (m)</th><th>Translation p95 (m)</th><th>Translation max (m)</th>"
+                "<th>Heading mean (rad)</th>"
+                "</tr></thead>"
+                f"<tbody>{window_rows}</tbody>"
+                "</table>"
+            )
+        per_window_html = f"<h3>Per-window correlation stats</h3>{''.join(groups)}"
     return (
         "<section>"
         "<h2>Real-vs-sim correlation</h2>"
@@ -982,6 +1078,7 @@ def _render_correlation_section_html(artifact: RoutePolicyScenarioCIReviewArtifa
         f"<tbody>{body}</tbody>"
         "</table>"
         f"{failures_html}"
+        f"{per_window_html}"
         "</section>"
     )
 
