@@ -873,3 +873,92 @@ def test_correlation_pair_distribution_strata_round_trips_through_json() -> None
     # strata=1 is functionally identical to None so it is dropped on serialisation.
     explicit_one = RealVsSimCorrelationThresholds(pair_distribution_strata=1)
     assert "pairDistributionStrata" not in explicit_one.to_dict()
+
+
+def test_correlation_aggregate_stats_stratification_emits_window_specific_tags() -> None:
+    """When stratified, mean/p95/max checks fire per window with -window-{i} tags."""
+    # 10 pairs over [0, 9] s. First 5 are clean (0 m), last 5 have 1 m drift.
+    # Aggregate mean = 0.5; per-window mean: window 0 = 0.0, window 1 = 1.0.
+    # threshold = 0.3: aggregate would fail; with strata=2 only window 1 fires.
+    pairs_timeline = [(float(i), 0.0) for i in range(5)] + [(float(i), 1.0) for i in range(5, 10)]
+    report = _correlation_report_with_pair_timeline(pairs_timeline)
+    thresholds = RealVsSimCorrelationThresholds(
+        max_translation_error_mean_meters=0.3,
+        pair_distribution_strata=2,
+    )
+    passed, failed = evaluate_real_vs_sim_correlation_thresholds(report, thresholds)
+    assert passed is False
+    assert "translation-mean" not in failed  # aggregate suppressed when stratified
+    assert "translation-mean-window-1" in failed
+    assert "translation-mean-window-0" not in failed
+
+
+def test_correlation_aggregate_stats_stratification_skips_empty_windows() -> None:
+    """Windows that hold no pairs (e.g. quiet stretches) must not emit window-specific failures."""
+    # 6 pairs all in [0, 1] s. Strata=4 means windows 2-3 are empty.
+    pairs_timeline = [(0.0, 0.0), (0.2, 0.0), (0.4, 0.0), (0.6, 0.0), (0.8, 0.0), (1.0, 0.0)]
+    report = _correlation_report_with_pair_timeline(pairs_timeline)
+    thresholds = RealVsSimCorrelationThresholds(
+        max_translation_error_max_meters=0.0,
+        pair_distribution_strata=4,
+    )
+    passed, failed = evaluate_real_vs_sim_correlation_thresholds(report, thresholds)
+    assert passed is True
+    assert failed == ()
+
+
+def test_correlation_aggregate_stats_stratification_applies_p95_and_max_per_window() -> None:
+    """p95 and max thresholds must each fire on their own window-specific tag."""
+    # Window 0: errors [0, 0, 0, 0, 0] -> p95=0, max=0.
+    # Window 1: errors [0, 0, 0, 0, 5.0] -> p95~5.0, max=5.0.
+    pairs_timeline = [(float(i), 0.0) for i in range(5)] + [
+        (5.0, 0.0),
+        (6.0, 0.0),
+        (7.0, 0.0),
+        (8.0, 0.0),
+        (9.0, 5.0),
+    ]
+    report = _correlation_report_with_pair_timeline(pairs_timeline)
+    thresholds = RealVsSimCorrelationThresholds(
+        max_translation_error_p95_meters=1.0,
+        max_translation_error_max_meters=1.0,
+        pair_distribution_strata=2,
+    )
+    _, failed = evaluate_real_vs_sim_correlation_thresholds(report, thresholds)
+    assert "translation-p95-window-1" in failed
+    assert "translation-max-window-1" in failed
+    assert "translation-p95-window-0" not in failed
+    assert "translation-max-window-0" not in failed
+    # Aggregate tags suppressed under stratification.
+    assert "translation-p95" not in failed
+    assert "translation-max" not in failed
+
+
+def test_correlation_aggregate_stratification_skips_heading_when_no_window_carries_data() -> None:
+    """Stratified heading-mean check must skip a window whose pairs all lack heading data."""
+    heading_errors: list[float | None] = [0.0, 0.0, 0.0, 0.0, 0.0, None, None, None, None, None]
+    bag_samples: list[BagPoseSample] = []
+    sim_samples: list[SimPoseSample] = []
+    for index, heading in enumerate(heading_errors):
+        ts = float(index)
+        if heading is None:
+            bag_orientation = None
+        else:
+            half = heading / 2.0
+            bag_orientation = (0.0, 0.0, math.sin(half), math.cos(half))
+        bag_samples.append(
+            BagPoseSample(timestamp_seconds=ts, position=(0.0, 0.0, 0.0), orientation_xyzw=bag_orientation)
+        )
+        sim_samples.append(
+            SimPoseSample(timestamp_seconds=ts, position=(0.0, 0.0, 0.0), orientation_xyzw=(0.0, 0.0, 0.0, 1.0))
+        )
+    report = correlate_against_sim_trajectory(_make_bag_stream(bag_samples), sim_samples, max_match_dt_seconds=0.5)
+    thresholds = RealVsSimCorrelationThresholds(
+        max_heading_error_mean_radians=0.0,  # any positive heading would fail
+        pair_distribution_strata=2,
+    )
+    passed, failed = evaluate_real_vs_sim_correlation_thresholds(report, thresholds)
+    # Window 0 has 5 heading-bearing pairs all at 0 rad (passes); window 1 has 0
+    # heading-bearing pairs and skips silently. No failure either way.
+    assert passed is True
+    assert failed == ()

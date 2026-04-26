@@ -385,28 +385,65 @@ def evaluate_real_vs_sim_correlation_thresholds(
     """
 
     failed: list[str] = []
-    if (
-        thresholds.max_translation_error_mean_meters is not None
-        and float(report.translation_error_mean_meters) > thresholds.max_translation_error_mean_meters
-    ):
-        failed.append("translation-mean")
-    if (
-        thresholds.max_translation_error_p95_meters is not None
-        and float(report.translation_error_p95_meters) > thresholds.max_translation_error_p95_meters
-    ):
-        failed.append("translation-p95")
-    if (
-        thresholds.max_translation_error_max_meters is not None
-        and float(report.translation_error_max_meters) > thresholds.max_translation_error_max_meters
-    ):
-        failed.append("translation-max")
-    if (
-        thresholds.max_heading_error_mean_radians is not None
-        and report.heading_error_mean_radians is not None
-        and float(report.heading_error_mean_radians) > thresholds.max_heading_error_mean_radians
-    ):
-        failed.append("heading-mean")
     strata = thresholds.pair_distribution_strata
+    aggregate_stratified = strata is not None and strata > 1 and bool(report.pairs)
+    if aggregate_stratified:
+        # Stratified mode replaces the report-level aggregate checks with
+        # per-window aggregates computed from report.pairs (the strided
+        # sample). Empty windows skip silently. Aggregates from heading
+        # use the heading-bearing subset of the window.
+        for window_index, window_pairs in enumerate(_split_pairs_by_time(report.pairs, int(strata))):
+            if not window_pairs:
+                continue
+            translation_errors = [float(pair.translation_error_meters) for pair in window_pairs]
+            window_mean = sum(translation_errors) / len(translation_errors)
+            window_max = max(translation_errors)
+            window_p95 = _percentile(translation_errors, 95.0)
+            if (
+                thresholds.max_translation_error_mean_meters is not None
+                and window_mean > thresholds.max_translation_error_mean_meters
+            ):
+                failed.append(f"translation-mean-window-{window_index}")
+            if (
+                thresholds.max_translation_error_p95_meters is not None
+                and window_p95 > thresholds.max_translation_error_p95_meters
+            ):
+                failed.append(f"translation-p95-window-{window_index}")
+            if (
+                thresholds.max_translation_error_max_meters is not None
+                and window_max > thresholds.max_translation_error_max_meters
+            ):
+                failed.append(f"translation-max-window-{window_index}")
+            if thresholds.max_heading_error_mean_radians is not None:
+                heading_errors = [
+                    float(pair.heading_error_radians) for pair in window_pairs if pair.heading_error_radians is not None
+                ]
+                if heading_errors:
+                    window_heading_mean = sum(heading_errors) / len(heading_errors)
+                    if window_heading_mean > thresholds.max_heading_error_mean_radians:
+                        failed.append(f"heading-mean-window-{window_index}")
+    else:
+        if (
+            thresholds.max_translation_error_mean_meters is not None
+            and float(report.translation_error_mean_meters) > thresholds.max_translation_error_mean_meters
+        ):
+            failed.append("translation-mean")
+        if (
+            thresholds.max_translation_error_p95_meters is not None
+            and float(report.translation_error_p95_meters) > thresholds.max_translation_error_p95_meters
+        ):
+            failed.append("translation-p95")
+        if (
+            thresholds.max_translation_error_max_meters is not None
+            and float(report.translation_error_max_meters) > thresholds.max_translation_error_max_meters
+        ):
+            failed.append("translation-max")
+        if (
+            thresholds.max_heading_error_mean_radians is not None
+            and report.heading_error_mean_radians is not None
+            and float(report.heading_error_mean_radians) > thresholds.max_heading_error_mean_radians
+        ):
+            failed.append("heading-mean")
     if (
         thresholds.max_pair_translation_error_meters is not None
         and thresholds.max_exceeding_translation_pair_fraction is not None
