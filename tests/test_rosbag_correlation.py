@@ -704,3 +704,91 @@ def test_correlation_thresholds_pair_distribution_round_trips_through_json() -> 
     )
     rebuilt = real_vs_sim_correlation_thresholds_from_dict(thresholds.to_dict())
     assert rebuilt == thresholds
+
+
+def _correlation_report_with_heading_pairs(heading_errors: list[float | None]):
+    """Build a synthetic report whose pairs carry the requested heading errors."""
+    bag_samples: list[BagPoseSample] = []
+    sim_samples: list[SimPoseSample] = []
+    for index, heading in enumerate(heading_errors):
+        ts = float(index)
+        bag_orientation: tuple[float, float, float, float] | None
+        if heading is None:
+            bag_orientation = None
+        else:
+            half = heading / 2.0
+            bag_orientation = (0.0, 0.0, math.sin(half), math.cos(half))
+        bag_samples.append(
+            BagPoseSample(timestamp_seconds=ts, position=(0.0, 0.0, 0.0), orientation_xyzw=bag_orientation)
+        )
+        sim_samples.append(
+            SimPoseSample(timestamp_seconds=ts, position=(0.0, 0.0, 0.0), orientation_xyzw=(0.0, 0.0, 0.0, 1.0))
+        )
+    return correlate_against_sim_trajectory(_make_bag_stream(bag_samples), sim_samples, max_match_dt_seconds=0.5)
+
+
+def test_correlation_heading_pair_distribution_gate_fails_when_over_fraction() -> None:
+    """3/10 pairs above 0.5 rad at a 20% limit (30% > 20%) must fail with the heading tag."""
+    report = _correlation_report_with_heading_pairs([0.0] * 7 + [1.0, 1.0, 1.0])
+    thresholds = RealVsSimCorrelationThresholds(
+        max_pair_heading_error_radians=0.5,
+        max_exceeding_heading_pair_fraction=0.2,
+    )
+    passed, failed = evaluate_real_vs_sim_correlation_thresholds(report, thresholds)
+    assert passed is False
+    assert "heading-pair-distribution" in failed
+
+
+def test_correlation_heading_pair_distribution_gate_passes_when_under_fraction() -> None:
+    """1/10 pairs above 0.5 rad at a 20% limit (10% < 20%) must not fail."""
+    report = _correlation_report_with_heading_pairs([0.0] * 9 + [1.0])
+    thresholds = RealVsSimCorrelationThresholds(
+        max_pair_heading_error_radians=0.5,
+        max_exceeding_heading_pair_fraction=0.2,
+    )
+    passed, failed = evaluate_real_vs_sim_correlation_thresholds(report, thresholds)
+    assert passed is True
+    assert "heading-pair-distribution" not in failed
+
+
+def test_correlation_heading_pair_distribution_skips_pairs_without_heading() -> None:
+    """Pairs whose heading_error_radians is None must be excluded from the fraction denominator."""
+    # 10 pairs total: 4 with heading data (3 of which exceed the bound), 6 without.
+    # Without filtering: 3/10 = 30% > 20% -> would fail.
+    # With filtering: 3/4 = 75% > 20% -> still fails, but on a different denominator.
+    # Verify the denominator is the heading-bearing subset by using a different pattern:
+    # 10 pairs total: 4 with heading (1 exceeding -> 1/4 = 25%), 6 without.
+    # 25% > 20% -> fails (with heading-only denominator), but 1/10 = 10% (would pass).
+    heading_errors: list[float | None] = [0.0, 0.0, 0.0, 1.0, None, None, None, None, None, None]
+    report = _correlation_report_with_heading_pairs(heading_errors)
+    thresholds = RealVsSimCorrelationThresholds(
+        max_pair_heading_error_radians=0.5,
+        max_exceeding_heading_pair_fraction=0.2,
+    )
+    passed, failed = evaluate_real_vs_sim_correlation_thresholds(report, thresholds)
+    # 1/4 = 25% > 20% on the heading-bearing denominator -> fails.
+    assert passed is False
+    assert "heading-pair-distribution" in failed
+
+
+def test_correlation_heading_pair_distribution_skips_when_no_pair_has_heading() -> None:
+    """When every pair lacks heading data, the gate must silently pass."""
+    heading_errors: list[float | None] = [None] * 5
+    report = _correlation_report_with_heading_pairs(heading_errors)
+    thresholds = RealVsSimCorrelationThresholds(
+        max_pair_heading_error_radians=0.0,
+        max_exceeding_heading_pair_fraction=0.0,
+    )
+    passed, failed = evaluate_real_vs_sim_correlation_thresholds(report, thresholds)
+    assert passed is True
+    assert failed == ()
+
+
+def test_correlation_thresholds_heading_pair_distribution_round_trips() -> None:
+    """Heading pair-distribution bounds must round-trip through to_dict/from_dict."""
+    thresholds = RealVsSimCorrelationThresholds(
+        max_pair_heading_error_radians=0.3,
+        max_exceeding_heading_pair_fraction=0.1,
+    )
+    rebuilt = real_vs_sim_correlation_thresholds_from_dict(thresholds.to_dict())
+    assert rebuilt == thresholds
