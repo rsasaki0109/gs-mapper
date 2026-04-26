@@ -500,6 +500,103 @@ def evaluate_real_vs_sim_correlation_thresholds(
     return (not failed, tuple(failed))
 
 
+@dataclass(frozen=True, slots=True)
+class RealVsSimCorrelationWindowStats:
+    """Per-window aggregate stats for one stratified correlation report.
+
+    Computed transiently from ``report.pairs`` (the strided pair sample)
+    so values are approximate when ``max_pairs_kept`` is small relative
+    to the matched pair count. ``bag_time_start_seconds`` and
+    ``bag_time_end_seconds`` describe the window's temporal extent for
+    the equal-duration mode; for the equal-pair-count mode they describe
+    the actual bag-time span of the pairs that landed in the window.
+    ``heading_error_mean_radians`` is ``None`` when no pair in the window
+    carries heading data.
+    """
+
+    window_index: int
+    pair_count: int
+    bag_time_start_seconds: float
+    bag_time_end_seconds: float
+    translation_error_mean_meters: float
+    translation_error_p95_meters: float
+    translation_error_max_meters: float
+    heading_error_mean_radians: float | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "windowIndex": int(self.window_index),
+            "pairCount": int(self.pair_count),
+            "bagTimeStartSeconds": float(self.bag_time_start_seconds),
+            "bagTimeEndSeconds": float(self.bag_time_end_seconds),
+            "translationErrorMeanMeters": float(self.translation_error_mean_meters),
+            "translationErrorP95Meters": float(self.translation_error_p95_meters),
+            "translationErrorMaxMeters": float(self.translation_error_max_meters),
+        }
+        if self.heading_error_mean_radians is not None:
+            payload["headingErrorMeanRadians"] = float(self.heading_error_mean_radians)
+        return payload
+
+
+def real_vs_sim_correlation_window_stats_from_dict(
+    payload: Mapping[str, Any],
+) -> RealVsSimCorrelationWindowStats:
+    """Rebuild :class:`RealVsSimCorrelationWindowStats` from JSON."""
+
+    heading_value = payload.get("headingErrorMeanRadians")
+    return RealVsSimCorrelationWindowStats(
+        window_index=int(payload["windowIndex"]),
+        pair_count=int(payload["pairCount"]),
+        bag_time_start_seconds=float(payload["bagTimeStartSeconds"]),
+        bag_time_end_seconds=float(payload["bagTimeEndSeconds"]),
+        translation_error_mean_meters=float(payload["translationErrorMeanMeters"]),
+        translation_error_p95_meters=float(payload["translationErrorP95Meters"]),
+        translation_error_max_meters=float(payload["translationErrorMaxMeters"]),
+        heading_error_mean_radians=None if heading_value is None else float(heading_value),
+    )
+
+
+def compute_per_window_correlation_stats(
+    report: RealVsSimCorrelationReport,
+    *,
+    strata: int,
+    mode: str = "equal-duration",
+) -> tuple[RealVsSimCorrelationWindowStats, ...]:
+    """Return per-window aggregate stats for ``report.pairs``.
+
+    Empty windows (no pairs landed) are dropped from the returned tuple.
+    Heading mean is ``None`` when no pair in the window carries heading
+    data. The bag-time span fields describe the actual min/max
+    ``bag_timestamp_seconds`` of the pairs in each window.
+    """
+
+    if strata <= 1 or not report.pairs:
+        return ()
+    windows = _split_pairs(report.pairs, strata, mode)
+    stats: list[RealVsSimCorrelationWindowStats] = []
+    for window_index, window_pairs in enumerate(windows):
+        if not window_pairs:
+            continue
+        translation_errors = [float(pair.translation_error_meters) for pair in window_pairs]
+        timestamps = [float(pair.bag_timestamp_seconds) for pair in window_pairs]
+        heading_errors = [
+            float(pair.heading_error_radians) for pair in window_pairs if pair.heading_error_radians is not None
+        ]
+        stats.append(
+            RealVsSimCorrelationWindowStats(
+                window_index=window_index,
+                pair_count=len(window_pairs),
+                bag_time_start_seconds=min(timestamps),
+                bag_time_end_seconds=max(timestamps),
+                translation_error_mean_meters=sum(translation_errors) / len(translation_errors),
+                translation_error_p95_meters=_percentile(translation_errors, 95.0),
+                translation_error_max_meters=max(translation_errors),
+                heading_error_mean_radians=(sum(heading_errors) / len(heading_errors) if heading_errors else None),
+            )
+        )
+    return tuple(stats)
+
+
 def _split_pairs_by_time(
     pairs: Sequence[CorrelatedPosePair],
     strata: int,

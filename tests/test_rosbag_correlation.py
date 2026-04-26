@@ -17,7 +17,9 @@ from gs_sim2real.robotics import (
     CorrelatedPosePair,
     REAL_VS_SIM_CORRELATION_REPORT_VERSION,
     RealVsSimCorrelationThresholds,
+    RealVsSimCorrelationWindowStats,
     SimPoseSample,
+    compute_per_window_correlation_stats,
     correlate_against_sim_trajectory,
     correlation_threshold_overrides_from_dict,
     correlation_threshold_overrides_to_dict,
@@ -28,6 +30,7 @@ from gs_sim2real.robotics import (
     merge_navsat_with_imu_orientation,
     real_vs_sim_correlation_report_from_dict,
     real_vs_sim_correlation_thresholds_from_dict,
+    real_vs_sim_correlation_window_stats_from_dict,
     render_real_vs_sim_correlation_markdown,
     wgs84_to_ecef,
     wgs84_to_local_enu,
@@ -1054,3 +1057,73 @@ def test_correlation_strata_mode_equal_pair_count_handles_uneven_split() -> None
     _, failed_strict = evaluate_real_vs_sim_correlation_thresholds(report, thresholds_strict)
     for index in range(4):
         assert f"translation-pair-distribution-window-{index}" in failed_strict
+
+
+def test_compute_per_window_correlation_stats_returns_per_window_aggregates() -> None:
+    """compute_per_window_correlation_stats must return mean/p95/max + bag span per window."""
+    pairs_timeline = [(float(i), 0.0) for i in range(5)] + [(float(i), 1.0) for i in range(5, 10)]
+    report = _correlation_report_with_pair_timeline(pairs_timeline)
+    stats = compute_per_window_correlation_stats(report, strata=2, mode="equal-duration")
+    assert len(stats) == 2
+    window0, window1 = stats
+    assert window0.window_index == 0
+    assert window0.pair_count == 5
+    assert window0.translation_error_mean_meters == pytest.approx(0.0)
+    assert window0.translation_error_max_meters == pytest.approx(0.0)
+    assert window0.heading_error_mean_radians is None
+    assert window0.bag_time_start_seconds == pytest.approx(0.0)
+    assert window0.bag_time_end_seconds == pytest.approx(4.0)
+    assert window1.window_index == 1
+    assert window1.pair_count == 5
+    assert window1.translation_error_mean_meters == pytest.approx(1.0)
+    assert window1.translation_error_max_meters == pytest.approx(1.0)
+    assert window1.bag_time_start_seconds == pytest.approx(5.0)
+    assert window1.bag_time_end_seconds == pytest.approx(9.0)
+
+
+def test_compute_per_window_correlation_stats_drops_empty_windows() -> None:
+    """Windows that hold no pairs (e.g. quiet stretches) must be omitted from the result."""
+    pairs_timeline = [(0.0, 0.0), (0.5, 0.0), (1.0, 0.0)]
+    report = _correlation_report_with_pair_timeline(pairs_timeline)
+    stats = compute_per_window_correlation_stats(report, strata=4, mode="equal-duration")
+    # Equal-duration over [0, 1] s into 4 windows. Pairs at t=0, 0.5, 1.0
+    # land in windows 0, 2, 3 (index = floor(offset/duration * 4)).
+    indices = sorted(stat.window_index for stat in stats)
+    assert indices == [0, 2, 3]
+
+
+def test_compute_per_window_correlation_stats_returns_empty_when_strata_le_one() -> None:
+    """strata <= 1 must return an empty tuple (no stratification requested)."""
+    pairs_timeline = [(float(i), 0.0) for i in range(5)]
+    report = _correlation_report_with_pair_timeline(pairs_timeline)
+    assert compute_per_window_correlation_stats(report, strata=1, mode="equal-duration") == ()
+    assert compute_per_window_correlation_stats(report, strata=0, mode="equal-duration") == ()
+
+
+def test_real_vs_sim_correlation_window_stats_round_trips_through_json() -> None:
+    """Window stats round-trip through to_dict/from_dict including the optional heading mean."""
+    stats = RealVsSimCorrelationWindowStats(
+        window_index=2,
+        pair_count=4,
+        bag_time_start_seconds=1.0,
+        bag_time_end_seconds=2.5,
+        translation_error_mean_meters=0.123,
+        translation_error_p95_meters=0.456,
+        translation_error_max_meters=0.789,
+        heading_error_mean_radians=0.05,
+    )
+    rebuilt = real_vs_sim_correlation_window_stats_from_dict(stats.to_dict())
+    assert rebuilt == stats
+    # No heading data: heading key must be omitted from the payload.
+    no_heading = RealVsSimCorrelationWindowStats(
+        window_index=0,
+        pair_count=1,
+        bag_time_start_seconds=0.0,
+        bag_time_end_seconds=0.0,
+        translation_error_mean_meters=0.0,
+        translation_error_p95_meters=0.0,
+        translation_error_max_meters=0.0,
+    )
+    payload = no_heading.to_dict()
+    assert "headingErrorMeanRadians" not in payload
+    assert real_vs_sim_correlation_window_stats_from_dict(payload) == no_heading
