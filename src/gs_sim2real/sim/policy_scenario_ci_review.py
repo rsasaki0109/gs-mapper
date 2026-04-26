@@ -814,6 +814,7 @@ def run_review_cli(args: Any) -> None:
         max_exceeding_translation_pair_fraction=getattr(args, "max_correlation_pair_fraction", None),
         max_pair_heading_error_radians=getattr(args, "max_correlation_pair_heading_radians", None),
         max_exceeding_heading_pair_fraction=getattr(args, "max_correlation_heading_pair_fraction", None),
+        pair_distribution_strata=getattr(args, "correlation_pair_distribution_strata", None),
     )
     if correlation_thresholds.is_empty:
         correlation_thresholds = None
@@ -915,6 +916,8 @@ def _describe_correlation_thresholds(thresholds: RealVsSimCorrelationThresholds)
             f"heading pair distribution: ≤ {thresholds.max_exceeding_heading_pair_fraction:g} fraction "
             f"of pairs above {thresholds.max_pair_heading_error_radians:g} rad"
         )
+    if thresholds.pair_distribution_strata is not None and thresholds.pair_distribution_strata > 1:
+        parts.append(f"pair distribution stratified into {thresholds.pair_distribution_strata} windows")
     return ", ".join(parts) if parts else "no thresholds configured"
 
 

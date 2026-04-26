@@ -1568,6 +1568,16 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     rpsrev.add_argument(
+        "--correlation-pair-distribution-strata",
+        type=int,
+        default=None,
+        help=(
+            "Optional time stratification: split each correlation report's pair list into N equal-duration "
+            "windows by bag_timestamp_seconds and run the per-pair distribution gates against each window "
+            "independently (failure tag includes the window index)"
+        ),
+    )
+    rpsrev.add_argument(
         "--correlation-thresholds-config",
         default=None,
         help=(

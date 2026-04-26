@@ -260,6 +260,13 @@ class RealVsSimCorrelationThresholds:
     max_exceeding_translation_pair_fraction: float | None = None
     max_pair_heading_error_radians: float | None = None
     max_exceeding_heading_pair_fraction: float | None = None
+    pair_distribution_strata: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.pair_distribution_strata is not None:
+            if int(self.pair_distribution_strata) < 1:
+                raise ValueError("pair_distribution_strata must be >= 1 when set")
+            object.__setattr__(self, "pair_distribution_strata", int(self.pair_distribution_strata))
 
     @property
     def is_empty(self) -> bool:
@@ -292,6 +299,8 @@ class RealVsSimCorrelationThresholds:
             payload["maxPairHeadingErrorRadians"] = float(self.max_pair_heading_error_radians)
         if self.max_exceeding_heading_pair_fraction is not None:
             payload["maxExceedingHeadingPairFraction"] = float(self.max_exceeding_heading_pair_fraction)
+        if self.pair_distribution_strata is not None and self.pair_distribution_strata > 1:
+            payload["pairDistributionStrata"] = int(self.pair_distribution_strata)
         return payload
 
 
@@ -302,6 +311,7 @@ def real_vs_sim_correlation_thresholds_from_dict(payload: Mapping[str, Any]) -> 
         value = payload.get(key)
         return None if value is None else float(value)
 
+    strata_value = payload.get("pairDistributionStrata")
     return RealVsSimCorrelationThresholds(
         max_translation_error_mean_meters=_optional("maxTranslationErrorMeanMeters"),
         max_translation_error_p95_meters=_optional("maxTranslationErrorP95Meters"),
@@ -311,6 +321,7 @@ def real_vs_sim_correlation_thresholds_from_dict(payload: Mapping[str, Any]) -> 
         max_exceeding_translation_pair_fraction=_optional("maxExceedingTranslationPairFraction"),
         max_pair_heading_error_radians=_optional("maxPairHeadingErrorRadians"),
         max_exceeding_heading_pair_fraction=_optional("maxExceedingHeadingPairFraction"),
+        pair_distribution_strata=None if strata_value is None else int(strata_value),
     )
 
 
@@ -395,29 +406,78 @@ def evaluate_real_vs_sim_correlation_thresholds(
         and float(report.heading_error_mean_radians) > thresholds.max_heading_error_mean_radians
     ):
         failed.append("heading-mean")
+    strata = thresholds.pair_distribution_strata
     if (
         thresholds.max_pair_translation_error_meters is not None
         and thresholds.max_exceeding_translation_pair_fraction is not None
         and report.pairs
     ):
         bound = float(thresholds.max_pair_translation_error_meters)
-        exceeding = sum(1 for pair in report.pairs if float(pair.translation_error_meters) > bound)
-        fraction = exceeding / len(report.pairs)
-        if fraction > float(thresholds.max_exceeding_translation_pair_fraction):
-            failed.append("translation-pair-distribution")
+        limit = float(thresholds.max_exceeding_translation_pair_fraction)
+        if strata is None or strata <= 1:
+            exceeding = sum(1 for pair in report.pairs if float(pair.translation_error_meters) > bound)
+            if exceeding / len(report.pairs) > limit:
+                failed.append("translation-pair-distribution")
+        else:
+            for window_index, window_pairs in enumerate(_split_pairs_by_time(report.pairs, strata)):
+                if not window_pairs:
+                    continue
+                exceeding = sum(1 for pair in window_pairs if float(pair.translation_error_meters) > bound)
+                if exceeding / len(window_pairs) > limit:
+                    failed.append(f"translation-pair-distribution-window-{window_index}")
     if (
         thresholds.max_pair_heading_error_radians is not None
         and thresholds.max_exceeding_heading_pair_fraction is not None
         and report.pairs
     ):
         bound = float(thresholds.max_pair_heading_error_radians)
-        with_heading = [pair for pair in report.pairs if pair.heading_error_radians is not None]
-        if with_heading:
-            exceeding = sum(1 for pair in with_heading if float(pair.heading_error_radians) > bound)
-            fraction = exceeding / len(with_heading)
-            if fraction > float(thresholds.max_exceeding_heading_pair_fraction):
-                failed.append("heading-pair-distribution")
+        limit = float(thresholds.max_exceeding_heading_pair_fraction)
+        if strata is None or strata <= 1:
+            with_heading = [pair for pair in report.pairs if pair.heading_error_radians is not None]
+            if with_heading:
+                exceeding = sum(1 for pair in with_heading if float(pair.heading_error_radians) > bound)
+                if exceeding / len(with_heading) > limit:
+                    failed.append("heading-pair-distribution")
+        else:
+            for window_index, window_pairs in enumerate(_split_pairs_by_time(report.pairs, strata)):
+                with_heading = [pair for pair in window_pairs if pair.heading_error_radians is not None]
+                if not with_heading:
+                    continue
+                exceeding = sum(1 for pair in with_heading if float(pair.heading_error_radians) > bound)
+                if exceeding / len(with_heading) > limit:
+                    failed.append(f"heading-pair-distribution-window-{window_index}")
     return (not failed, tuple(failed))
+
+
+def _split_pairs_by_time(
+    pairs: Sequence[CorrelatedPosePair],
+    strata: int,
+) -> list[list[CorrelatedPosePair]]:
+    """Partition ``pairs`` into ``strata`` equal-duration time windows.
+
+    The window boundaries span ``[min(bag_timestamp_seconds), max(...)]``.
+    Pairs at the upper boundary go to the last window. When all pairs share
+    the same timestamp (zero duration) every pair lands in window 0 and the
+    other windows are empty.
+    """
+
+    if strata <= 1 or not pairs:
+        return [list(pairs)]
+    timestamps = [float(pair.bag_timestamp_seconds) for pair in pairs]
+    start = min(timestamps)
+    end = max(timestamps)
+    duration = end - start
+    windows: list[list[CorrelatedPosePair]] = [[] for _ in range(strata)]
+    if duration <= 0.0:
+        windows[0].extend(pairs)
+        return windows
+    for pair, ts in zip(pairs, timestamps, strict=True):
+        offset = ts - start
+        index = int(offset / duration * strata)
+        if index >= strata:
+            index = strata - 1
+        windows[index].append(pair)
+    return windows
 
 
 _NAVSAT_MSGTYPES: frozenset[str] = frozenset({"sensor_msgs/msg/NavSatFix", "sensor_msgs/NavSatFix"})

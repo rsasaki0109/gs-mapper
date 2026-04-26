@@ -792,3 +792,84 @@ def test_correlation_thresholds_heading_pair_distribution_round_trips() -> None:
     )
     rebuilt = real_vs_sim_correlation_thresholds_from_dict(thresholds.to_dict())
     assert rebuilt == thresholds
+
+
+def _correlation_report_with_pair_timeline(
+    pair_errors: list[tuple[float, float]],
+):
+    """Build a synthetic report whose pairs have explicit (timestamp, error) shape."""
+    bag_samples = [BagPoseSample(timestamp_seconds=ts, position=(0.0, 0.0, 0.0)) for ts, _ in pair_errors]
+    sim_samples = [
+        SimPoseSample(timestamp_seconds=ts, position=(error, 0.0, 0.0), orientation_xyzw=(0, 0, 0, 1))
+        for ts, error in pair_errors
+    ]
+    return correlate_against_sim_trajectory(_make_bag_stream(bag_samples), sim_samples, max_match_dt_seconds=0.5)
+
+
+def test_correlation_pair_distribution_strata_isolates_late_drift() -> None:
+    """Pairs concentrated in window 1 must trip a window-specific failure tag, not the aggregate."""
+    # 10 pairs over [0, 9] s. First 5 are clean, last 5 have drift that exceeds the bound.
+    # Aggregate: 5/10 = 50% > 0.2 limit -> would fire the aggregate tag.
+    # With strata=2: window 0 has 0/5 exceeding, window 1 has 5/5 exceeding -> only window 1 trips.
+    pairs_timeline = [(float(i), 0.0) for i in range(5)] + [(float(i), 1.0) for i in range(5, 10)]
+    report = _correlation_report_with_pair_timeline(pairs_timeline)
+    thresholds = RealVsSimCorrelationThresholds(
+        max_pair_translation_error_meters=0.5,
+        max_exceeding_translation_pair_fraction=0.2,
+        pair_distribution_strata=2,
+    )
+    passed, failed = evaluate_real_vs_sim_correlation_thresholds(report, thresholds)
+    assert passed is False
+    # Aggregate tag must NOT appear — only window-specific tags.
+    assert "translation-pair-distribution" not in failed
+    assert "translation-pair-distribution-window-1" in failed
+    assert "translation-pair-distribution-window-0" not in failed
+
+
+def test_correlation_pair_distribution_strata_skips_empty_windows_silently() -> None:
+    """Windows with no pairs (e.g. a long quiet stretch in the bag) must not produce a failure."""
+    # 6 pairs all clustered in [0, 1] s. Strata=4 means windows 0 and 1 collect everything,
+    # windows 2 and 3 are empty. Since all errors are 0, no window fails.
+    pairs_timeline = [(0.0, 0.0), (0.2, 0.0), (0.4, 0.0), (0.6, 0.0), (0.8, 0.0), (1.0, 0.0)]
+    report = _correlation_report_with_pair_timeline(pairs_timeline)
+    thresholds = RealVsSimCorrelationThresholds(
+        max_pair_translation_error_meters=0.1,
+        max_exceeding_translation_pair_fraction=0.0,
+        pair_distribution_strata=4,
+    )
+    passed, failed = evaluate_real_vs_sim_correlation_thresholds(report, thresholds)
+    assert passed is True
+    assert failed == ()
+
+
+def test_correlation_pair_distribution_strata_one_falls_back_to_aggregate_tag() -> None:
+    """strata=1 (or None) must keep the existing aggregate tag for backwards compat."""
+    pairs_timeline = [(float(i), 1.0) for i in range(10)]
+    report = _correlation_report_with_pair_timeline(pairs_timeline)
+    aggregate = RealVsSimCorrelationThresholds(
+        max_pair_translation_error_meters=0.5,
+        max_exceeding_translation_pair_fraction=0.2,
+        pair_distribution_strata=1,
+    )
+    _, failed_aggregate = evaluate_real_vs_sim_correlation_thresholds(report, aggregate)
+    assert "translation-pair-distribution" in failed_aggregate
+    assert all(not tag.startswith("translation-pair-distribution-window-") for tag in failed_aggregate)
+
+
+def test_correlation_pair_distribution_strata_zero_or_negative_raises() -> None:
+    """pair_distribution_strata must be >= 1 when set; out-of-range values raise on construction."""
+    with pytest.raises(ValueError, match="pair_distribution_strata"):
+        RealVsSimCorrelationThresholds(pair_distribution_strata=0)
+    with pytest.raises(ValueError, match="pair_distribution_strata"):
+        RealVsSimCorrelationThresholds(pair_distribution_strata=-3)
+
+
+def test_correlation_pair_distribution_strata_round_trips_through_json() -> None:
+    """pair_distribution_strata must round-trip and be omitted from JSON when None or 1."""
+    explicit = RealVsSimCorrelationThresholds(pair_distribution_strata=4)
+    payload = explicit.to_dict()
+    assert payload["pairDistributionStrata"] == 4
+    assert real_vs_sim_correlation_thresholds_from_dict(payload) == explicit
+    # strata=1 is functionally identical to None so it is dropped on serialisation.
+    explicit_one = RealVsSimCorrelationThresholds(pair_distribution_strata=1)
+    assert "pairDistributionStrata" not in explicit_one.to_dict()
