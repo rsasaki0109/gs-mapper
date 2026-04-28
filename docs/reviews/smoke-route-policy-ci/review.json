@@ -1,0 +1,78 @@
+{
+  "activationActivated": true,
+  "activationId": "smoke-route-policy-ci-activation",
+  "activeWorkflowPath": "sample-artifacts/workflows/smoke-route-policy-ci.yml",
+  "adoption": {
+    "adopted": true,
+    "adoptedActiveWorkflowPath": "sample-artifacts/workflows/smoke-route-policy-ci-adopted.yml",
+    "adoptedSourceWorkflowPath": "sample-artifacts/ci-workflow-adopted.generated.yml",
+    "adoptionId": "smoke-route-policy-ci-adoption",
+    "metadata": {},
+    "pullRequestBranches": [
+      "main"
+    ],
+    "pushBranches": [],
+    "recordType": "route-policy-scenario-ci-review-adoption",
+    "triggerMode": "pull-request",
+    "workflowDiff": "--- manual\n+++ adopted\n@@ -4,6 +4,9 @@\n \n on:\n   workflow_dispatch: {}\n+  pull_request:\n+    branches:\n+      - 'main'\n \n jobs:\n   route-policy-scenario-shards:\n"
+  },
+  "failedShards": [],
+  "historyFailedChecks": [],
+  "historyPassed": true,
+  "manifestId": "smoke-route-policy-ci-manifest",
+  "mergeId": "smoke-route-policy-ci-merge",
+  "metadata": {
+    "activationFailedChecks": [],
+    "historyMarkdownPath": "sample-artifacts/shard-history.md",
+    "historyPath": "sample-artifacts/shard-history.json",
+    "pagesBaseUrl": "https://rsasaki0109.github.io/gs-mapper/reviews/smoke-route-policy-ci/",
+    "sampleBundle": true,
+    "sampleNotice": "Synthetic smoke fixture generated from scripts/smoke_route_policy_scenario_ci.py; it proves the scenario-CI review bundle contract but is not a production benchmark run.",
+    "sampleSource": "scripts/smoke_route_policy_scenario_ci.py",
+    "validationFailedChecks": []
+  },
+  "passed": true,
+  "recordType": "route-policy-scenario-ci-review",
+  "reportCount": 2,
+  "reviewId": "smoke-route-policy-ci-review",
+  "scenarioCount": 2,
+  "shardCount": 2,
+  "shardMergePassed": true,
+  "shards": [
+    {
+      "historyPath": "sample-artifacts/histories/smoke-route-policy-ci-matrix-direct-shard-001.json",
+      "metadata": {
+        "registryId": "smoke-route-policy-ci-registry"
+      },
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-review-shard",
+      "reportCount": 1,
+      "reportPaths": [
+        "sample-artifacts/reports/smoke-route-policy-ci-matrix-direct-shard-001/unit-near-short.json"
+      ],
+      "runPath": "sample-artifacts/runs/smoke-route-policy-ci-matrix-direct-shard-001.json",
+      "scenarioCount": 1,
+      "shardId": "smoke-route-policy-ci-matrix-direct-shard-001"
+    },
+    {
+      "historyPath": "sample-artifacts/histories/smoke-route-policy-ci-matrix-direct-shard-002.json",
+      "metadata": {
+        "registryId": "smoke-route-policy-ci-registry"
+      },
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-review-shard",
+      "reportCount": 1,
+      "reportPaths": [
+        "sample-artifacts/reports/smoke-route-policy-ci-matrix-direct-shard-002/unit-far-short.json"
+      ],
+      "runPath": "sample-artifacts/runs/smoke-route-policy-ci-matrix-direct-shard-002.json",
+      "scenarioCount": 1,
+      "shardId": "smoke-route-policy-ci-matrix-direct-shard-002"
+    }
+  ],
+  "sourceWorkflowPath": "sample-artifacts/ci-workflow.generated.yml",
+  "validationId": "smoke-route-policy-ci-validation",
+  "validationPassed": true,
+  "version": "gs-mapper-route-policy-scenario-ci-review/v1",
+  "workflowId": "smoke-route-policy-ci-workflow"
+}

@@ -1,0 +1,171 @@
+{
+  "manifestId": "smoke-route-policy-ci-manifest",
+  "matrix": {
+    "include": [
+      {
+        "cacheKey": "smoke-route-policy-ci-cache-smoke-route-policy-ci-shards-smoke-route-policy-ci-matrix-direct-shard-001",
+        "historyOutput": "ci/histories/smoke-route-policy-ci-matrix-direct-shard-001.json",
+        "jobId": "scenario-smoke-route-policy-ci-matrix-direct-shard-001",
+        "reportDir": "ci/reports/smoke-route-policy-ci-matrix-direct-shard-001",
+        "runOutput": "ci/runs/smoke-route-policy-ci-matrix-direct-shard-001.json",
+        "scenarioCount": 1,
+        "scenarioSetPath": "sample-artifacts/shards/smoke-route-policy-ci-matrix-direct-shard-001.json",
+        "shardId": "smoke-route-policy-ci-matrix-direct-shard-001"
+      },
+      {
+        "cacheKey": "smoke-route-policy-ci-cache-smoke-route-policy-ci-shards-smoke-route-policy-ci-matrix-direct-shard-002",
+        "historyOutput": "ci/histories/smoke-route-policy-ci-matrix-direct-shard-002.json",
+        "jobId": "scenario-smoke-route-policy-ci-matrix-direct-shard-002",
+        "reportDir": "ci/reports/smoke-route-policy-ci-matrix-direct-shard-002",
+        "runOutput": "ci/runs/smoke-route-policy-ci-matrix-direct-shard-002.json",
+        "scenarioCount": 1,
+        "scenarioSetPath": "sample-artifacts/shards/smoke-route-policy-ci-matrix-direct-shard-002.json",
+        "shardId": "smoke-route-policy-ci-matrix-direct-shard-002"
+      }
+    ]
+  },
+  "mergeJob": {
+    "cacheKey": "smoke-route-policy-ci-cache-smoke-route-policy-ci-shards-merge",
+    "command": [
+      "gs-mapper",
+      "route-policy-scenario-shard-merge",
+      "--run",
+      "ci/runs/smoke-route-policy-ci-matrix-direct-shard-001.json",
+      "--run",
+      "ci/runs/smoke-route-policy-ci-matrix-direct-shard-002.json",
+      "--merge-id",
+      "smoke-route-policy-ci-merge",
+      "--history-output",
+      "ci/history.json",
+      "--output",
+      "ci/merge.json",
+      "--fail-on-regression"
+    ],
+    "dependsOn": [
+      "scenario-smoke-route-policy-ci-matrix-direct-shard-001",
+      "scenario-smoke-route-policy-ci-matrix-direct-shard-002"
+    ],
+    "historyMarkdownOutput": null,
+    "historyOutput": "ci/history.json",
+    "jobId": "smoke-route-policy-ci-merge",
+    "markdownOutput": null,
+    "mergeId": "smoke-route-policy-ci-merge",
+    "metadata": {
+      "shardPlanId": "smoke-route-policy-ci-shards"
+    },
+    "output": "ci/merge.json",
+    "recordType": "route-policy-scenario-ci-merge-job",
+    "runInputs": [
+      "ci/runs/smoke-route-policy-ci-matrix-direct-shard-001.json",
+      "ci/runs/smoke-route-policy-ci-matrix-direct-shard-002.json"
+    ]
+  },
+  "metadata": {
+    "cacheKeyPrefix": "smoke-route-policy-ci-cache",
+    "failOnRegression": true,
+    "includeMarkdown": true
+  },
+  "recordType": "route-policy-scenario-ci-manifest",
+  "scenarioCount": 2,
+  "shardJobCount": 2,
+  "shardJobs": [
+    {
+      "cacheKey": "smoke-route-policy-ci-cache-smoke-route-policy-ci-shards-smoke-route-policy-ci-matrix-direct-shard-001",
+      "command": [
+        "gs-mapper",
+        "route-policy-scenario-set",
+        "--scenario-set",
+        "sample-artifacts/shards/smoke-route-policy-ci-matrix-direct-shard-001.json",
+        "--report-dir",
+        "ci/reports/smoke-route-policy-ci-matrix-direct-shard-001",
+        "--output",
+        "ci/runs/smoke-route-policy-ci-matrix-direct-shard-001.json",
+        "--history-output",
+        "ci/histories/smoke-route-policy-ci-matrix-direct-shard-001.json",
+        "--markdown-output",
+        "ci/runs/smoke-route-policy-ci-matrix-direct-shard-001.md",
+        "--history-markdown-output",
+        "ci/histories/smoke-route-policy-ci-matrix-direct-shard-001.md",
+        "--fail-on-regression"
+      ],
+      "expectedReportPaths": [
+        "ci/reports/smoke-route-policy-ci-matrix-direct-shard-001/unit-near-short.json"
+      ],
+      "historyMarkdownOutput": "ci/histories/smoke-route-policy-ci-matrix-direct-shard-001.md",
+      "historyOutput": "ci/histories/smoke-route-policy-ci-matrix-direct-shard-001.json",
+      "jobId": "scenario-smoke-route-policy-ci-matrix-direct-shard-001",
+      "markdownOutput": "ci/runs/smoke-route-policy-ci-matrix-direct-shard-001.md",
+      "mergeJobId": "smoke-route-policy-ci-merge",
+      "metadata": {
+        "matrixId": "smoke-route-policy-ci-matrix",
+        "maxScenariosPerShard": 1,
+        "registryId": "direct",
+        "registryMetadata": {},
+        "shardCount": 2,
+        "shardIndex": 1,
+        "sourceScenarioIds": [
+          "unit-near-short"
+        ],
+        "sourceScenarioSetId": "smoke-route-policy-ci-matrix-direct"
+      },
+      "policyRegistryPath": "../registry.json",
+      "recordType": "route-policy-scenario-ci-shard-job",
+      "reportDir": "ci/reports/smoke-route-policy-ci-matrix-direct-shard-001",
+      "runOutput": "ci/runs/smoke-route-policy-ci-matrix-direct-shard-001.json",
+      "scenarioCount": 1,
+      "scenarioSetPath": "sample-artifacts/shards/smoke-route-policy-ci-matrix-direct-shard-001.json",
+      "shardId": "smoke-route-policy-ci-matrix-direct-shard-001",
+      "sourceScenarioSetId": "smoke-route-policy-ci-matrix-direct"
+    },
+    {
+      "cacheKey": "smoke-route-policy-ci-cache-smoke-route-policy-ci-shards-smoke-route-policy-ci-matrix-direct-shard-002",
+      "command": [
+        "gs-mapper",
+        "route-policy-scenario-set",
+        "--scenario-set",
+        "sample-artifacts/shards/smoke-route-policy-ci-matrix-direct-shard-002.json",
+        "--report-dir",
+        "ci/reports/smoke-route-policy-ci-matrix-direct-shard-002",
+        "--output",
+        "ci/runs/smoke-route-policy-ci-matrix-direct-shard-002.json",
+        "--history-output",
+        "ci/histories/smoke-route-policy-ci-matrix-direct-shard-002.json",
+        "--markdown-output",
+        "ci/runs/smoke-route-policy-ci-matrix-direct-shard-002.md",
+        "--history-markdown-output",
+        "ci/histories/smoke-route-policy-ci-matrix-direct-shard-002.md",
+        "--fail-on-regression"
+      ],
+      "expectedReportPaths": [
+        "ci/reports/smoke-route-policy-ci-matrix-direct-shard-002/unit-far-short.json"
+      ],
+      "historyMarkdownOutput": "ci/histories/smoke-route-policy-ci-matrix-direct-shard-002.md",
+      "historyOutput": "ci/histories/smoke-route-policy-ci-matrix-direct-shard-002.json",
+      "jobId": "scenario-smoke-route-policy-ci-matrix-direct-shard-002",
+      "markdownOutput": "ci/runs/smoke-route-policy-ci-matrix-direct-shard-002.md",
+      "mergeJobId": "smoke-route-policy-ci-merge",
+      "metadata": {
+        "matrixId": "smoke-route-policy-ci-matrix",
+        "maxScenariosPerShard": 1,
+        "registryId": "direct",
+        "registryMetadata": {},
+        "shardCount": 2,
+        "shardIndex": 2,
+        "sourceScenarioIds": [
+          "unit-far-short"
+        ],
+        "sourceScenarioSetId": "smoke-route-policy-ci-matrix-direct"
+      },
+      "policyRegistryPath": "../registry.json",
+      "recordType": "route-policy-scenario-ci-shard-job",
+      "reportDir": "ci/reports/smoke-route-policy-ci-matrix-direct-shard-002",
+      "runOutput": "ci/runs/smoke-route-policy-ci-matrix-direct-shard-002.json",
+      "scenarioCount": 1,
+      "scenarioSetPath": "sample-artifacts/shards/smoke-route-policy-ci-matrix-direct-shard-002.json",
+      "shardId": "smoke-route-policy-ci-matrix-direct-shard-002",
+      "sourceScenarioSetId": "smoke-route-policy-ci-matrix-direct"
+    }
+  ],
+  "shardPlanId": "smoke-route-policy-ci-shards",
+  "version": "gs-mapper-route-policy-scenario-ci-manifest/v1"
+}

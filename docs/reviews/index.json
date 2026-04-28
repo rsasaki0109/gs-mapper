@@ -1,7 +1,19 @@
 {
-  "entries": [],
+  "entries": [
+    {
+      "adoptionAdopted": true,
+      "adoptionTriggerMode": "pull-request",
+      "bundleDir": "smoke-route-policy-ci",
+      "bundleHtml": "smoke-route-policy-ci/index.html",
+      "passed": true,
+      "reportCount": 2,
+      "reviewId": "smoke-route-policy-ci-review",
+      "scenarioCount": 2,
+      "shardCount": 2
+    }
+  ],
   "failCount": 0,
-  "passCount": 0,
+  "passCount": 1,
   "recordType": "gs-mapper-route-policy-scenario-ci-reviews-index/v1",
-  "reviewCount": 0
+  "reviewCount": 1
 }

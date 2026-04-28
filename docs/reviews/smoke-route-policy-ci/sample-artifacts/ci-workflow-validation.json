@@ -1,0 +1,313 @@
+{
+  "checkCount": 35,
+  "checks": [
+    {
+      "checkId": "workflow-yaml-parse",
+      "message": "workflow YAML parsed as a mapping",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "manifest-id",
+      "message": "workflow materialization references the expected manifest",
+      "metadata": {
+        "actual": "smoke-route-policy-ci-manifest",
+        "expected": "smoke-route-policy-ci-manifest"
+      },
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "workflow-name",
+      "message": "workflow name matches config",
+      "metadata": {
+        "actual": "Smoke Route Policy Scenario CI",
+        "expected": "Smoke Route Policy Scenario CI"
+      },
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "shard-job-count",
+      "message": "workflow metadata shard count matches manifest",
+      "metadata": {
+        "actual": 2,
+        "expected": 2
+      },
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "scenario-count",
+      "message": "workflow metadata scenario count matches manifest",
+      "metadata": {
+        "actual": 2,
+        "expected": 2
+      },
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "generated-header",
+      "message": "workflow contains generated-file header",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "shard-job-present",
+      "message": "workflow contains shard fan-out job",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "merge-job-present",
+      "message": "workflow contains merge fan-in job",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "upload-artifact-present",
+      "message": "workflow uploads shard artifacts",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "download-artifact-present",
+      "message": "workflow downloads shard artifacts",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "shard-command:smoke-route-policy-ci-matrix-direct-shard-001",
+      "message": "workflow contains command for shard smoke-route-policy-ci-matrix-direct-shard-001",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "shard-output:smoke-route-policy-ci-matrix-direct-shard-001",
+      "message": "workflow contains run output for shard smoke-route-policy-ci-matrix-direct-shard-001",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "shard-history-output:smoke-route-policy-ci-matrix-direct-shard-001",
+      "message": "workflow contains history output for shard smoke-route-policy-ci-matrix-direct-shard-001",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "shard-command:smoke-route-policy-ci-matrix-direct-shard-002",
+      "message": "workflow contains command for shard smoke-route-policy-ci-matrix-direct-shard-002",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "shard-output:smoke-route-policy-ci-matrix-direct-shard-002",
+      "message": "workflow contains run output for shard smoke-route-policy-ci-matrix-direct-shard-002",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "shard-history-output:smoke-route-policy-ci-matrix-direct-shard-002",
+      "message": "workflow contains history output for shard smoke-route-policy-ci-matrix-direct-shard-002",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "merge-command",
+      "message": "workflow contains merge command",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "yaml-name",
+      "message": "workflow YAML name matches config",
+      "metadata": {
+        "actual": "Smoke Route Policy Scenario CI",
+        "expected": "Smoke Route Policy Scenario CI"
+      },
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "yaml-triggers",
+      "message": "workflow YAML contains trigger map",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "yaml-jobs",
+      "message": "workflow YAML contains jobs map",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "yaml-shard-job",
+      "message": "workflow YAML contains shard job",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "yaml-merge-job",
+      "message": "workflow YAML contains merge job",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "yaml-shard-matrix-count",
+      "message": "shard matrix include count matches manifest",
+      "metadata": {
+        "actual": 2,
+        "expected": 2
+      },
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "yaml-shard-entry-job:smoke-route-policy-ci-matrix-direct-shard-001",
+      "message": "matrix entry job id matches shard smoke-route-policy-ci-matrix-direct-shard-001",
+      "metadata": {
+        "actual": "scenario-smoke-route-policy-ci-matrix-direct-shard-001",
+        "expected": "scenario-smoke-route-policy-ci-matrix-direct-shard-001"
+      },
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "yaml-shard-entry-scenario-set:smoke-route-policy-ci-matrix-direct-shard-001",
+      "message": "matrix entry scenario-set path matches shard smoke-route-policy-ci-matrix-direct-shard-001",
+      "metadata": {
+        "actual": "sample-artifacts/shards/smoke-route-policy-ci-matrix-direct-shard-001.json",
+        "expected": "sample-artifacts/shards/smoke-route-policy-ci-matrix-direct-shard-001.json"
+      },
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "yaml-shard-entry-command:smoke-route-policy-ci-matrix-direct-shard-001",
+      "message": "matrix entry command matches shard smoke-route-policy-ci-matrix-direct-shard-001",
+      "metadata": {
+        "actual": "gs-mapper route-policy-scenario-set --scenario-set sample-artifacts/shards/smoke-route-policy-ci-matrix-direct-shard-001.json --report-dir ci/reports/smoke-route-policy-ci-matrix-direct-shard-001 --output ci/runs/smoke-route-policy-ci-matrix-direct-shard-001.json --history-output ci/histories/smoke-route-policy-ci-matrix-direct-shard-001.json --markdown-output ci/runs/smoke-route-policy-ci-matrix-direct-shard-001.md --history-markdown-output ci/histories/smoke-route-policy-ci-matrix-direct-shard-001.md --fail-on-regression",
+        "expected": "gs-mapper route-policy-scenario-set --scenario-set sample-artifacts/shards/smoke-route-policy-ci-matrix-direct-shard-001.json --report-dir ci/reports/smoke-route-policy-ci-matrix-direct-shard-001 --output ci/runs/smoke-route-policy-ci-matrix-direct-shard-001.json --history-output ci/histories/smoke-route-policy-ci-matrix-direct-shard-001.json --markdown-output ci/runs/smoke-route-policy-ci-matrix-direct-shard-001.md --history-markdown-output ci/histories/smoke-route-policy-ci-matrix-direct-shard-001.md --fail-on-regression"
+      },
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "yaml-shard-entry-run-output:smoke-route-policy-ci-matrix-direct-shard-001",
+      "message": "matrix entry run output matches shard smoke-route-policy-ci-matrix-direct-shard-001",
+      "metadata": {
+        "actual": "ci/runs/smoke-route-policy-ci-matrix-direct-shard-001.json",
+        "expected": "ci/runs/smoke-route-policy-ci-matrix-direct-shard-001.json"
+      },
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "yaml-shard-entry-history-output:smoke-route-policy-ci-matrix-direct-shard-001",
+      "message": "matrix entry history output matches shard smoke-route-policy-ci-matrix-direct-shard-001",
+      "metadata": {
+        "actual": "ci/histories/smoke-route-policy-ci-matrix-direct-shard-001.json",
+        "expected": "ci/histories/smoke-route-policy-ci-matrix-direct-shard-001.json"
+      },
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "yaml-shard-entry-job:smoke-route-policy-ci-matrix-direct-shard-002",
+      "message": "matrix entry job id matches shard smoke-route-policy-ci-matrix-direct-shard-002",
+      "metadata": {
+        "actual": "scenario-smoke-route-policy-ci-matrix-direct-shard-002",
+        "expected": "scenario-smoke-route-policy-ci-matrix-direct-shard-002"
+      },
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "yaml-shard-entry-scenario-set:smoke-route-policy-ci-matrix-direct-shard-002",
+      "message": "matrix entry scenario-set path matches shard smoke-route-policy-ci-matrix-direct-shard-002",
+      "metadata": {
+        "actual": "sample-artifacts/shards/smoke-route-policy-ci-matrix-direct-shard-002.json",
+        "expected": "sample-artifacts/shards/smoke-route-policy-ci-matrix-direct-shard-002.json"
+      },
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "yaml-shard-entry-command:smoke-route-policy-ci-matrix-direct-shard-002",
+      "message": "matrix entry command matches shard smoke-route-policy-ci-matrix-direct-shard-002",
+      "metadata": {
+        "actual": "gs-mapper route-policy-scenario-set --scenario-set sample-artifacts/shards/smoke-route-policy-ci-matrix-direct-shard-002.json --report-dir ci/reports/smoke-route-policy-ci-matrix-direct-shard-002 --output ci/runs/smoke-route-policy-ci-matrix-direct-shard-002.json --history-output ci/histories/smoke-route-policy-ci-matrix-direct-shard-002.json --markdown-output ci/runs/smoke-route-policy-ci-matrix-direct-shard-002.md --history-markdown-output ci/histories/smoke-route-policy-ci-matrix-direct-shard-002.md --fail-on-regression",
+        "expected": "gs-mapper route-policy-scenario-set --scenario-set sample-artifacts/shards/smoke-route-policy-ci-matrix-direct-shard-002.json --report-dir ci/reports/smoke-route-policy-ci-matrix-direct-shard-002 --output ci/runs/smoke-route-policy-ci-matrix-direct-shard-002.json --history-output ci/histories/smoke-route-policy-ci-matrix-direct-shard-002.json --markdown-output ci/runs/smoke-route-policy-ci-matrix-direct-shard-002.md --history-markdown-output ci/histories/smoke-route-policy-ci-matrix-direct-shard-002.md --fail-on-regression"
+      },
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "yaml-shard-entry-run-output:smoke-route-policy-ci-matrix-direct-shard-002",
+      "message": "matrix entry run output matches shard smoke-route-policy-ci-matrix-direct-shard-002",
+      "metadata": {
+        "actual": "ci/runs/smoke-route-policy-ci-matrix-direct-shard-002.json",
+        "expected": "ci/runs/smoke-route-policy-ci-matrix-direct-shard-002.json"
+      },
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "yaml-shard-entry-history-output:smoke-route-policy-ci-matrix-direct-shard-002",
+      "message": "matrix entry history output matches shard smoke-route-policy-ci-matrix-direct-shard-002",
+      "metadata": {
+        "actual": "ci/histories/smoke-route-policy-ci-matrix-direct-shard-002.json",
+        "expected": "ci/histories/smoke-route-policy-ci-matrix-direct-shard-002.json"
+      },
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "yaml-merge-needs",
+      "message": "merge job depends on shard fan-out job",
+      "metadata": {
+        "actual": "route-policy-scenario-shards",
+        "expected": "route-policy-scenario-shards"
+      },
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    },
+    {
+      "checkId": "yaml-merge-command-step",
+      "message": "merge job contains manifest merge command",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-validation-check"
+    }
+  ],
+  "failedChecks": [],
+  "manifestId": "smoke-route-policy-ci-manifest",
+  "metadata": {
+    "scenarioCount": 2,
+    "shardJobCount": 2
+  },
+  "passed": true,
+  "recordType": "route-policy-scenario-ci-workflow-validation",
+  "validationId": "smoke-route-policy-ci-validation",
+  "version": "gs-mapper-route-policy-scenario-ci-workflow-validation/v1",
+  "workflowId": "smoke-route-policy-ci-workflow",
+  "workflowPath": "sample-artifacts/ci-workflow.generated.yml"
+}

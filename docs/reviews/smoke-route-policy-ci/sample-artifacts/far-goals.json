@@ -1,0 +1,21 @@
+{
+  "frameId": "generic_world",
+  "goalCount": 1,
+  "goals": [
+    {
+      "frameId": null,
+      "goalId": "far",
+      "metadata": {},
+      "position": [
+        0.5,
+        0.0,
+        0.0
+      ]
+    }
+  ],
+  "metadata": {},
+  "recordType": "route-policy-goal-suite",
+  "sceneId": "unit-scene",
+  "suiteId": "smoke-route-policy-ci-far",
+  "version": "gs-mapper-route-policy-goal-suite/v1"
+}

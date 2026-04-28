@@ -1,0 +1,147 @@
+{
+  "activeWorkflowPath": "sample-artifacts/workflows/smoke-route-policy-ci.yml",
+  "checkCount": 17,
+  "checks": [
+    {
+      "checkId": "trigger-mode",
+      "message": "trigger mode is supported",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-promotion-check"
+    },
+    {
+      "checkId": "review-passed",
+      "message": "scenario CI review passed",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-promotion-check"
+    },
+    {
+      "checkId": "validation-passed",
+      "message": "workflow validation passed",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-promotion-check"
+    },
+    {
+      "checkId": "activation-active",
+      "message": "workflow activation was active",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-promotion-check"
+    },
+    {
+      "checkId": "shard-merge-passed",
+      "message": "scenario shard merge passed",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-promotion-check"
+    },
+    {
+      "checkId": "history-passed",
+      "message": "merged benchmark history passed",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-promotion-check"
+    },
+    {
+      "checkId": "active-path-root",
+      "message": "active workflow path is under .github/workflows",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-promotion-check"
+    },
+    {
+      "checkId": "active-path-suffix",
+      "message": "active workflow path has a YAML suffix",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-promotion-check"
+    },
+    {
+      "checkId": "review-url",
+      "message": "review URL is attached to the promotion",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-promotion-check"
+    },
+    {
+      "checkId": "shard-coverage",
+      "message": "review includes executed shard coverage",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-promotion-check"
+    },
+    {
+      "checkId": "failed-shards",
+      "message": "review has no failed shards",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-promotion-check"
+    },
+    {
+      "checkId": "push-branches-present",
+      "message": "push trigger branches are configured",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-promotion-check"
+    },
+    {
+      "checkId": "pull-request-branches-present",
+      "message": "pull_request trigger branches are configured",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-promotion-check"
+    },
+    {
+      "checkId": "push-branches-mode",
+      "message": "push branches match trigger mode",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-promotion-check"
+    },
+    {
+      "checkId": "pull-request-branches-mode",
+      "message": "pull request branches match trigger mode",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-promotion-check"
+    },
+    {
+      "checkId": "push-branch-policy",
+      "message": "trigger branches satisfy literal branch policy",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-promotion-check"
+    },
+    {
+      "checkId": "pull-request-branch-policy",
+      "message": "trigger branches satisfy literal branch policy",
+      "metadata": {},
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-workflow-promotion-check"
+    }
+  ],
+  "failedChecks": [],
+  "manifestId": "smoke-route-policy-ci-manifest",
+  "metadata": {
+    "reviewPassed": true,
+    "reviewReportCount": 2,
+    "reviewScenarioCount": 2,
+    "reviewShardCount": 2
+  },
+  "passed": true,
+  "promoted": true,
+  "promotionId": "smoke-route-policy-ci-promotion",
+  "pullRequestBranches": [
+    "main"
+  ],
+  "pushBranches": [],
+  "recordType": "route-policy-scenario-ci-workflow-promotion",
+  "reviewId": "smoke-route-policy-ci-review",
+  "reviewUrl": "https://rsasaki0109.github.io/gs-mapper/reviews/smoke-route-policy-ci/",
+  "triggerBranchCount": 1,
+  "triggerMode": "pull-request",
+  "version": "gs-mapper-route-policy-scenario-ci-workflow-promotion/v1",
+  "workflowId": "smoke-route-policy-ci-workflow"
+}

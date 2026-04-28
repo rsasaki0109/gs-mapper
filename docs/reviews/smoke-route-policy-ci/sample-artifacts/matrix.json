@@ -1,0 +1,59 @@
+{
+  "configs": [
+    {
+      "configId": "short",
+      "dynamicObstaclesPath": null,
+      "episodeCount": 1,
+      "maxSteps": 4,
+      "metadata": {},
+      "rawSensorNoiseProfilePath": null,
+      "recordType": "route-policy-matrix-config",
+      "seedStart": 0,
+      "sensorNoiseProfilePath": null,
+      "thresholds": null
+    }
+  ],
+  "episodeCount": 16,
+  "goalSuites": [
+    {
+      "goalSuiteKey": "near",
+      "goalSuitePath": "near-goals.json",
+      "metadata": {},
+      "recordType": "route-policy-matrix-goal-suite"
+    },
+    {
+      "goalSuiteKey": "far",
+      "goalSuitePath": "far-goals.json",
+      "metadata": {},
+      "recordType": "route-policy-matrix-goal-suite"
+    }
+  ],
+  "includeDirectBaseline": false,
+  "matrixId": "smoke-route-policy-ci-matrix",
+  "maxSteps": null,
+  "metadata": {},
+  "recordType": "route-policy-scenario-matrix",
+  "registries": [
+    {
+      "metadata": {},
+      "policyRegistryPath": "registry.json",
+      "recordType": "route-policy-matrix-registry",
+      "registryId": "direct"
+    }
+  ],
+  "scenarioCountPerSet": 2,
+  "scenarioSetCount": 1,
+  "scenes": [
+    {
+      "metadata": {},
+      "recordType": "route-policy-matrix-scene",
+      "sceneCatalog": "scenes.json",
+      "sceneId": "unit-scene",
+      "sceneKey": "unit",
+      "siteUrl": null
+    }
+  ],
+  "seedStart": 100,
+  "siteUrl": "https://rsasaki0109.github.io/gs-mapper/",
+  "version": "gs-mapper-route-policy-scenario-matrix/v1"
+}

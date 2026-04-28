@@ -1,0 +1,15 @@
+{
+  "metadata": {},
+  "policies": [
+    {
+      "metadata": {},
+      "modelPath": null,
+      "policyName": "direct",
+      "policyType": "direct-goal"
+    }
+  ],
+  "policyCount": 1,
+  "recordType": "route-policy-registry",
+  "registryId": "smoke-route-policy-ci-registry",
+  "version": "gs-mapper-route-policy-registry/v1"
+}

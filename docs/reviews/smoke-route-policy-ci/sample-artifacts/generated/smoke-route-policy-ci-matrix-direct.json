@@ -1,0 +1,69 @@
+{
+  "episodeCount": 16,
+  "includeDirectBaseline": false,
+  "maxSteps": null,
+  "metadata": {
+    "matrixId": "smoke-route-policy-ci-matrix",
+    "registryId": "direct",
+    "registryMetadata": {}
+  },
+  "policyRegistryPath": "../registry.json",
+  "recordType": "route-policy-scenario-set",
+  "scenarioCount": 2,
+  "scenarioSetId": "smoke-route-policy-ci-matrix-direct",
+  "scenarios": [
+    {
+      "dynamicObstaclesPath": null,
+      "episodeCount": 1,
+      "goalSuitePath": "../near-goals.json",
+      "maxSteps": 4,
+      "metadata": {
+        "configId": "short",
+        "configMetadata": {},
+        "goalSuiteKey": "near",
+        "goalSuiteMetadata": {},
+        "matrixId": "smoke-route-policy-ci-matrix",
+        "registryId": "direct",
+        "sceneKey": "unit",
+        "sceneMetadata": {}
+      },
+      "rawSensorNoiseProfilePath": null,
+      "recordType": "route-policy-scenario",
+      "scenarioId": "unit-near-short",
+      "sceneCatalog": "../scenes.json",
+      "sceneId": "unit-scene",
+      "seedStart": 0,
+      "sensorNoiseProfilePath": null,
+      "siteUrl": null,
+      "thresholds": null
+    },
+    {
+      "dynamicObstaclesPath": null,
+      "episodeCount": 1,
+      "goalSuitePath": "../far-goals.json",
+      "maxSteps": 4,
+      "metadata": {
+        "configId": "short",
+        "configMetadata": {},
+        "goalSuiteKey": "far",
+        "goalSuiteMetadata": {},
+        "matrixId": "smoke-route-policy-ci-matrix",
+        "registryId": "direct",
+        "sceneKey": "unit",
+        "sceneMetadata": {}
+      },
+      "rawSensorNoiseProfilePath": null,
+      "recordType": "route-policy-scenario",
+      "scenarioId": "unit-far-short",
+      "sceneCatalog": "../scenes.json",
+      "sceneId": "unit-scene",
+      "seedStart": 0,
+      "sensorNoiseProfilePath": null,
+      "siteUrl": null,
+      "thresholds": null
+    }
+  ],
+  "seedStart": 100,
+  "siteUrl": "https://rsasaki0109.github.io/gs-mapper/",
+  "version": "gs-mapper-route-policy-scenario-set/v1"
+}

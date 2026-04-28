@@ -1,6 +1,6 @@
 # 屋外 3D Gaussian Splatting / Physical AI Simulation 開発計画
 
-更新日: 2026-04-28（Pages reviews index / outdoor GS preview refresh 反映）
+更新日: 2026-04-29（Pages sample review bundle 反映）
 
 この文書は、GS Mapper の屋外 3DGS パイプラインと、その上に載せる Physical AI simulation / policy benchmark / scenario CI の現行計画をまとめる長めの handoff です。
 
@@ -24,8 +24,9 @@
 - External SLAM import は VGGT-SLAM 2.0 / MASt3R-SLAM comparison splat まで実走済み。Pi3 / LoGeR profile も artifact resolver 側に候補追加済み。
 - 2026-04-24 時点では、屋外 3DGS だけでなく **Physical AI simulation benchmark environment** を目指す方向へ拡張中。
 - Route policy benchmark 系は、dataset / imitation / registry / benchmark / history / scenario-set / matrix / sharding / CI manifest / workflow materialization / validation / activation / review bundle / workflow trigger promotion gate / promotion-backed trigger adoption / adoption-aware review bundle まで分割済み。
-- 最新の pushed commit は `2262f22`。Tier 2 chain (#121–#134) で env-hardening + correlation gate plumbing が完成。local full pytest / GitHub Actions CI / Pages deploy は green。
+- 最新の merged Pages refresh は `ee42f7a`。Tier 2 chain (#121–#134) で env-hardening + correlation gate plumbing が完成し、Pages landing は outdoor GS demo-first に刷新済み。local full pytest / GitHub Actions CI / Pages deploy は green。
 - adoption step + CLI (`gs-mapper route-policy-scenario-ci-workflow-adopt`) + adoption-aware review bundle まで実装済み。review には `--adoption-report` を渡すと Pages の `review.{json,md,html}` に trigger mode / branches / manual vs adopted YAML の unified diff が乗る。
+- Pages `/reviews/` には synthetic smoke fixture 由来の `docs/reviews/smoke-route-policy-ci/` sample bundle を置く方針に変更。`scripts/build_pages_sample_review_bundle.py` が smoke chain を回し、temp path を self-contained な `sample-artifacts/` 相対リンクへ書き換えて index も再生成する。
 - 2026-04-25 〜 26 の Tier 2 rollup で、real-vs-sim correlation library (#113/#115) → scenario-set run report への attach (#121) → review bundle への surface (#125) → regression gate (#126) → per-bag overrides (#128) → translation/heading pair-distribution gates (#129/#130) → time stratification (#131/#132) + equal-pair-count mode (#133) + per-window stats (#134) まで一気に完成。`gs-mapper route-policy-scenario-ci-review` の correlation gate は実用 production rollout で使える状態。
 - 同時に env-hardening 側も IMU finite-diff renderer (#111) → ObstaclePolicy protocol (#112) → IMU + peer-aware features を gym adapter feature dict へ surface (#122/#123) → query_collision / score_trajectory に per-step peer cache を threading (#124/#127) で multi-agent サポートが整った。
 
@@ -523,6 +524,14 @@ PYTHONPATH=src python3 scripts/build_pages_reviews_index.py \
   --json-output docs/reviews/index.json
 ```
 
+Public sample として `docs/reviews/smoke-route-policy-ci/` を生成する場合は次を使う。これは `scripts/smoke_route_policy_scenario_ci.py` の synthetic fixture から作るため production benchmark ではないが、review bundle / adoption diff / index discovery の Pages contract を実物として確認できる。
+
+```bash
+PYTHONPATH=src python3 scripts/build_pages_sample_review_bundle.py
+```
+
+生成後の bundle は `review.json` / `review.md` / `index.html` と、リンク先の `sample-artifacts/` を含む。`/tmp/...` や `https://example.test/...` は commit しない。
+
 ## 10. Public / Launch Track
 
 ### 10.1 現状
@@ -644,7 +653,8 @@ python3 scripts/collect_mcd_quality_runs.py --format gate --fail-on-gate
 
 | Task | Why | Suggested slice |
 | --- | --- | --- |
-| Review bundle sample under docs | Synthetic fixture でもよいので Pages の `/reviews/` 例を置くか判断 | `docs/reviews/index.{html,json}` の空 placeholder は生成済み。generated sample bundle はまだ commit しない方針。 |
+| Review bundle sample under docs | 完了。Pages `/reviews/` が空ではなく scenario CI review / adoption diff の形を見せられる | `docs/reviews/smoke-route-policy-ci/` を `scripts/build_pages_sample_review_bundle.py` で生成。synthetic smoke fixture であり production benchmark ではないことを bundle 内に明示。 |
+| Real review bundle from production scenario CI | sample は contract demo。次は実際の production scenario CI / benchmark run artifact を公開する | real run の shard merge / validation / activation / adoption report を `gs-mapper route-policy-scenario-ci-review --bundle-dir docs/reviews/<id>` に流し、`scripts/build_pages_reviews_index.py` で index 再生成。 |
 
 ### 12.2 B: Physical AI env hardening
 

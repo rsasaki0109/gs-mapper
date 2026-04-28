@@ -1,0 +1,167 @@
+{
+  "metadata": {
+    "matrixId": "smoke-route-policy-ci-matrix",
+    "maxScenariosPerShard": 1,
+    "outputDir": "sample-artifacts/shards"
+  },
+  "recordType": "route-policy-scenario-shard-plan",
+  "scenarioCount": 2,
+  "scenarioSets": [
+    {
+      "episodeCount": 16,
+      "includeDirectBaseline": false,
+      "maxSteps": null,
+      "metadata": {
+        "matrixId": "smoke-route-policy-ci-matrix",
+        "maxScenariosPerShard": 1,
+        "registryId": "direct",
+        "registryMetadata": {},
+        "shardCount": 2,
+        "shardIndex": 1,
+        "sourceScenarioIds": [
+          "unit-near-short"
+        ],
+        "sourceScenarioSetId": "smoke-route-policy-ci-matrix-direct"
+      },
+      "policyRegistryPath": "../registry.json",
+      "recordType": "route-policy-scenario-set",
+      "scenarioCount": 1,
+      "scenarioSetId": "smoke-route-policy-ci-matrix-direct-shard-001",
+      "scenarios": [
+        {
+          "dynamicObstaclesPath": null,
+          "episodeCount": 1,
+          "goalSuitePath": "../near-goals.json",
+          "maxSteps": 4,
+          "metadata": {
+            "configId": "short",
+            "configMetadata": {},
+            "goalSuiteKey": "near",
+            "goalSuiteMetadata": {},
+            "matrixId": "smoke-route-policy-ci-matrix",
+            "registryId": "direct",
+            "sceneKey": "unit",
+            "sceneMetadata": {}
+          },
+          "rawSensorNoiseProfilePath": null,
+          "recordType": "route-policy-scenario",
+          "scenarioId": "unit-near-short",
+          "sceneCatalog": "../scenes.json",
+          "sceneId": "unit-scene",
+          "seedStart": 0,
+          "sensorNoiseProfilePath": null,
+          "siteUrl": null,
+          "thresholds": null
+        }
+      ],
+      "seedStart": 100,
+      "siteUrl": "https://rsasaki0109.github.io/gs-mapper/",
+      "version": "gs-mapper-route-policy-scenario-set/v1"
+    },
+    {
+      "episodeCount": 16,
+      "includeDirectBaseline": false,
+      "maxSteps": null,
+      "metadata": {
+        "matrixId": "smoke-route-policy-ci-matrix",
+        "maxScenariosPerShard": 1,
+        "registryId": "direct",
+        "registryMetadata": {},
+        "shardCount": 2,
+        "shardIndex": 2,
+        "sourceScenarioIds": [
+          "unit-far-short"
+        ],
+        "sourceScenarioSetId": "smoke-route-policy-ci-matrix-direct"
+      },
+      "policyRegistryPath": "../registry.json",
+      "recordType": "route-policy-scenario-set",
+      "scenarioCount": 1,
+      "scenarioSetId": "smoke-route-policy-ci-matrix-direct-shard-002",
+      "scenarios": [
+        {
+          "dynamicObstaclesPath": null,
+          "episodeCount": 1,
+          "goalSuitePath": "../far-goals.json",
+          "maxSteps": 4,
+          "metadata": {
+            "configId": "short",
+            "configMetadata": {},
+            "goalSuiteKey": "far",
+            "goalSuiteMetadata": {},
+            "matrixId": "smoke-route-policy-ci-matrix",
+            "registryId": "direct",
+            "sceneKey": "unit",
+            "sceneMetadata": {}
+          },
+          "rawSensorNoiseProfilePath": null,
+          "recordType": "route-policy-scenario",
+          "scenarioId": "unit-far-short",
+          "sceneCatalog": "../scenes.json",
+          "sceneId": "unit-scene",
+          "seedStart": 0,
+          "sensorNoiseProfilePath": null,
+          "siteUrl": null,
+          "thresholds": null
+        }
+      ],
+      "seedStart": 100,
+      "siteUrl": "https://rsasaki0109.github.io/gs-mapper/",
+      "version": "gs-mapper-route-policy-scenario-set/v1"
+    }
+  ],
+  "shardCount": 2,
+  "shardPlanId": "smoke-route-policy-ci-shards",
+  "shards": [
+    {
+      "metadata": {
+        "matrixId": "smoke-route-policy-ci-matrix",
+        "maxScenariosPerShard": 1,
+        "registryId": "direct",
+        "registryMetadata": {},
+        "shardCount": 2,
+        "shardIndex": 1,
+        "sourceScenarioIds": [
+          "unit-near-short"
+        ],
+        "sourceScenarioSetId": "smoke-route-policy-ci-matrix-direct"
+      },
+      "policyRegistryPath": "../registry.json",
+      "recordType": "route-policy-scenario-shard",
+      "scenarioCount": 1,
+      "scenarioIds": [
+        "unit-near-short"
+      ],
+      "scenarioSetPath": "sample-artifacts/shards/smoke-route-policy-ci-matrix-direct-shard-001.json",
+      "shardId": "smoke-route-policy-ci-matrix-direct-shard-001",
+      "sourceScenarioSetId": "smoke-route-policy-ci-matrix-direct",
+      "sourceScenarioSetPath": "sample-artifacts/generated/smoke-route-policy-ci-matrix-direct.json"
+    },
+    {
+      "metadata": {
+        "matrixId": "smoke-route-policy-ci-matrix",
+        "maxScenariosPerShard": 1,
+        "registryId": "direct",
+        "registryMetadata": {},
+        "shardCount": 2,
+        "shardIndex": 2,
+        "sourceScenarioIds": [
+          "unit-far-short"
+        ],
+        "sourceScenarioSetId": "smoke-route-policy-ci-matrix-direct"
+      },
+      "policyRegistryPath": "../registry.json",
+      "recordType": "route-policy-scenario-shard",
+      "scenarioCount": 1,
+      "scenarioIds": [
+        "unit-far-short"
+      ],
+      "scenarioSetPath": "sample-artifacts/shards/smoke-route-policy-ci-matrix-direct-shard-002.json",
+      "shardId": "smoke-route-policy-ci-matrix-direct-shard-002",
+      "sourceScenarioSetId": "smoke-route-policy-ci-matrix-direct",
+      "sourceScenarioSetPath": "sample-artifacts/generated/smoke-route-policy-ci-matrix-direct.json"
+    }
+  ],
+  "sourceScenarioSetCount": 1,
+  "version": "gs-mapper-route-policy-scenario-shard-plan/v1"
+}

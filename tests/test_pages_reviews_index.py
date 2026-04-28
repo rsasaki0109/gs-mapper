@@ -10,10 +10,11 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "build_pages_reviews_index.py"
+SAMPLE_SCRIPT = REPO_ROOT / "scripts" / "build_pages_sample_review_bundle.py"
 
 
-def _load_script_module():
-    spec = importlib.util.spec_from_file_location("build_pages_reviews_index", SCRIPT)
+def _load_script_module(path: Path = SCRIPT, name: str = "build_pages_reviews_index"):
+    spec = importlib.util.spec_from_file_location(name, path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -53,6 +54,8 @@ def _write_review_bundle(
 def test_script_file_exists_and_is_executable() -> None:
     assert SCRIPT.is_file()
     assert SCRIPT.stat().st_mode & 0o111
+    assert SAMPLE_SCRIPT.is_file()
+    assert SAMPLE_SCRIPT.stat().st_mode & 0o111
 
 
 def test_collect_review_entries_returns_empty_for_missing_dir(tmp_path: Path) -> None:
@@ -192,3 +195,69 @@ def test_entry_falls_back_to_bundle_dir_when_html_missing(tmp_path: Path) -> Non
     # Without a per-bundle index.html, the href points at the directory so the
     # browser shows the Pages directory listing or a fallback.
     assert entries[0].bundle_html == "delta"
+
+
+def test_sample_review_bundle_generator_writes_self_contained_pages_bundle(tmp_path: Path) -> None:
+    module = _load_script_module(SAMPLE_SCRIPT, "build_pages_sample_review_bundle")
+
+    docs_dir = tmp_path / "docs"
+    bundle_dir = module.build_sample_review_bundle(docs_dir)
+
+    assert bundle_dir == docs_dir / "reviews" / "smoke-route-policy-ci"
+    payload = json.loads((bundle_dir / "review.json").read_text(encoding="utf-8"))
+    assert payload["reviewId"] == "smoke-route-policy-ci-review"
+    assert payload["passed"] is True
+    assert payload["metadata"]["sampleBundle"] is True
+    assert (
+        payload["metadata"]["pagesBaseUrl"] == "https://rsasaki0109.github.io/gs-mapper/reviews/smoke-route-policy-ci/"
+    )
+    assert payload["adoption"]["triggerMode"] == "pull-request"
+    assert payload["adoption"]["adopted"] is True
+    assert "/tmp/" not in json.dumps(payload)
+    for shard in payload["shards"]:
+        assert (bundle_dir / shard["runPath"]).is_file()
+        assert (bundle_dir / shard["historyPath"]).is_file()
+        for report_path in shard["reportPaths"]:
+            assert (bundle_dir / report_path).is_file()
+
+    html_text = (bundle_dir / "index.html").read_text(encoding="utf-8")
+    assert "Synthetic smoke fixture" in html_text
+    assert "ADOPTED" in html_text
+    assert "/tmp/" not in html_text
+    for path in (bundle_dir / "sample-artifacts").rglob("*"):
+        if path.is_file() and path.suffix in {".json", ".md", ".yml"}:
+            text = path.read_text(encoding="utf-8")
+            assert "/tmp/" not in text, path
+            assert "https://example.test" not in text, path
+
+    index_payload = json.loads((docs_dir / "reviews" / "index.json").read_text(encoding="utf-8"))
+    assert index_payload["reviewCount"] == 1
+    assert index_payload["entries"][0]["reviewId"] == "smoke-route-policy-ci-review"
+    assert index_payload["entries"][0]["adoptionTriggerMode"] == "pull-request"
+
+
+def test_published_docs_reviews_index_includes_smoke_sample_bundle() -> None:
+    reviews_dir = REPO_ROOT / "docs" / "reviews"
+    payload = json.loads((reviews_dir / "index.json").read_text(encoding="utf-8"))
+
+    entries = {entry["reviewId"]: entry for entry in payload["entries"]}
+    sample = entries["smoke-route-policy-ci-review"]
+    assert sample["passed"] is True
+    assert sample["bundleHtml"] == "smoke-route-policy-ci/index.html"
+    assert sample["shardCount"] == 2
+    assert sample["scenarioCount"] == 2
+    assert sample["reportCount"] == 2
+    assert sample["adoptionTriggerMode"] == "pull-request"
+    assert sample["adoptionAdopted"] is True
+
+    review_payload = json.loads((reviews_dir / "smoke-route-policy-ci" / "review.json").read_text(encoding="utf-8"))
+    assert review_payload["metadata"]["sampleBundle"] is True
+    assert "/tmp/" not in json.dumps(review_payload)
+    assert "https://example.test" not in json.dumps(review_payload)
+    html_text = (reviews_dir / "smoke-route-policy-ci" / "index.html").read_text(encoding="utf-8")
+    assert "Synthetic smoke fixture" in html_text
+    for path in (reviews_dir / "smoke-route-policy-ci" / "sample-artifacts").rglob("*"):
+        if path.is_file() and path.suffix in {".json", ".md", ".yml"}:
+            text = path.read_text(encoding="utf-8")
+            assert "/tmp/" not in text, path
+            assert "https://example.test" not in text, path

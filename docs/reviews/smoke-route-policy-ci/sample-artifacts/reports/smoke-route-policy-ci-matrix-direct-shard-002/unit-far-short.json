@@ -1,0 +1,834 @@
+{
+  "benchmarkId": "smoke-route-policy-ci-matrix-direct-shard-002-unit-far-short",
+  "bestPolicyName": "direct",
+  "evaluation": {
+    "bestPolicyName": "direct",
+    "evaluationId": "smoke-route-policy-ci-matrix-direct-shard-002-unit-far-short",
+    "metadata": {
+      "benchmarkId": "smoke-route-policy-ci-matrix-direct-shard-002-unit-far-short",
+      "configId": "short",
+      "configMetadata": {},
+      "goalSuiteKey": "far",
+      "goalSuiteMetadata": {},
+      "goalSuitePath": "sample-artifacts/shards/../far-goals.json",
+      "includeDirectBaseline": false,
+      "matrixId": "smoke-route-policy-ci-matrix",
+      "registryId": "direct",
+      "scenarioId": "unit-far-short",
+      "scenarioSetId": "smoke-route-policy-ci-matrix-direct-shard-002",
+      "sceneCatalog": "sample-artifacts/shards/../scenes.json",
+      "sceneId": "unit-scene",
+      "sceneKey": "unit",
+      "sceneMetadata": {}
+    },
+    "policyCount": 1,
+    "recordType": "route-policy-baseline-evaluation",
+    "results": [
+      {
+        "dataset": {
+          "datasetId": "smoke-route-policy-ci-matrix-direct-shard-002-unit-far-short-00-direct",
+          "episodeCount": 1,
+          "episodes": [
+            {
+              "episodeId": "smoke-route-policy-ci-matrix-direct-shard-002-unit-far-short-00-direct-episode-000000",
+              "episodeIndex": 0,
+              "initialObservation": {
+                "episode-index": 0.0,
+                "episode-progress": 0.0,
+                "episode-step-index": 0.0,
+                "goal-delta-x": -0.18884370305009623,
+                "goal-delta-y": 0.0,
+                "goal-delta-z": -0.515908805880605,
+                "goal-distance-meters": 0.5493849653629271,
+                "goal-orientation-w": 1.0,
+                "goal-orientation-x": 0.0,
+                "goal-orientation-y": 0.0,
+                "goal-orientation-z": 0.0,
+                "goal-position-x": 0.5,
+                "goal-position-y": 0.0,
+                "goal-position-z": 0.0,
+                "goal-reached": 0.0,
+                "goal-tolerance-meters": 0.25,
+                "imu-angular-velocity-x": 0.0,
+                "imu-angular-velocity-y": 0.0,
+                "imu-angular-velocity-z": 0.0,
+                "imu-linear-acceleration-x": 0.0,
+                "imu-linear-acceleration-y": 0.0,
+                "imu-linear-acceleration-z": 0.0,
+                "imu-step-dt-seconds": 0.0,
+                "pose-orientation-w": 1.0,
+                "pose-orientation-x": 0.0,
+                "pose-orientation-y": 0.0,
+                "pose-orientation-z": 0.0,
+                "pose-position-x": 0.6888437030500962,
+                "pose-position-y": 0.0,
+                "pose-position-z": 0.515908805880605,
+                "remaining-step-fraction": 1.0
+              },
+              "metadata": {
+                "adapterIndex": 0,
+                "collectorIndex": 0
+              },
+              "recordType": "route-policy-episode",
+              "resetInfo": {
+                "done": false,
+                "episodeIndex": 0,
+                "goal": {
+                  "frameId": "generic_world",
+                  "orientationXyzw": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                  ],
+                  "position": [
+                    0.5,
+                    0.0,
+                    0.0
+                  ]
+                },
+                "goalDistanceMeters": 0.5493849653629271,
+                "pose": {
+                  "frameId": "generic_estimated_metric_world",
+                  "orientationXyzw": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                  ],
+                  "position": [
+                    0.6888437030500962,
+                    0.0,
+                    0.515908805880605
+                  ]
+                },
+                "reset_payload": {
+                  "backend": "headless-bounds",
+                  "scene": {
+                    "assetUrl": "assets/unit-scene/unit-scene.splat",
+                    "bounds": {
+                      "center": [
+                        0.0,
+                        0.0,
+                        0.0
+                      ],
+                      "confidence": "placeholder",
+                      "extent": [
+                        2.0,
+                        2.0,
+                        2.0
+                      ],
+                      "max": [
+                        1.0,
+                        1.0,
+                        1.0
+                      ],
+                      "min": [
+                        -1.0,
+                        -1.0,
+                        -1.0
+                      ],
+                      "source": "unit-placeholder"
+                    },
+                    "coordinateFrame": {
+                      "frameId": "generic_estimated_metric_world",
+                      "gravity": [
+                        0.0,
+                        -9.80665,
+                        0.0
+                      ],
+                      "handedness": "right-handed",
+                      "scaleStatus": "estimated-metric",
+                      "unit": "meter",
+                      "upAxis": "y"
+                    },
+                    "evaluationTasks": [
+                      {
+                        "kind": "pose-estimation",
+                        "label": "Visual localization",
+                        "metrics": [
+                          "translation-error",
+                          "rotation-error",
+                          "tracking-success-rate"
+                        ],
+                        "requiredSensors": [
+                          "rgb-forward"
+                        ],
+                        "taskId": "localization"
+                      },
+                      {
+                        "kind": "planning",
+                        "label": "Viewpoint planning",
+                        "metrics": [
+                          "coverage-gain",
+                          "path-length",
+                          "render-validity"
+                        ],
+                        "requiredSensors": [
+                          "rgb-forward",
+                          "depth-proxy"
+                        ],
+                        "taskId": "viewpoint-planning"
+                      },
+                      {
+                        "kind": "navigation",
+                        "label": "Waypoint navigation",
+                        "metrics": [
+                          "goal-success",
+                          "collision-rate",
+                          "path-efficiency"
+                        ],
+                        "requiredSensors": [
+                          "rgb-forward",
+                          "lidar-ray-proxy"
+                        ],
+                        "taskId": "waypoint-navigation"
+                      },
+                      {
+                        "kind": "mapping",
+                        "label": "Mapping coverage",
+                        "metrics": [
+                          "surface-coverage",
+                          "frontier-count",
+                          "revisit-rate"
+                        ],
+                        "requiredSensors": [
+                          "rgb-forward",
+                          "depth-proxy"
+                        ],
+                        "taskId": "mapping-coverage"
+                      }
+                    ],
+                    "label": "Unit Scene",
+                    "previewUrl": "",
+                    "reconstructionMethod": "unknown",
+                    "sceneFamily": "generic",
+                    "sceneId": "unit-scene",
+                    "sensorRig": {
+                      "rigId": "physical-ai-default",
+                      "sensors": [
+                        {
+                          "description": "RGB observation rendered from the browser-viewable splat scene.",
+                          "modality": "rgb",
+                          "outputs": [
+                            "rgb"
+                          ],
+                          "sensorId": "rgb-forward",
+                          "status": "ready-via-splat-viewer"
+                        },
+                        {
+                          "description": "Depth proxy rendered from the local splat rasterizer as float32 depth plus validity mask.",
+                          "modality": "depth",
+                          "outputs": [
+                            "depth",
+                            "validity-mask"
+                          ],
+                          "sensorId": "depth-proxy",
+                          "status": "ready-via-splat-raster"
+                        },
+                        {
+                          "description": "LiDAR-like range and point proxy sampled from the local splat raster depth image.",
+                          "modality": "lidar",
+                          "outputs": [
+                            "ranges",
+                            "points"
+                          ],
+                          "sensorId": "lidar-ray-proxy",
+                          "status": "ready-via-depth-rays"
+                        },
+                        {
+                          "description": "IMU proxy synthesised by HeadlessPhysicalAIEnvironment: each step finite-differences the agent pose to estimate body-frame angular velocity and linear acceleration, with no gravity model. teleport actions and the post-reset state both report the zero kinematic state (step_dt_seconds == 0). Raw-sensor noise profiles' IMU σ fields perturb the rendered outputs in place.",
+                          "modality": "imu",
+                          "outputs": [
+                            "angular-velocity",
+                            "linear-acceleration"
+                          ],
+                          "sensorId": "imu-proxy",
+                          "status": "ready-via-kinematic-finite-diff"
+                        }
+                      ]
+                    },
+                    "summary": "Generic unit scene",
+                    "tags": [
+                      "unknown",
+                      "generic",
+                      "estimated-metric",
+                      "inferred"
+                    ],
+                    "taskSplit": [
+                      {
+                        "description": "Trajectory poses used for reconstruction or artifact import.",
+                        "episodeId": "unit-scene-train",
+                        "poseCount": null,
+                        "source": "reconstruction-trajectory",
+                        "split": "train"
+                      },
+                      {
+                        "description": "Held-out viewpoints sampled within scene bounds for Physical AI evaluation.",
+                        "episodeId": "unit-scene-eval",
+                        "poseCount": null,
+                        "source": "held-out-viewpoint-contract",
+                        "split": "eval"
+                      }
+                    ],
+                    "trajectoryExtentMeters": null,
+                    "viewerUrl": "https://rsasaki0109.github.io/gs-mapper/splat.html?url=assets/unit-scene/unit-scene.splat"
+                  },
+                  "state": {
+                    "pose": {
+                      "frameId": "generic_estimated_metric_world",
+                      "orientationXyzw": [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                      ],
+                      "position": [
+                        0.6888437030500962,
+                        0.0,
+                        0.515908805880605
+                      ]
+                    },
+                    "sceneId": "unit-scene",
+                    "stepIndex": 0
+                  }
+                },
+                "sceneId": "unit-scene",
+                "stepIndex": 0
+              },
+              "sceneId": "unit-scene",
+              "seed": 0,
+              "summary": {
+                "blocked": false,
+                "goalReached": true,
+                "stepCount": 1,
+                "terminated": true,
+                "terminationReason": "goal-reached",
+                "totalReward": 2.4845061503463706,
+                "truncated": false
+              },
+              "transitions": [
+                {
+                  "action": {
+                    "kind": "mapping",
+                    "payload": {
+                      "routeId": "direct-0-0",
+                      "target": {
+                        "frameId": "generic_world",
+                        "orientationXyzw": [
+                          0.0,
+                          0.0,
+                          0.0,
+                          1.0
+                        ],
+                        "position": [
+                          0.5,
+                          0.0,
+                          0.0
+                        ]
+                      }
+                    }
+                  },
+                  "episodeId": "smoke-route-policy-ci-matrix-direct-shard-002-unit-far-short-00-direct-episode-000000",
+                  "episodeIndex": 0,
+                  "info": {
+                    "blocked": false,
+                    "done": true,
+                    "episodeIndex": 0,
+                    "goal": {
+                      "frameId": "generic_world",
+                      "orientationXyzw": [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                      ],
+                      "position": [
+                        0.5,
+                        0.0,
+                        0.0
+                      ]
+                    },
+                    "goalDistanceMeters": 0.0,
+                    "goal_reached": true,
+                    "policySample": {
+                      "observation": {
+                        "events": [
+                          "passed"
+                        ],
+                        "features": {
+                          "action-type-teleport": 1.0,
+                          "action-type-twist": 0.0,
+                          "applied-rate": 1.0,
+                          "applied-step-count": 1.0,
+                          "blocked-step-index": -1.0,
+                          "collision-count": 0.0,
+                          "completion-rate": 1.0,
+                          "executed-step-count": 1.0,
+                          "passed": 1.0,
+                          "planned-distance-meters": 0.5493849653629271,
+                          "requested-step-count": 1.0
+                        },
+                        "sourceId": "direct-0-0",
+                        "sourceType": "route-rollout"
+                      },
+                      "reward": {
+                        "components": {
+                          "collision": -0.0,
+                          "completion": 0.5,
+                          "distance": -0.005493849653629272,
+                          "replan": -0.0,
+                          "step": -0.01,
+                          "success": 1.0
+                        },
+                        "passed": true,
+                        "reward": 1.4845061503463708,
+                        "terminal": true
+                      }
+                    },
+                    "pose": {
+                      "frameId": "generic_estimated_metric_world",
+                      "orientationXyzw": [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                      ],
+                      "position": [
+                        0.5,
+                        0.0,
+                        0.0
+                      ]
+                    },
+                    "rollout": {
+                      "actionType": "teleport",
+                      "blockedStepIndex": null,
+                      "metrics": {
+                        "applied-rate": 1.0,
+                        "applied-step-count": 1.0,
+                        "collision-count": 0.0,
+                        "completion-rate": 1.0,
+                        "executed-step-count": 1.0,
+                        "planned-distance-meters": 0.5493849653629271,
+                        "requested-step-count": 1.0
+                      },
+                      "outcomes": [
+                        {
+                          "applied": true,
+                          "collides": false,
+                          "step": {
+                            "action": {
+                              "durationSeconds": 1.0,
+                              "type": "teleport",
+                              "values": {
+                                "qw": 1.0,
+                                "qx": 0.0,
+                                "qy": 0.0,
+                                "qz": 0.0,
+                                "x": 0.5,
+                                "y": 0.0,
+                                "z": 0.0
+                              }
+                            },
+                            "actionIndex": 0,
+                            "distanceMeters": 0.5493849653629271,
+                            "routeId": "direct-0-0",
+                            "sourcePose": {
+                              "frameId": "generic_estimated_metric_world",
+                              "orientationXyzw": [
+                                0.0,
+                                0.0,
+                                0.0,
+                                1.0
+                              ],
+                              "position": [
+                                0.6888437030500962,
+                                0.0,
+                                0.515908805880605
+                              ]
+                            },
+                            "targetPose": {
+                              "frameId": "generic_world",
+                              "orientationXyzw": [
+                                0.0,
+                                0.0,
+                                0.0,
+                                1.0
+                              ],
+                              "position": [
+                                0.5,
+                                0.0,
+                                0.0
+                              ]
+                            }
+                          },
+                          "transition": {
+                            "applied": true,
+                            "collision": {
+                              "clearanceMeters": 0.5,
+                              "collides": false,
+                              "pose": {
+                                "frameId": "generic_estimated_metric_world",
+                                "orientationXyzw": [
+                                  0.0,
+                                  0.0,
+                                  0.0,
+                                  1.0
+                                ],
+                                "position": [
+                                  0.5,
+                                  0.0,
+                                  0.0
+                                ]
+                              },
+                              "reason": "inside-bounds"
+                            },
+                            "sceneId": "unit-scene",
+                            "state": {
+                              "pose": {
+                                "frameId": "generic_estimated_metric_world",
+                                "orientationXyzw": [
+                                  0.0,
+                                  0.0,
+                                  0.0,
+                                  1.0
+                                ],
+                                "position": [
+                                  0.5,
+                                  0.0,
+                                  0.0
+                                ]
+                              },
+                              "sceneId": "unit-scene",
+                              "stepIndex": 1
+                            }
+                          }
+                        }
+                      ],
+                      "passed": true,
+                      "routeId": "direct-0-0",
+                      "steps": [
+                        {
+                          "action": {
+                            "durationSeconds": 1.0,
+                            "type": "teleport",
+                            "values": {
+                              "qw": 1.0,
+                              "qx": 0.0,
+                              "qy": 0.0,
+                              "qz": 0.0,
+                              "x": 0.5,
+                              "y": 0.0,
+                              "z": 0.0
+                            }
+                          },
+                          "actionIndex": 0,
+                          "distanceMeters": 0.5493849653629271,
+                          "routeId": "direct-0-0",
+                          "sourcePose": {
+                            "frameId": "generic_estimated_metric_world",
+                            "orientationXyzw": [
+                              0.0,
+                              0.0,
+                              0.0,
+                              1.0
+                            ],
+                            "position": [
+                              0.6888437030500962,
+                              0.0,
+                              0.515908805880605
+                            ]
+                          },
+                          "targetPose": {
+                            "frameId": "generic_world",
+                            "orientationXyzw": [
+                              0.0,
+                              0.0,
+                              0.0,
+                              1.0
+                            ],
+                            "position": [
+                              0.5,
+                              0.0,
+                              0.0
+                            ]
+                          }
+                        }
+                      ]
+                    },
+                    "route": {
+                      "routeId": "direct-0-0",
+                      "trajectory": [
+                        {
+                          "frameId": "generic_estimated_metric_world",
+                          "orientationXyzw": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                          ],
+                          "position": [
+                            0.6888437030500962,
+                            0.0,
+                            0.515908805880605
+                          ]
+                        },
+                        {
+                          "frameId": "generic_world",
+                          "orientationXyzw": [
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0
+                          ],
+                          "position": [
+                            0.5,
+                            0.0,
+                            0.0
+                          ]
+                        }
+                      ]
+                    },
+                    "sceneId": "unit-scene",
+                    "stepIndex": 1,
+                    "terminated": true,
+                    "termination_reason": "goal-reached",
+                    "truncated": false
+                  },
+                  "nextObservation": {
+                    "episode-index": 0.0,
+                    "episode-progress": 0.25,
+                    "episode-step-index": 1.0,
+                    "goal-delta-x": 0.0,
+                    "goal-delta-y": 0.0,
+                    "goal-delta-z": 0.0,
+                    "goal-distance-meters": 0.0,
+                    "goal-orientation-w": 1.0,
+                    "goal-orientation-x": 0.0,
+                    "goal-orientation-y": 0.0,
+                    "goal-orientation-z": 0.0,
+                    "goal-position-x": 0.5,
+                    "goal-position-y": 0.0,
+                    "goal-position-z": 0.0,
+                    "goal-reached": 1.0,
+                    "goal-tolerance-meters": 0.25,
+                    "imu-angular-velocity-x": 0.0,
+                    "imu-angular-velocity-y": 0.0,
+                    "imu-angular-velocity-z": 0.0,
+                    "imu-linear-acceleration-x": 0.0,
+                    "imu-linear-acceleration-y": 0.0,
+                    "imu-linear-acceleration-z": 0.0,
+                    "imu-step-dt-seconds": 1.0,
+                    "pose-orientation-w": 1.0,
+                    "pose-orientation-x": 0.0,
+                    "pose-orientation-y": 0.0,
+                    "pose-orientation-z": 0.0,
+                    "pose-position-x": 0.5,
+                    "pose-position-y": 0.0,
+                    "pose-position-z": 0.0,
+                    "remaining-step-fraction": 0.75,
+                    "route-action-type-teleport": 1.0,
+                    "route-action-type-twist": 0.0,
+                    "route-applied-rate": 1.0,
+                    "route-applied-step-count": 1.0,
+                    "route-blocked-step-index": -1.0,
+                    "route-collision-count": 0.0,
+                    "route-completion-rate": 1.0,
+                    "route-executed-step-count": 1.0,
+                    "route-passed": 1.0,
+                    "route-planned-distance-meters": 0.5493849653629271,
+                    "route-requested-step-count": 1.0
+                  },
+                  "observation": {
+                    "episode-index": 0.0,
+                    "episode-progress": 0.0,
+                    "episode-step-index": 0.0,
+                    "goal-delta-x": -0.18884370305009623,
+                    "goal-delta-y": 0.0,
+                    "goal-delta-z": -0.515908805880605,
+                    "goal-distance-meters": 0.5493849653629271,
+                    "goal-orientation-w": 1.0,
+                    "goal-orientation-x": 0.0,
+                    "goal-orientation-y": 0.0,
+                    "goal-orientation-z": 0.0,
+                    "goal-position-x": 0.5,
+                    "goal-position-y": 0.0,
+                    "goal-position-z": 0.0,
+                    "goal-reached": 0.0,
+                    "goal-tolerance-meters": 0.25,
+                    "imu-angular-velocity-x": 0.0,
+                    "imu-angular-velocity-y": 0.0,
+                    "imu-angular-velocity-z": 0.0,
+                    "imu-linear-acceleration-x": 0.0,
+                    "imu-linear-acceleration-y": 0.0,
+                    "imu-linear-acceleration-z": 0.0,
+                    "imu-step-dt-seconds": 0.0,
+                    "pose-orientation-w": 1.0,
+                    "pose-orientation-x": 0.0,
+                    "pose-orientation-y": 0.0,
+                    "pose-orientation-z": 0.0,
+                    "pose-position-x": 0.6888437030500962,
+                    "pose-position-y": 0.0,
+                    "pose-position-z": 0.515908805880605,
+                    "remaining-step-fraction": 1.0
+                  },
+                  "recordType": "route-policy-transition",
+                  "reward": 2.4845061503463706,
+                  "sceneId": "unit-scene",
+                  "stepIndex": 0,
+                  "terminated": true,
+                  "truncated": false
+                }
+              ]
+            }
+          ],
+          "metadata": {
+            "baselinePolicy": "direct",
+            "benchmarkId": "smoke-route-policy-ci-matrix-direct-shard-002-unit-far-short",
+            "configId": "short",
+            "configMetadata": {},
+            "goalSuiteKey": "far",
+            "goalSuiteMetadata": {},
+            "goalSuitePath": "sample-artifacts/shards/../far-goals.json",
+            "includeDirectBaseline": false,
+            "matrixId": "smoke-route-policy-ci-matrix",
+            "registryId": "direct",
+            "scenarioId": "unit-far-short",
+            "scenarioSetId": "smoke-route-policy-ci-matrix-direct-shard-002",
+            "sceneCatalog": "sample-artifacts/shards/../scenes.json",
+            "sceneId": "unit-scene",
+            "sceneKey": "unit",
+            "sceneMetadata": {}
+          },
+          "recordType": "route-policy-dataset",
+          "transitionCount": 1,
+          "version": "gs-mapper-route-policy-dataset/v1"
+        },
+        "metadata": {
+          "collectorIndex": 0
+        },
+        "passed": true,
+        "policyName": "direct",
+        "quality": {
+          "datasetId": "smoke-route-policy-ci-matrix-direct-shard-002-unit-far-short-00-direct",
+          "failedChecks": [],
+          "metadata": {
+            "baselinePolicy": "direct"
+          },
+          "metrics": {
+            "blocked-rate": 0.0,
+            "collision-count": 0.0,
+            "collision-rate": 0.0,
+            "episode-count": 1.0,
+            "mean-episode-length": 1.0,
+            "mean-reward": 2.4845061503463706,
+            "mean-transition-reward": 2.4845061503463706,
+            "scene-count": 1.0,
+            "success-rate": 1.0,
+            "termination-rate": 1.0,
+            "transition-count": 1.0,
+            "truncation-rate": 0.0
+          },
+          "passed": true,
+          "recordType": "route-policy-quality-report",
+          "rewardDistribution": {
+            "count": 1.0,
+            "max": 2.4845061503463706,
+            "mean": 2.4845061503463706,
+            "min": 2.4845061503463706,
+            "p50": 2.4845061503463706,
+            "p90": 2.4845061503463706
+          },
+          "sceneCoverage": {
+            "unit-scene": 1
+          },
+          "terminationCounts": {
+            "goal-reached": 1
+          },
+          "thresholds": {
+            "maxCollisionRate": 0.05,
+            "maxTruncationRate": 0.1,
+            "minEpisodeCount": 1,
+            "minMeanReward": null,
+            "minSceneCount": 1,
+            "minSuccessRate": 0.8,
+            "minTransitionCount": 1
+          },
+          "version": "gs-mapper-route-policy-quality/v1"
+        },
+        "recordType": "route-policy-baseline-result"
+      }
+    ],
+    "version": "gs-mapper-route-policy-quality/v1"
+  },
+  "metadata": {
+    "configId": "short",
+    "configMetadata": {},
+    "goalSuiteKey": "far",
+    "goalSuiteMetadata": {},
+    "goalSuitePath": "sample-artifacts/shards/../far-goals.json",
+    "includeDirectBaseline": false,
+    "matrixId": "smoke-route-policy-ci-matrix",
+    "registryId": "direct",
+    "scenarioId": "unit-far-short",
+    "scenarioSetId": "smoke-route-policy-ci-matrix-direct-shard-002",
+    "sceneCatalog": "sample-artifacts/shards/../scenes.json",
+    "sceneId": "unit-scene",
+    "sceneKey": "unit",
+    "sceneMetadata": {}
+  },
+  "modelSummary": {
+    "policies": [
+      {
+        "metadata": {},
+        "policyName": "direct",
+        "policyType": "direct-goal",
+        "source": "builtin"
+      }
+    ],
+    "registry": {
+      "metadata": {},
+      "policies": [
+        {
+          "metadata": {},
+          "modelPath": null,
+          "policyName": "direct",
+          "policyType": "direct-goal"
+        }
+      ],
+      "policyCount": 1,
+      "recordType": "route-policy-registry",
+      "registryId": "smoke-route-policy-ci-registry",
+      "version": "gs-mapper-route-policy-registry/v1"
+    }
+  },
+  "passed": true,
+  "recordType": "route-policy-benchmark-report",
+  "summary": {
+    "bestPolicyName": "direct",
+    "evaluationId": "smoke-route-policy-ci-matrix-direct-shard-002-unit-far-short",
+    "policies": [
+      {
+        "failedChecks": [],
+        "metrics": {
+          "blocked-rate": 0.0,
+          "collision-count": 0.0,
+          "collision-rate": 0.0,
+          "episode-count": 1.0,
+          "mean-episode-length": 1.0,
+          "mean-reward": 2.4845061503463706,
+          "mean-transition-reward": 2.4845061503463706,
+          "scene-count": 1.0,
+          "success-rate": 1.0,
+          "termination-rate": 1.0,
+          "transition-count": 1.0,
+          "truncation-rate": 0.0
+        },
+        "passed": true,
+        "policyName": "direct"
+      }
+    ],
+    "policyCount": 1
+  },
+  "version": "gs-mapper-route-policy-benchmark/v1"
+}

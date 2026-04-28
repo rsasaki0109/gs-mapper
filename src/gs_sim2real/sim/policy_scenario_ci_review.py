@@ -640,6 +640,7 @@ def route_policy_scenario_ci_review_from_dict(
 def render_route_policy_scenario_ci_review_markdown(artifact: RoutePolicyScenarioCIReviewArtifact) -> str:
     """Render a compact Markdown review artifact."""
 
+    sample_notice = _sample_notice(artifact)
     lines = [
         f"# Route Policy Scenario CI Review: {artifact.review_id}",
         f"- Status: {'PASS' if artifact.passed else 'FAIL'}",
@@ -653,9 +654,15 @@ def render_route_policy_scenario_ci_review_markdown(artifact: RoutePolicyScenari
         f"- Scenarios: {artifact.scenario_count}",
         f"- Reports: {artifact.report_count}",
         "",
-        "| Shard | Pass | Scenarios | Reports | Run |",
-        "| --- | --- | ---: | ---: | --- |",
     ]
+    if sample_notice:
+        lines.extend([f"> {sample_notice}", ""])
+    lines.extend(
+        [
+            "| Shard | Pass | Scenarios | Reports | Run |",
+            "| --- | --- | ---: | ---: | --- |",
+        ]
+    )
     for shard in artifact.shards:
         lines.append(
             "| "
@@ -770,6 +777,8 @@ def render_route_policy_scenario_ci_review_html(artifact: RoutePolicyScenarioCIR
     """Render a self-contained static HTML review page."""
 
     status_class = "pass" if artifact.passed else "fail"
+    sample_notice = _sample_notice(artifact)
+    notice_section = f'<p class="notice">{escape(sample_notice)}</p>' if sample_notice else ""
     rows = "\n".join(
         "<tr>"
         f"<td>{escape(shard.shard_id)}</td>"
@@ -805,6 +814,7 @@ def render_route_policy_scenario_ci_review_html(artifact: RoutePolicyScenarioCIR
     .metric {{ background: #ffffff; border: 1px solid #dfe4da; border-radius: 8px; padding: 14px; }}
     .metric span {{ display: block; color: #5b6259; font-size: 13px; }}
     .metric strong {{ display: block; margin-top: 6px; font-size: 22px; }}
+    .notice {{ background: #fff8d7; border: 1px solid #e7d68c; border-radius: 8px; color: #514411; padding: 12px 14px; margin: 0 0 24px; }}
     .pill {{ display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 700; }}
     .pass {{ background: #dcefd8; color: #1e5a2b; }}
     .fail {{ background: #f7d6d2; color: #8a1f16; }}
@@ -824,6 +834,7 @@ def render_route_policy_scenario_ci_review_html(artifact: RoutePolicyScenarioCIR
   <main>
     <h1>Route Policy Scenario CI Review</h1>
     <p class="subtitle"><span class="pill {status_class}">{"PASS" if artifact.passed else "FAIL"}</span> {escape(artifact.review_id)}</p>
+    {notice_section}
     <section class="grid">
       <div class="metric"><span>Workflow</span><strong>{escape(artifact.workflow_id)}</strong></div>
       <div class="metric"><span>Manifest</span><strong>{escape(artifact.manifest_id)}</strong></div>
@@ -1146,6 +1157,11 @@ def _optional_link(path: str | None) -> str:
         return "n/a"
     escaped = escape(path)
     return f'<a href="{escaped}">{escaped}</a>'
+
+
+def _sample_notice(artifact: RoutePolicyScenarioCIReviewArtifact) -> str | None:
+    notice = artifact.metadata.get("sampleNotice")
+    return str(notice) if notice else None
 
 
 def _record_type(payload: Mapping[str, Any], expected: str) -> None:

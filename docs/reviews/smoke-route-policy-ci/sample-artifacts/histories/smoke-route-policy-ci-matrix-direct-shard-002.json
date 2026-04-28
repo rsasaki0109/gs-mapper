@@ -1,0 +1,189 @@
+{
+  "aggregate": [
+    {
+      "metrics": {
+        "blocked-rate": {
+          "count": 1.0,
+          "delta": 0.0,
+          "first": 0.0,
+          "last": 0.0,
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0
+        },
+        "collision-count": {
+          "count": 1.0,
+          "delta": 0.0,
+          "first": 0.0,
+          "last": 0.0,
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0
+        },
+        "collision-rate": {
+          "count": 1.0,
+          "delta": 0.0,
+          "first": 0.0,
+          "last": 0.0,
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0
+        },
+        "episode-count": {
+          "count": 1.0,
+          "delta": 0.0,
+          "first": 1.0,
+          "last": 1.0,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0
+        },
+        "mean-episode-length": {
+          "count": 1.0,
+          "delta": 0.0,
+          "first": 1.0,
+          "last": 1.0,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0
+        },
+        "mean-reward": {
+          "count": 1.0,
+          "delta": 0.0,
+          "first": 2.4845061503463706,
+          "last": 2.4845061503463706,
+          "max": 2.4845061503463706,
+          "mean": 2.4845061503463706,
+          "min": 2.4845061503463706
+        },
+        "mean-transition-reward": {
+          "count": 1.0,
+          "delta": 0.0,
+          "first": 2.4845061503463706,
+          "last": 2.4845061503463706,
+          "max": 2.4845061503463706,
+          "mean": 2.4845061503463706,
+          "min": 2.4845061503463706
+        },
+        "scene-count": {
+          "count": 1.0,
+          "delta": 0.0,
+          "first": 1.0,
+          "last": 1.0,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0
+        },
+        "success-rate": {
+          "count": 1.0,
+          "delta": 0.0,
+          "first": 1.0,
+          "last": 1.0,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0
+        },
+        "termination-rate": {
+          "count": 1.0,
+          "delta": 0.0,
+          "first": 1.0,
+          "last": 1.0,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0
+        },
+        "transition-count": {
+          "count": 1.0,
+          "delta": 0.0,
+          "first": 1.0,
+          "last": 1.0,
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0
+        },
+        "truncation-rate": {
+          "count": 1.0,
+          "delta": 0.0,
+          "first": 0.0,
+          "last": 0.0,
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0
+        }
+      },
+      "passRate": 1.0,
+      "passedCount": 1,
+      "policyName": "direct",
+      "reportCount": 1
+    }
+  ],
+  "baselineReport": null,
+  "failedChecks": [],
+  "historyId": "smoke-route-policy-ci-matrix-direct-shard-002-history",
+  "metadata": {
+    "policyRegistryPath": "sample-artifacts/registry.json",
+    "scenarioSetId": "smoke-route-policy-ci-matrix-direct-shard-002"
+  },
+  "passed": true,
+  "recordType": "route-policy-benchmark-history",
+  "regressionChecks": [],
+  "reportCount": 1,
+  "reports": [
+    {
+      "benchmarkId": "smoke-route-policy-ci-matrix-direct-shard-002-unit-far-short",
+      "bestPolicyName": "direct",
+      "metadata": {
+        "configId": "short",
+        "configMetadata": {},
+        "goalSuiteKey": "far",
+        "goalSuiteMetadata": {},
+        "goalSuitePath": "sample-artifacts/shards/../far-goals.json",
+        "includeDirectBaseline": false,
+        "matrixId": "smoke-route-policy-ci-matrix",
+        "registryId": "direct",
+        "scenarioId": "unit-far-short",
+        "scenarioSetId": "smoke-route-policy-ci-matrix-direct-shard-002",
+        "sceneCatalog": "sample-artifacts/shards/../scenes.json",
+        "sceneId": "unit-scene",
+        "sceneKey": "unit",
+        "sceneMetadata": {}
+      },
+      "passed": true,
+      "policies": [
+        {
+          "failedChecks": [],
+          "metrics": {
+            "blocked-rate": 0.0,
+            "collision-count": 0.0,
+            "collision-rate": 0.0,
+            "episode-count": 1.0,
+            "mean-episode-length": 1.0,
+            "mean-reward": 2.4845061503463706,
+            "mean-transition-reward": 2.4845061503463706,
+            "scene-count": 1.0,
+            "success-rate": 1.0,
+            "termination-rate": 1.0,
+            "transition-count": 1.0,
+            "truncation-rate": 0.0
+          },
+          "passed": true,
+          "policyName": "direct",
+          "recordType": "route-policy-benchmark-policy-snapshot"
+        }
+      ],
+      "policyCount": 1,
+      "recordType": "route-policy-benchmark-snapshot",
+      "sourcePath": "sample-artifacts/reports/smoke-route-policy-ci-matrix-direct-shard-002/unit-far-short.json",
+      "version": "gs-mapper-route-policy-benchmark/v1"
+    }
+  ],
+  "thresholds": {
+    "failOnReportFailure": true,
+    "maxCollisionRateIncrease": 0.0,
+    "maxMeanRewardDrop": null,
+    "maxSuccessRateDrop": 0.0,
+    "maxTruncationRateIncrease": 0.0,
+    "requireBaselinePolicies": true
+  },
+  "version": "gs-mapper-route-policy-benchmark-history/v1"
+}
