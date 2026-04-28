@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import re
+import sys
 from pathlib import Path
 from types import ModuleType
 
@@ -70,6 +71,7 @@ def _load_script_module(path: Path) -> ModuleType:
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -316,12 +318,30 @@ def test_readme_production_scene_table_matches_shared_scene_list() -> None:
 
 
 def test_readme_preview_images_cover_every_production_scene() -> None:
-    """README preview PNGs should exist and be full-canvas captures."""
+    """README preview PNGs should exist and keep the 1280x720 preview contract."""
     for scene in _scene_picker_scenes():
         preview = REPO_ROOT / "docs" / scene["preview"]
         assert preview.stat().st_size > 50_000, f"preview looks too small: {preview}"
         with Image.open(preview) as image:
-            assert image.size == (1280, 720), f"preview should be a full-canvas 1280x720 grab: {preview}"
+            assert image.size == (1280, 720), f"preview should be a 1280x720 scene preview: {preview}"
+
+
+def test_demo_sweep_enhancement_script_and_hero_gif_cover_production_scenes() -> None:
+    """Preview punch-up tooling should remain tied to docs/scenes-list.json."""
+    module = _load_script_module(REPO_ROOT / "scripts" / "enhance_demo_sweep_previews.py")
+    assert module.TARGET_SIZE == (1280, 720)
+    assert module.HERO_SIZE == (720, 405)
+    assert module._crop_for_bbox((1280, 720), (328, 56, 951, 665), target_size=(1280, 720), padding=1.18) == (
+        0,
+        0,
+        1280,
+        720,
+    )
+    hero = REPO_ROOT / "docs" / "images" / "demo-sweep" / "hero.gif"
+    assert hero.stat().st_size > 50_000
+    with Image.open(hero) as image:
+        assert image.size == module.HERO_SIZE
+        assert getattr(image, "n_frames", 1) >= len(_scene_picker_scenes())
 
 
 def test_splat_html_supports_embed_mode() -> None:
@@ -329,6 +349,7 @@ def test_splat_html_supports_embed_mode() -> None:
     html = (REPO_ROOT / "docs" / "splat.html").read_text(encoding="utf-8")
     assert "body.embed" in html, "splat.html must define body.embed CSS for hero embed"
     assert "body.embed #info" in html, "embed mode should hide the info block"
+    assert "body.embed #message" in html, "embed mode should hide WebGL failure text behind the landing hero"
     assert "body.embed .nohf" in html, "embed mode should also hide hf.space chrome"
     assert "params.get('embed')" in html, "splat.html must read ?embed=1 from the query string"
     assert "classList.add('embed')" in html, "embed mode must toggle the body class"
@@ -353,14 +374,51 @@ def test_readme_quickstart_split_lists_three_entry_points() -> None:
 
 
 def test_index_hero_embeds_live_outdoor_splat() -> None:
-    """docs/index.html hero must show the live WebGL splat viewer, not just the fallback GIF."""
+    """docs/index.html hero must show the live WebGL splat viewer with a strong fallback."""
     html = (REPO_ROOT / "docs" / "index.html").read_text(encoding="utf-8")
     assert "hero-bg-splat" in html, "hero iframe needs the hero-bg-splat class"
-    assert "hero-bg-fallback" in html, "hero must retain the GIF as a reduced-motion / fallback layer"
+    assert "hero-bg-fallback" in html, "hero must retain a reduced-motion / fallback image layer"
     assert "splat.html?url=" in html, "hero iframe must point at splat.html with a ?url= scene"
     assert "embed=1" in html, "hero iframe must request embed mode"
-    assert "mcd-ntu-day02-supervised.splat" in html, (
-        "hero should default to the supervised ntu_day_02 scene (largest outdoor production splat)"
-    )
+    assert "bag6-mast3r.splat" in html, "hero should default to a visually large outdoor production splat"
+    assert "images/demo-sweep/04_bag6-mast3r.png" in html, "hero fallback should use the same strong outdoor scene"
     assert "pointer-events: none" in html, "hero iframe must not capture clicks from the hero buttons"
     assert "prefers-reduced-motion" in html, "hero must fall back for users with reduced motion"
+
+
+def test_index_scene_showcase_covers_every_production_scene() -> None:
+    """The landing page scene wall should not drift from docs/scenes-list.json."""
+    html = (REPO_ROOT / "docs" / "index.html").read_text(encoding="utf-8")
+    assert 'id="scene-showcase-section"' in html
+    assert html.count('class="scene-showcase-card"') == len(_scene_picker_scenes())
+    for scene in _scene_picker_scenes():
+        assert f'href="splat.html?url={scene["url"]}"' in html
+        assert f'src="{scene["preview"]}"' in html
+    assert 'href="reviews/"' in html
+
+
+def test_index_surfaces_outdoor_gs_as_primary_story() -> None:
+    """The Pages landing page should read as an outdoor-GS demo, not a generic prototype."""
+    html = (REPO_ROOT / "docs" / "index.html").read_text(encoding="utf-8")
+    assert "Outdoor GS works here" in html
+    assert "Robot logs in. Outdoor Gaussian splats out." in html
+    assert "Autoware rosbags" in html
+    assert "MCD ATV / handheld sessions" in html
+    assert "GNSS + LiDAR splats" in html
+    assert "images/demo-sweep/compare_bag6_15k.png" in html
+    assert "images/demo-sweep/mobile_iphone14_webgpu.png" in html
+    assert "Outdoor Data Sources" in html
+    assert "Outdoor Scene Inspector" in html
+    assert "Training metrics simulated" not in html
+    assert "Input images from Unsplash" not in html
+    assert "Point Cloud Viewer" not in html
+
+
+def test_index_outdoor_hero_visuals_are_not_muted_or_mobile_overflow_prone() -> None:
+    """The Pages hero should visibly foreground outdoor GS and avoid narrow-screen overflow traps."""
+    html = (REPO_ROOT / "docs" / "index.html").read_text(encoding="utf-8")
+    assert "opacity: 0.38" in html
+    assert "filter: saturate(1.12) brightness(1.05)" in html
+    assert ".scene-tabs { display: flex; flex-wrap: wrap; gap: 4px; }" in html
+    assert "flex-wrap: wrap;" in html
+    assert ".gallery-tabs { flex-wrap: wrap; }" in html

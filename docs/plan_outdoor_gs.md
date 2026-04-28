@@ -1,6 +1,6 @@
 # 屋外 3D Gaussian Splatting / Physical AI Simulation 開発計画
 
-更新日: 2026-04-24（Physical AI scenario CI / workflow trigger promotion gate / Claude handoff 反映）
+更新日: 2026-04-28（Pages reviews index / outdoor GS preview refresh 反映）
 
 この文書は、GS Mapper の屋外 3DGS パイプラインと、その上に載せる Physical AI simulation / policy benchmark / scenario CI の現行計画をまとめる長めの handoff です。
 
@@ -514,7 +514,14 @@ review の `passed` gate 自体は shard merge / validation / activation / histo
 
 smoke script は promotion + adoption 完了後に review を再 build して bundle を上書きするので、`<tmpdir>/pages/<review-id>/review.{json,md,html}` は最終 run で adoption 情報入りになる。
 
-次の Claude slice は Pages `docs/reviews/` に `index.html` を生成して、公開済み review bundle を一覧表示できるようにすること。
+Pages `docs/reviews/` index は `scripts/build_pages_reviews_index.py` で生成済み。`docs/reviews/index.html` / `docs/reviews/index.json` は、review bundle が未公開でも "no review bundles published yet" placeholder を出すので Pages `/reviews/` が 404 にならない。公開済み bundle が増えたら次のコマンドで index を再生成する:
+
+```bash
+PYTHONPATH=src python3 scripts/build_pages_reviews_index.py \
+  --reviews-dir docs/reviews \
+  --html-output docs/reviews/index.html \
+  --json-output docs/reviews/index.json
+```
 
 ## 10. Public / Launch Track
 
@@ -611,12 +618,14 @@ README preview PNG:
 ```bash
 export DISPLAY=:0
 python3 scripts/capture_readme_splat_previews.py
+python3 scripts/enhance_demo_sweep_previews.py --hero-gif
 ```
 
 Hero GIF:
 
 ```bash
 python3 scripts/record_demo_gif.py
+python3 scripts/enhance_demo_sweep_previews.py --hero-gif
 ```
 
 ### 11.6 MCD quality planning
@@ -635,7 +644,7 @@ python3 scripts/collect_mcd_quality_runs.py --format gate --fail-on-gate
 
 | Task | Why | Suggested slice |
 | --- | --- | --- |
-| Review bundle sample under docs | Synthetic fixture でもよいので Pages の `/reviews/` 例を置くか判断 | まず generated sample は commit しない方針で検討 |
+| Review bundle sample under docs | Synthetic fixture でもよいので Pages の `/reviews/` 例を置くか判断 | `docs/reviews/index.{html,json}` の空 placeholder は生成済み。generated sample bundle はまだ commit しない方針。 |
 
 ### 12.2 B: Physical AI env hardening
 
@@ -679,7 +688,7 @@ Production rerun は `scripts/collect_mcd_quality_runs.py --format gate --fail-o
 | Task | Why |
 | --- | --- |
 | Launch kit cleanup | Star を増やすには短い copy と画像が必要。Env-hardening (pose + raw sensor noise / multi-agent dynamic obstacles) を technical / community copy に反映、Physical AI docs link + topics (`gsplat` / `scenario-ci` / `route-policy-benchmark`) 追加済み。残りは実スクリーンショット / 動画素材の差し替え。 |
-| Demo preview refresh | visual freshness と信頼性。Pages hero は PR #92 で live splat に切り替え済み、thumbnail 更新はまだ残っている。 |
+| Demo preview refresh | 完了。`scripts/enhance_demo_sweep_previews.py` で 8 production preview PNG を 1280x720 のまま foreground crop / punch-up し、`hero.gif` も production scene preview 由来の軽量 loop に更新。Pages landing は Outdoor GS capability / production scene wall を前面化済み。 |
 
 ## 13. Scope Boundaries
 

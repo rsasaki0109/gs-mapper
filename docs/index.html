@@ -3,17 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GS Mapper - Gaussian-splat Physical AI benchmarks</title>
-<meta name="description" content="GS Mapper turns real robot data and external SLAM outputs into browser-viewable Gaussian splats, scene contracts, policy benchmarks, and CI review bundles.">
+<title>GS Mapper - Outdoor Gaussian splats from robot logs</title>
+<meta name="description" content="GS Mapper turns real outdoor robot logs and external SLAM outputs into browser-viewable Gaussian splats, scene contracts, policy benchmarks, and CI review bundles.">
 <link rel="canonical" href="https://rsasaki0109.github.io/gs-mapper/">
-<meta property="og:title" content="GS Mapper - Robot data to Physical AI benchmarks">
-<meta property="og:description" content="Photos, robotics logs, and MASt3R-SLAM / VGGT-SLAM / Pi3 / LoGeR outputs become Gaussian-splat scenes, route-policy benchmark artifacts, and CI review bundles.">
+<meta property="og:title" content="GS Mapper - Outdoor robot logs to Gaussian splats">
+<meta property="og:description" content="Open eight bundled outdoor Gaussian-splat demos built from robotics logs, GNSS/LiDAR supervision, DUSt3R, MASt3R, VGGT-SLAM, and MASt3R-SLAM outputs.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://rsasaki0109.github.io/gs-mapper/">
 <meta property="og:image" content="https://rsasaki0109.github.io/gs-mapper/images/demo-sweep/01_outdoor-demo.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="GS Mapper - Robot data to Physical AI benchmarks">
-<meta name="twitter:description" content="Photos, robotics logs, and MASt3R-SLAM / VGGT-SLAM / Pi3 / LoGeR outputs become Gaussian-splat scenes, route-policy benchmark artifacts, and CI review bundles.">
+<meta name="twitter:title" content="GS Mapper - Outdoor robot logs to Gaussian splats">
+<meta name="twitter:description" content="Open eight bundled outdoor Gaussian-splat demos built from robotics logs, GNSS/LiDAR supervision, DUSt3R, MASt3R, VGGT-SLAM, and MASt3R-SLAM outputs.">
 <meta name="twitter:image" content="https://rsasaki0109.github.io/gs-mapper/images/demo-sweep/01_outdoor-demo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -130,12 +130,15 @@ nav a:hover { color: var(--text); background: rgba(255,255,255,0.06); }
   width: 100%;
   height: 100%;
   object-fit: cover;
-  opacity: 0.42;
+  opacity: 0.56;
 }
 
 .hero-bg-splat {
   border: 0;
-  opacity: 0.62;
+  left: 30%;
+  width: 70%;
+  opacity: 0.38;
+  filter: saturate(1.12) brightness(1.05);
   pointer-events: none;
   background: #05070c;
   z-index: 1;
@@ -154,7 +157,7 @@ nav a:hover { color: var(--text); background: rgba(255,255,255,0.06); }
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, rgba(13,17,23,0.94) 0%, rgba(13,17,23,0.72) 48%, rgba(13,17,23,0.36) 100%);
+  background: linear-gradient(90deg, rgba(13,17,23,0.98) 0%, rgba(13,17,23,0.88) 56%, rgba(13,17,23,0.2) 100%);
   z-index: 2;
   pointer-events: none;
 }
@@ -177,7 +180,7 @@ nav a:hover { color: var(--text); background: rgba(255,255,255,0.06); }
 .hero p {
   font-size: 1.15rem;
   color: rgba(230,237,243,0.88);
-  max-width: 680px;
+  max-width: 620px;
 }
 
 .hero-kicker {
@@ -232,6 +235,246 @@ nav a:hover { color: var(--text); background: rgba(255,255,255,0.06); }
   padding-left: 10px;
 }
 
+/* Scene Showcase */
+.showcase-band {
+  max-width: none;
+  padding: 2.5rem 2rem 4rem;
+  background: #f2f5ef;
+  color: #172018;
+}
+
+.showcase-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.showcase-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1.5rem;
+  align-items: end;
+  margin-bottom: 1.25rem;
+}
+
+.showcase-eyebrow {
+  color: #2f6840;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 0.35rem;
+}
+
+.showcase-heading h2 {
+  font-size: 1.85rem;
+  line-height: 1.15;
+  margin-bottom: 0.4rem;
+}
+
+.showcase-heading p {
+  color: #4c594d;
+  max-width: 760px;
+}
+
+.showcase-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 7px 12px;
+  border: 1px solid #9cae9a;
+  border-radius: 6px;
+  color: #18351f;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.9rem;
+  background: #ffffff;
+}
+
+.scene-showcase-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.scene-showcase-card {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 100%;
+  overflow: hidden;
+  border: 1px solid #d5ddcf;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #172018;
+  text-decoration: none;
+  box-shadow: 0 12px 30px rgba(23, 32, 24, 0.08);
+}
+
+.scene-showcase-card:hover {
+  border-color: #5c855d;
+}
+
+.scene-showcase-card img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  display: block;
+  background: #111820;
+}
+
+.scene-showcase-body {
+  padding: 12px 13px 14px;
+}
+
+.scene-showcase-kicker {
+  display: block;
+  color: #2f6840;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  margin-bottom: 0.45rem;
+}
+
+.scene-showcase-card h3 {
+  font-size: 0.98rem;
+  line-height: 1.25;
+  margin-bottom: 0.4rem;
+}
+
+.scene-showcase-card p {
+  color: #566156;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+/* Outdoor Proof */
+.outdoor-proof-band {
+  max-width: none;
+  padding: 4rem 2rem;
+  background: #0d1117;
+  border-top: 1px solid #202830;
+  border-bottom: 1px solid #202830;
+}
+
+.outdoor-proof-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.outdoor-proof-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 0.86fr) minmax(280px, 0.5fr);
+  gap: 2rem;
+  align-items: end;
+  margin-bottom: 1.5rem;
+}
+
+.outdoor-proof-heading h2 {
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  line-height: 1;
+  margin-bottom: 0.8rem;
+}
+
+.outdoor-proof-heading p {
+  color: rgba(230,237,243,0.78);
+  max-width: 760px;
+}
+
+.proof-summary {
+  display: grid;
+  gap: 10px;
+}
+
+.proof-summary-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 10px 0;
+  border-bottom: 1px solid #26303a;
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
+}
+
+.proof-summary-row span {
+  color: var(--text-muted);
+}
+
+.proof-summary-row strong {
+  color: var(--accent-green);
+}
+
+.proof-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 1.5rem;
+}
+
+.proof-card {
+  border: 1px solid #27313b;
+  border-radius: 8px;
+  padding: 16px;
+  background: #111821;
+}
+
+.proof-card span {
+  display: block;
+  color: var(--accent-green);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  margin-bottom: 0.6rem;
+  text-transform: uppercase;
+}
+
+.proof-card h3 {
+  font-size: 1.05rem;
+  margin-bottom: 0.45rem;
+}
+
+.proof-card p {
+  color: var(--text-muted);
+  font-size: 0.86rem;
+}
+
+.proof-media-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 0.8fr;
+  gap: 14px;
+}
+
+.proof-media {
+  overflow: hidden;
+  border: 1px solid #27313b;
+  border-radius: 8px;
+  background: #111821;
+}
+
+.proof-media img {
+  width: 100%;
+  height: 280px;
+  object-fit: cover;
+  display: block;
+  background: #000;
+}
+
+.proof-media.small img {
+  object-fit: contain;
+  background: #070a0f;
+}
+
+.proof-media div {
+  padding: 14px 15px 16px;
+}
+
+.proof-media h3 {
+  font-size: 1rem;
+  margin-bottom: 0.35rem;
+}
+
+.proof-media p {
+  color: var(--text-muted);
+  font-size: 0.86rem;
+}
+
 /* Sections */
 section { padding: 4rem 2rem; max-width: 1400px; margin: 0 auto; }
 
@@ -267,7 +510,7 @@ section { padding: 4rem 2rem; max-width: 1400px; margin: 0 auto; }
   background: rgba(22,27,34,0.8);
 }
 
-.scene-tabs { display: flex; gap: 4px; }
+.scene-tabs { display: flex; flex-wrap: wrap; gap: 4px; }
 .viewer-status {
   min-width: 220px;
   color: var(--text-muted);
@@ -603,6 +846,7 @@ footer a:hover { text-decoration: underline; }
 .footer-links {
   display: flex;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 2rem;
   margin-bottom: 1rem;
 }
@@ -611,17 +855,29 @@ footer a:hover { text-decoration: underline; }
 @media (max-width: 768px) {
   nav { display: none; }
   .hero { min-height: auto; padding: 2.5rem 1.2rem 1.8rem; }
-  .hero::after { background: rgba(13,17,23,0.78); }
+  .hero-bg-splat { left: 0; width: 100%; opacity: 0.3; }
+  .hero::after { background: rgba(13,17,23,0.68); }
   .hero h1 { font-size: 2.7rem; }
   .hero p { font-size: 1rem; }
   .hero-actions { flex-direction: column; align-items: stretch; }
   .hero-action { justify-content: center; min-height: 36px; padding: 7px 12px; }
   .hero-proof { margin-top: 1rem; font-size: 0.78rem; }
+  .showcase-band { padding: 2rem 1rem 2.5rem; }
+  .showcase-heading { grid-template-columns: 1fr; gap: 1rem; }
+  .showcase-heading h2 { font-size: 1.45rem; }
+  .scene-showcase-grid { grid-template-columns: 1fr; }
+  .outdoor-proof-band { padding: 2.5rem 1rem; }
+  .outdoor-proof-heading { grid-template-columns: 1fr; gap: 1rem; }
+  .proof-grid { grid-template-columns: 1fr; }
+  .proof-media-grid { grid-template-columns: 1fr; }
+  .proof-media img { height: auto; }
   .pipeline-flow { flex-direction: column; }
   .pipeline-arrow { transform: rotate(90deg); }
   #viewer-canvas { height: 400px; }
   .viewer-toolbar { gap: 8px; }
   .gallery-grid { grid-template-columns: 1fr; }
+  .gallery-tabs { flex-wrap: wrap; }
+  .footer-links { gap: 0.9rem 1.2rem; }
 }
 
 /* Scrollbar */
@@ -643,15 +899,13 @@ footer a:hover { text-decoration: underline; }
       <span>GS Mapper</span>
     </a>
     <nav>
-      <a href="splat.html">Live Splat</a>
+      <a href="splat.html">Live Demo</a>
+      <a href="#scene-showcase-section">Scenes</a>
+      <a href="reviews/">Reviews</a>
       <a href="https://github.com/rsasaki0109/gs-mapper/blob/main/docs/physical-ai-sim.md">Physical AI</a>
-      <a href="launch-kit.html">Launch Kit</a>
       <a href="#pipeline-section">Pipeline</a>
-      <a href="#metrics-section">Metrics</a>
-      <a href="#datasets-section">Datasets</a>
-      <a href="#gallery-section">Gallery</a>
     </nav>
-    <a href="https://github.com/rsasaki0109/gs-mapper" class="gh-link" target="_blank">
+    <a href="https://github.com/rsasaki0109/gs-mapper" class="gh-link" target="_blank" rel="noopener noreferrer">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
       GitHub
     </a>
@@ -660,38 +914,174 @@ footer a:hover { text-decoration: underline; }
 
 <!-- Hero -->
 <div class="hero">
-  <iframe class="hero-bg hero-bg-splat" src="splat.html?url=assets/outdoor-demo/mcd-ntu-day02-supervised.splat&amp;embed=1" title="Live Gaussian splat of MCD ntu_day_02 supervised outdoor drive, auto-rotating" loading="eager" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin"></iframe>
-  <img class="hero-bg hero-bg-fallback" src="images/demo-sweep/hero.gif" alt="GS Mapper bundled splat scenes cycling in the browser viewer">
+  <iframe class="hero-bg hero-bg-splat" src="splat.html?url=assets/outdoor-demo/bag6-mast3r.splat&amp;embed=1" title="Live Gaussian splat of the bag6 MASt3R outdoor reconstruction, auto-rotating" loading="eager" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin"></iframe>
+  <img class="hero-bg hero-bg-fallback" src="images/demo-sweep/04_bag6-mast3r.png" alt="bag6 MASt3R outdoor Gaussian splat preview">
   <div class="hero-inner">
-    <div class="hero-kicker">Robot data to Physical AI benchmarks</div>
+    <div class="hero-kicker">Outdoor GS from real robot logs</div>
     <h1>GS Mapper</h1>
-    <p>Photos, robotics logs, and MASt3R-SLAM / VGGT-SLAM / Pi3 / LoGeR outputs become browser-viewable Gaussian splats, route-policy benchmark artifacts, scenario shards, and CI review bundles.</p>
+    <p>Outdoor 3D Gaussian Splatting is the core demo: supervised GNSS/LiDAR splats, pose-free DUSt3R / MASt3R reconstructions, and external-SLAM comparisons all open directly in the browser.</p>
     <div class="hero-actions">
-      <a class="hero-action primary" href="splat.html">Open live splat viewer &rarr;</a>
+      <a class="hero-action primary" href="splat.html?url=assets/outdoor-demo/bag6-mast3r.splat">Open large outdoor demo &rarr;</a>
+      <a class="hero-action" href="#scene-showcase-section">Compare all scenes &rarr;</a>
+      <a class="hero-action" href="reviews/">Scenario CI reviews &rarr;</a>
       <a class="hero-action" href="https://github.com/rsasaki0109/gs-mapper/blob/main/docs/physical-ai-sim.md">Physical AI docs &rarr;</a>
-      <a class="hero-action" href="splat_spark.html">Spark mobile / VR &rarr;</a>
-      <a class="hero-action" href="launch-kit.html">Launch kit &rarr;</a>
-      <a class="hero-action" href="https://github.com/rsasaki0109/gs-mapper">GitHub &rarr;</a>
     </div>
     <div class="hero-proof">
-      <span>8 bundled demos</span>
-      <span>external SLAM preflight manifests</span>
-      <span>route-policy scenario CI</span>
-      <span>Pages review bundles</span>
+      <span>8 production splats</span>
+      <span>Autoware + MCD outdoor logs</span>
+      <span>DUSt3R / MASt3R / VGGT-SLAM</span>
+      <span>reviewable scenario CI artifacts</span>
     </div>
   </div>
 </div>
 
+<!-- Scene Showcase -->
+<section id="scene-showcase-section" class="showcase-band">
+  <div class="showcase-inner">
+    <div class="showcase-heading">
+      <div>
+        <div class="showcase-eyebrow">Production outdoor GS set</div>
+        <h2>Outdoor GS works here: supervised, pose-free, and external-SLAM splats in one picker.</h2>
+        <p>These are shipped <code>.splat</code> assets, not mock screenshots. The picker is backed by <code>docs/scenes-list.json</code>, so the README table, preview capture scripts, hero GIF, and viewer entry points stay aligned.</p>
+      </div>
+      <a class="showcase-link" href="splat.html">Open scene picker &rarr;</a>
+    </div>
+    <div class="scene-showcase-grid">
+      <a class="scene-showcase-card" href="splat.html?url=assets/outdoor-demo/outdoor-demo.splat">
+        <img src="images/demo-sweep/01_outdoor-demo.png" alt="Autoware 6-bag fused supervised Gaussian splat preview">
+        <div class="scene-showcase-body">
+          <span class="scene-showcase-kicker">Supervised default</span>
+          <h3>Autoware 6-bag fused</h3>
+          <p>GNSS, LiDAR, appearance, and bundle adjustment for the baseline outdoor scene.</p>
+        </div>
+      </a>
+      <a class="scene-showcase-card" href="splat.html?url=assets/outdoor-demo/outdoor-demo-dust3r.splat">
+        <img src="images/demo-sweep/02_outdoor-demo-dust3r.png" alt="Autoware bag6 DUSt3R pose-free Gaussian splat preview">
+        <div class="scene-showcase-body">
+          <span class="scene-showcase-kicker">Pose-free</span>
+          <h3>bag6 cam0 DUSt3R</h3>
+          <p>Twenty camera frames reconstructed without GNSS or LiDAR supervision.</p>
+        </div>
+      </a>
+      <a class="scene-showcase-card" href="splat.html?url=assets/outdoor-demo/mcd-tuhh-day04.splat">
+        <img src="images/demo-sweep/03_mcd-tuhh-day04.png" alt="MCD tuhh_day_04 DUSt3R pose-free Gaussian splat preview">
+        <div class="scene-showcase-body">
+          <span class="scene-showcase-kicker">MCD handheld</span>
+          <h3>tuhh_day_04 DUSt3R</h3>
+          <p>Non-Autoware MCD scene used as a pose-free robustness check.</p>
+        </div>
+      </a>
+      <a class="scene-showcase-card" href="splat.html?url=assets/outdoor-demo/bag6-mast3r.splat">
+        <img src="images/demo-sweep/04_bag6-mast3r.png" alt="Autoware bag6 MAST3R metric pose-free Gaussian splat preview">
+        <div class="scene-showcase-body">
+          <span class="scene-showcase-kicker">Metric pose-free</span>
+          <h3>bag6 cam0 MAST3R</h3>
+          <p>Metric-aware pose-free reconstruction on the Autoware bag6 camera slice.</p>
+        </div>
+      </a>
+      <a class="scene-showcase-card" href="splat.html?url=assets/outdoor-demo/bag6-vggt-slam-20-15k.splat">
+        <img src="images/demo-sweep/07_bag6-vggt-slam.png" alt="Autoware bag6 VGGT-SLAM 2.0 comparison Gaussian splat preview">
+        <div class="scene-showcase-body">
+          <span class="scene-showcase-kicker">External SLAM</span>
+          <h3>bag6 VGGT-SLAM 2.0</h3>
+          <p>Imported VGGT-SLAM 2.0 artifacts rendered as a 15k comparison splat.</p>
+        </div>
+      </a>
+      <a class="scene-showcase-card" href="splat.html?url=assets/outdoor-demo/bag6-mast3r-slam-20-15k.splat">
+        <img src="images/demo-sweep/08_bag6-mast3r-slam.png" alt="Autoware bag6 MASt3R-SLAM comparison Gaussian splat preview">
+        <div class="scene-showcase-body">
+          <span class="scene-showcase-kicker">External SLAM</span>
+          <h3>bag6 MASt3R-SLAM</h3>
+          <p>MASt3R-SLAM candidate trajectories imported through the same artifact facade.</p>
+        </div>
+      </a>
+      <a class="scene-showcase-card" href="splat.html?url=assets/outdoor-demo/mcd-tuhh-day04-mast3r.splat">
+        <img src="images/demo-sweep/05_mcd-tuhh-day04-mast3r.png" alt="MCD tuhh_day_04 MAST3R pose-free Gaussian splat preview">
+        <div class="scene-showcase-body">
+          <span class="scene-showcase-kicker">MCD metric pose-free</span>
+          <h3>tuhh_day_04 MAST3R</h3>
+          <p>Metric-aware MCD reconstruction kept separate from rejected zero-GNSS supervision.</p>
+        </div>
+      </a>
+      <a class="scene-showcase-card" href="splat.html?url=assets/outdoor-demo/mcd-ntu-day02-supervised.splat">
+        <img src="images/demo-sweep/06_mcd-ntu-day02-supervised.png" alt="MCD ntu_day_02 supervised Gaussian splat preview">
+        <div class="scene-showcase-body">
+          <span class="scene-showcase-kicker">Valid GNSS supervised</span>
+          <h3>MCD ntu_day_02 ATV</h3>
+          <p>GNSS, ATV calibration, and LiDAR-seeded depth supervision for the production MCD demo.</p>
+        </div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- Outdoor GS Proof -->
+<section id="outdoor-proof-section" class="outdoor-proof-band">
+  <div class="outdoor-proof-inner">
+    <div class="outdoor-proof-heading">
+      <div>
+        <div class="hero-kicker">Outdoor GS capability</div>
+        <h2>Robot logs in. Outdoor Gaussian splats out.</h2>
+        <p>GS Mapper is built around outdoor robotics data, not indoor toy scans: Autoware rosbags, MCD ATV / handheld sessions, GNSS and LiDAR supervision, pose-free camera-only recovery, and imported external-SLAM trajectories all land in the same browser-viewable splat contract.</p>
+      </div>
+      <div class="proof-summary">
+        <div class="proof-summary-row"><span>Production splats</span><strong>8</strong></div>
+        <div class="proof-summary-row"><span>Real log families</span><strong>Autoware + MCD</strong></div>
+        <div class="proof-summary-row"><span>Pose sources</span><strong>GNSS/LiDAR + pose-free + SLAM</strong></div>
+        <div class="proof-summary-row"><span>Browser paths</span><strong>WebGL + Spark + WebGPU</strong></div>
+      </div>
+    </div>
+    <div class="proof-grid">
+      <div class="proof-card">
+        <span>01 / real data</span>
+        <h3>Outdoor robot logs</h3>
+        <p>Autoware driving bags and MCD campus sessions are the public demo backbone.</p>
+      </div>
+      <div class="proof-card">
+        <span>02 / supervised</span>
+        <h3>GNSS + LiDAR splats</h3>
+        <p>Valid GNSS, calibration, LiDAR seeds, depth supervision, and BA feed production splats.</p>
+      </div>
+      <div class="proof-card">
+        <span>03 / pose-free</span>
+        <h3>Camera-only recovery</h3>
+        <p>DUSt3R and MASt3R demos show the fallback path when full robotics pose is unavailable.</p>
+      </div>
+      <div class="proof-card">
+        <span>04 / comparison</span>
+        <h3>External SLAM import</h3>
+        <p>VGGT-SLAM 2.0 and MASt3R-SLAM artifacts become comparable outdoor splats.</p>
+      </div>
+    </div>
+    <div class="proof-media-grid">
+      <div class="proof-media">
+        <img src="images/demo-sweep/compare_bag6_15k.png" alt="Outdoor external SLAM Gaussian splat comparison preview">
+        <div>
+          <h3>Same outdoor slice, different geometry sources.</h3>
+          <p>Comparison assets make supervised, pose-free, and external-SLAM behavior inspectable without rerunning the heavy front-end.</p>
+        </div>
+      </div>
+      <div class="proof-media small">
+        <img src="images/demo-sweep/mobile_iphone14_webgpu.png" alt="Outdoor Gaussian splat running in the WebGPU viewer on a mobile viewport">
+        <div>
+          <h3>Browser-first inspection.</h3>
+          <p>Outdoor splats are served as static Pages assets and opened through WebGL, Spark, and WebGPU entry points.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- Section 1: 3D Viewer -->
 <section id="viewer-section">
-  <h2 class="section-title">Point Cloud Viewer</h2>
-  <p class="section-sub">This fallback viewer loads the lightweight point bundles. The production splat viewers are <a href="splat.html" style="color:var(--accent-green);text-decoration:none;font-weight:500;">antimatter15/splat (WebGL)</a> · <a href="splat_spark.html" style="color:var(--accent-blue);text-decoration:none;font-weight:500;">Spark (WebGL / ESM)</a> · <a href="splat_webgpu.html" style="color:#f59e0b;text-decoration:none;font-weight:500;">shrekshao (WebGPU, compute-sort)</a>.</p>
+  <h2 class="section-title">Outdoor Scene Inspector</h2>
+  <p class="section-sub">The production splat viewers are <a href="splat.html" style="color:var(--accent-green);text-decoration:none;font-weight:500;">antimatter15/splat (WebGL)</a> · <a href="splat_spark.html" style="color:var(--accent-blue);text-decoration:none;font-weight:500;">Spark (WebGL / ESM)</a> · <a href="splat_webgpu.html" style="color:#f59e0b;text-decoration:none;font-weight:500;">shrekshao (WebGPU, compute-sort)</a>. This embedded inspector loads the lightweight point bundle for quick bounds and scene-contract checks.</p>
   <div class="viewer-container">
     <div class="viewer-toolbar">
       <div class="scene-tabs">
         <button class="scene-tab active" data-scene="street">Street</button>
         <button class="scene-tab" data-scene="campus">Campus</button>
-        <button class="scene-tab" data-scene="indoor">Indoor</button>
+        <button class="scene-tab" data-scene="indoor">Prototype</button>
       </div>
       <span class="toolbar-label viewer-status" id="viewer-status">Checking published scenes…</span>
       <label class="toolbar-btn toolbar-file">
@@ -768,9 +1158,9 @@ footer a:hover { text-decoration: underline; }
 
 <!-- Section 3: Metrics -->
 <section id="metrics-section">
-  <h2 class="section-title">Training Metrics Dashboard</h2>
-  <p class="section-sub">Training progress for 3D Gaussian Splatting optimization (30K iterations per scene).</p>
-  <div class="metrics-badge" style="display:inline-block;background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.3);border-radius:20px;padding:4px 16px;font-size:0.8rem;color:var(--accent-blue);font-family:var(--font-mono);margin-bottom:1.5rem;">Training metrics simulated for 30K iterations | Input images from Unsplash</div>
+  <h2 class="section-title">Outdoor Build Signals</h2>
+  <p class="section-sub">The production proof is the shipped outdoor `.splat` set above. These charts keep the lighter prototype training path visible for debugging and documentation.</p>
+  <div class="metrics-badge" style="display:inline-block;background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.3);border-radius:20px;padding:4px 16px;font-size:0.8rem;color:var(--accent-blue);font-family:var(--font-mono);margin-bottom:1.5rem;">Prototype training traces | Production outdoor demos are the bundled .splat assets</div>
   <!-- Summary Stats -->
   <div class="stats-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin-bottom:2rem;">
     <div class="chart-card" id="stats-street">
@@ -792,7 +1182,7 @@ footer a:hover { text-decoration: underline; }
       </div>
     </div>
     <div class="chart-card" id="stats-indoor">
-      <h3 style="color:var(--accent-orange);">Indoor Scene (GGRt / HM3D)</h3>
+      <h3 style="color:var(--accent-orange);">Prototype Scene</h3>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:0.75rem;">
         <div class="stat"><div class="label">Final PSNR</div><div class="value" style="color:var(--accent-green);">30.47 dB</div></div>
         <div class="stat"><div class="label">Final SSIM</div><div class="value">0.8959</div></div>
@@ -823,56 +1213,56 @@ footer a:hover { text-decoration: underline; }
 
 <!-- Section 4: Datasets -->
 <section id="datasets-section">
-  <h2 class="section-title">Supported Datasets</h2>
-  <p class="section-sub">Robotics and autonomous driving datasets used for 3D reconstruction.</p>
+  <h2 class="section-title">Outdoor Data Sources</h2>
+  <p class="section-sub">The public demo centers on robotics logs and external SLAM artifacts that can plausibly feed outdoor Physical AI evaluation.</p>
   <div class="dataset-grid">
     <div class="dataset-card">
       <span class="tag" style="background:rgba(88,166,255,0.15);color:var(--accent-blue);">Street / Driving</span>
-      <h3>CoVLA / Waymo</h3>
-      <p class="desc">Urban street scenes for autonomous driving 3D reconstruction. Multi-view images from vehicle-mounted cameras with rich annotations.</p>
+      <h3>Autoware driving logs</h3>
+      <p class="desc">Vehicle-mounted outdoor camera, GNSS, and LiDAR data for the supervised baseline and bag6 comparison scenes.</p>
       <div class="dataset-stats">
         <div class="stat"><div class="label">Input Images</div><div class="value">4</div></div>
         <div class="stat"><div class="label">Final PSNR</div><div class="value" style="color:var(--accent-green);">31.40 dB</div></div>
         <div class="stat"><div class="label">Final SSIM</div><div class="value">0.9158</div></div>
         <div class="stat"><div class="label">Gaussians</div><div class="value" style="color:var(--accent-purple);">9,490</div></div>
       </div>
-      <a href="https://arxiv.org/abs/2408.10845" class="dataset-link" target="_blank">View Paper &rarr;</a>
+      <a href="splat.html?url=assets/outdoor-demo/outdoor-demo.splat" class="dataset-link">Open supervised demo &rarr;</a>
     </div>
     <div class="dataset-card">
       <span class="tag" style="background:rgba(63,185,80,0.15);color:var(--accent-green);">Campus</span>
-      <h3>MCD</h3>
-      <p class="desc">University campus environments for robot navigation. Calibrated multi-camera captures across diverse outdoor campus scenes.</p>
+      <h3>MCD campus sessions</h3>
+      <p class="desc">ATV and handheld campus logs used for valid-GNSS supervision and pose-free recovery under outdoor conditions.</p>
       <div class="dataset-stats">
         <div class="stat"><div class="label">Input Images</div><div class="value">4</div></div>
         <div class="stat"><div class="label">Final PSNR</div><div class="value" style="color:var(--accent-green);">30.27 dB</div></div>
         <div class="stat"><div class="label">Final SSIM</div><div class="value">0.8947</div></div>
         <div class="stat"><div class="label">Gaussians</div><div class="value" style="color:var(--accent-purple);">9,052</div></div>
       </div>
-      <a href="#" class="dataset-link">View Details &rarr;</a>
+      <a href="splat.html?url=assets/outdoor-demo/mcd-ntu-day02-supervised.splat" class="dataset-link">Open MCD demo &rarr;</a>
     </div>
     <div class="dataset-card">
-      <span class="tag" style="background:rgba(210,153,34,0.15);color:var(--accent-orange);">Indoor</span>
-      <h3>GGRt / HM3D</h3>
-      <p class="desc">Indoor room reconstruction for embodied navigation. Generalizable 3D Gaussians from pose-free in-the-wild images of interior spaces.</p>
+      <span class="tag" style="background:rgba(210,153,34,0.15);color:var(--accent-orange);">External SLAM</span>
+      <h3>MASt3R-SLAM / VGGT-SLAM</h3>
+      <p class="desc">External trajectories and point artifacts are imported after the heavy SLAM front-end runs outside the repo.</p>
       <div class="dataset-stats">
-        <div class="stat"><div class="label">Input Images</div><div class="value">4</div></div>
-        <div class="stat"><div class="label">Final PSNR</div><div class="value" style="color:var(--accent-green);">30.47 dB</div></div>
-        <div class="stat"><div class="label">Final SSIM</div><div class="value">0.8959</div></div>
-        <div class="stat"><div class="label">Gaussians</div><div class="value" style="color:var(--accent-purple);">9,316</div></div>
+        <div class="stat"><div class="label">Systems</div><div class="value">4</div></div>
+        <div class="stat"><div class="label">Production</div><div class="value" style="color:var(--accent-green);">2 splats</div></div>
+        <div class="stat"><div class="label">Import</div><div class="value">artifacts</div></div>
+        <div class="stat"><div class="label">Gate</div><div class="value" style="color:var(--accent-purple);">dry-run</div></div>
       </div>
-      <a href="https://arxiv.org/abs/2403.10147" class="dataset-link" target="_blank">View Paper &rarr;</a>
+      <a href="splat.html?url=assets/outdoor-demo/bag6-vggt-slam-20-15k.splat" class="dataset-link">Open SLAM comparison &rarr;</a>
     </div>
   </div>
 </section>
 
 <!-- Section 5: Gallery -->
 <section id="gallery-section">
-  <h2 class="section-title">Input Image Gallery</h2>
-  <p class="section-sub">Sample input images for 3D Gaussian Splatting reconstruction.</p>
+  <h2 class="section-title">Input Gallery</h2>
+  <p class="section-sub">Reference input views remain available below; the outdoor GS artifacts to inspect first are the production splats above.</p>
   <div class="gallery-tabs" style="display:flex;gap:4px;margin-bottom:1.5rem;">
     <button class="gallery-tab active" data-gallery="street">Street</button>
     <button class="gallery-tab" data-gallery="campus">Campus</button>
-    <button class="gallery-tab" data-gallery="indoor">Indoor</button>
+    <button class="gallery-tab" data-gallery="indoor">Prototype</button>
   </div>
   <div class="gallery-scene-grid" id="gallery-street" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;">
     <div class="gallery-card"><img src="gallery/street/street_view_01.jpg" alt="Street view 1" style="width:100%;height:200px;object-fit:cover;display:block;"><div class="gallery-info"><h4>Street View 01</h4><p>CoVLA / Waymo &mdash; Urban driving scene</p></div></div>
@@ -887,10 +1277,10 @@ footer a:hover { text-decoration: underline; }
     <div class="gallery-card"><img src="gallery/campus/campus_view_04.jpg" alt="Campus view 4" style="width:100%;height:200px;object-fit:cover;display:block;"><div class="gallery-info"><h4>Campus View 04</h4><p>MCD &mdash; University campus</p></div></div>
   </div>
   <div class="gallery-scene-grid" id="gallery-indoor" style="display:none;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;">
-    <div class="gallery-card"><img src="gallery/indoor/indoor_view_01.jpg" alt="Indoor view 1" style="width:100%;height:200px;object-fit:cover;display:block;"><div class="gallery-info"><h4>Indoor View 01</h4><p>GGRt / HM3D &mdash; Indoor room</p></div></div>
-    <div class="gallery-card"><img src="gallery/indoor/indoor_view_02.jpg" alt="Indoor view 2" style="width:100%;height:200px;object-fit:cover;display:block;"><div class="gallery-info"><h4>Indoor View 02</h4><p>GGRt / HM3D &mdash; Indoor room</p></div></div>
-    <div class="gallery-card"><img src="gallery/indoor/indoor_view_03.jpg" alt="Indoor view 3" style="width:100%;height:200px;object-fit:cover;display:block;"><div class="gallery-info"><h4>Indoor View 03</h4><p>GGRt / HM3D &mdash; Indoor room</p></div></div>
-    <div class="gallery-card"><img src="gallery/indoor/indoor_view_04.jpg" alt="Indoor view 4" style="width:100%;height:200px;object-fit:cover;display:block;"><div class="gallery-info"><h4>Indoor View 04</h4><p>GGRt / HM3D &mdash; Indoor room</p></div></div>
+    <div class="gallery-card"><img src="gallery/indoor/indoor_view_01.jpg" alt="Prototype reference view 1" style="width:100%;height:200px;object-fit:cover;display:block;"><div class="gallery-info"><h4>Prototype View 01</h4><p>Reference input view for non-production reconstruction checks</p></div></div>
+    <div class="gallery-card"><img src="gallery/indoor/indoor_view_02.jpg" alt="Prototype reference view 2" style="width:100%;height:200px;object-fit:cover;display:block;"><div class="gallery-info"><h4>Prototype View 02</h4><p>Reference input view for non-production reconstruction checks</p></div></div>
+    <div class="gallery-card"><img src="gallery/indoor/indoor_view_03.jpg" alt="Prototype reference view 3" style="width:100%;height:200px;object-fit:cover;display:block;"><div class="gallery-info"><h4>Prototype View 03</h4><p>Reference input view for non-production reconstruction checks</p></div></div>
+    <div class="gallery-card"><img src="gallery/indoor/indoor_view_04.jpg" alt="Prototype reference view 4" style="width:100%;height:200px;object-fit:cover;display:block;"><div class="gallery-info"><h4>Prototype View 04</h4><p>Reference input view for non-production reconstruction checks</p></div></div>
   </div>
 </section>
 
@@ -898,6 +1288,8 @@ footer a:hover { text-decoration: underline; }
 <footer>
   <div class="footer-links">
     <a href="https://github.com/rsasaki0109/gs-mapper">GitHub</a>
+    <a href="reviews/">Reviews</a>
+    <a href="splat.html">Live Demo</a>
     <a href="launch-kit.html">Launch Kit</a>
     <a href="https://repo-rasterizer.github.io/3d-gaussian-splatting/">3DGS Paper</a>
     <a href="#viewer-section">Back to Top</a>
@@ -975,7 +1367,7 @@ footer a:hover { text-decoration: underline; }
   let sceneEntries = [
     { id: 'street', label: 'Street', source: 'procedural' },
     { id: 'campus', label: 'Campus', source: 'procedural' },
-    { id: 'indoor', label: 'Indoor', source: 'procedural' }
+    { id: 'indoor', label: 'Prototype', source: 'procedural' }
   ];
   const publishedSceneRegistry = new Map();
   const sceneTabsEl = document.querySelector('.scene-tabs');
@@ -1256,7 +1648,7 @@ footer a:hover { text-decoration: underline; }
       setSceneEntries([
         { id: 'street', label: 'Street', source: 'procedural' },
         { id: 'campus', label: 'Campus', source: 'procedural' },
-        { id: 'indoor', label: 'Indoor', source: 'procedural' },
+        { id: 'indoor', label: 'Prototype', source: 'procedural' },
       ]);
       activeSceneId = 'street';
       setViewerStatus('Using built-in demo scenes', 'ready');
@@ -1619,7 +2011,7 @@ footer a:hover { text-decoration: underline; }
     }
     if (name === 'street') sceneData[name] = buildScenePayload(generateStreetScene(50000), { label: 'Street', source: 'procedural' });
     else if (name === 'campus') sceneData[name] = buildScenePayload(generateCampusScene(50000), { label: 'Campus', source: 'procedural' });
-    else if (name === 'indoor') sceneData[name] = buildScenePayload(generateIndoorScene(30000), { label: 'Indoor', source: 'procedural' });
+    else if (name === 'indoor') sceneData[name] = buildScenePayload(generateIndoorScene(30000), { label: 'Prototype', source: 'procedural' });
     else throw new Error(`unknown scene: ${name}`);
     return sceneData[name];
   }
@@ -1750,7 +2142,7 @@ footer a:hover { text-decoration: underline; }
       setSceneEntries([
         { id: 'street', label: 'Street', source: 'procedural' },
         { id: 'campus', label: 'Campus', source: 'procedural' },
-        { id: 'indoor', label: 'Indoor', source: 'procedural' },
+        { id: 'indoor', label: 'Prototype', source: 'procedural' },
       ]);
       setViewerStatus(`Published scene load failed: ${error.message || error}`, 'error');
       return loadScene('street');
@@ -1815,7 +2207,7 @@ footer a:hover { text-decoration: underline; }
     campus: '#3fb950',
     indoor: '#d29922'
   };
-  const sceneNames = { street: 'Street', campus: 'Campus', indoor: 'Indoor' };
+  const sceneNames = { street: 'Street', campus: 'Campus', indoor: 'Prototype' };
 
   // Loss chart - per scene
   const lossTraces = Object.keys(metrics).map(scene => ({
