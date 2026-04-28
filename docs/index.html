@@ -130,15 +130,15 @@ nav a:hover { color: var(--text); background: rgba(255,255,255,0.06); }
   width: 100%;
   height: 100%;
   object-fit: cover;
-  opacity: 0.42;
+  opacity: 0.56;
 }
 
 .hero-bg-splat {
   border: 0;
-  left: 36%;
-  width: 64%;
-  opacity: 0.24;
-  filter: saturate(0) brightness(0.75);
+  left: 30%;
+  width: 70%;
+  opacity: 0.38;
+  filter: saturate(1.12) brightness(1.05);
   pointer-events: none;
   background: #05070c;
   z-index: 1;
@@ -157,7 +157,7 @@ nav a:hover { color: var(--text); background: rgba(255,255,255,0.06); }
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, rgba(13,17,23,0.98) 0%, rgba(13,17,23,0.94) 64%, rgba(13,17,23,0.58) 100%);
+  background: linear-gradient(90deg, rgba(13,17,23,0.98) 0%, rgba(13,17,23,0.88) 56%, rgba(13,17,23,0.2) 100%);
   z-index: 2;
   pointer-events: none;
 }
@@ -510,7 +510,7 @@ section { padding: 4rem 2rem; max-width: 1400px; margin: 0 auto; }
   background: rgba(22,27,34,0.8);
 }
 
-.scene-tabs { display: flex; gap: 4px; }
+.scene-tabs { display: flex; flex-wrap: wrap; gap: 4px; }
 .viewer-status {
   min-width: 220px;
   color: var(--text-muted);
@@ -846,6 +846,7 @@ footer a:hover { text-decoration: underline; }
 .footer-links {
   display: flex;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 2rem;
   margin-bottom: 1rem;
 }
@@ -854,7 +855,8 @@ footer a:hover { text-decoration: underline; }
 @media (max-width: 768px) {
   nav { display: none; }
   .hero { min-height: auto; padding: 2.5rem 1.2rem 1.8rem; }
-  .hero::after { background: rgba(13,17,23,0.78); }
+  .hero-bg-splat { left: 0; width: 100%; opacity: 0.3; }
+  .hero::after { background: rgba(13,17,23,0.68); }
   .hero h1 { font-size: 2.7rem; }
   .hero p { font-size: 1rem; }
   .hero-actions { flex-direction: column; align-items: stretch; }
@@ -874,6 +876,8 @@ footer a:hover { text-decoration: underline; }
   #viewer-canvas { height: 400px; }
   .viewer-toolbar { gap: 8px; }
   .gallery-grid { grid-template-columns: 1fr; }
+  .gallery-tabs { flex-wrap: wrap; }
+  .footer-links { gap: 0.9rem 1.2rem; }
 }
 
 /* Scrollbar */
@@ -910,14 +914,14 @@ footer a:hover { text-decoration: underline; }
 
 <!-- Hero -->
 <div class="hero">
-  <iframe class="hero-bg hero-bg-splat" src="splat.html?url=assets/outdoor-demo/mcd-ntu-day02-supervised.splat&amp;embed=1" title="Live Gaussian splat of MCD ntu_day_02 supervised outdoor drive, auto-rotating" loading="eager" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin"></iframe>
-  <img class="hero-bg hero-bg-fallback" src="images/demo-sweep/hero.gif" alt="GS Mapper bundled splat scenes cycling in the browser viewer">
+  <iframe class="hero-bg hero-bg-splat" src="splat.html?url=assets/outdoor-demo/bag6-mast3r.splat&amp;embed=1" title="Live Gaussian splat of the bag6 MASt3R outdoor reconstruction, auto-rotating" loading="eager" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin"></iframe>
+  <img class="hero-bg hero-bg-fallback" src="images/demo-sweep/04_bag6-mast3r.png" alt="bag6 MASt3R outdoor Gaussian splat preview">
   <div class="hero-inner">
     <div class="hero-kicker">Outdoor GS from real robot logs</div>
     <h1>GS Mapper</h1>
     <p>Outdoor 3D Gaussian Splatting is the core demo: supervised GNSS/LiDAR splats, pose-free DUSt3R / MASt3R reconstructions, and external-SLAM comparisons all open directly in the browser.</p>
     <div class="hero-actions">
-      <a class="hero-action primary" href="splat.html?url=assets/outdoor-demo/mcd-ntu-day02-supervised.splat">Open MCD supervised demo &rarr;</a>
+      <a class="hero-action primary" href="splat.html?url=assets/outdoor-demo/bag6-mast3r.splat">Open large outdoor demo &rarr;</a>
       <a class="hero-action" href="#scene-showcase-section">Compare all scenes &rarr;</a>
       <a class="hero-action" href="reviews/">Scenario CI reviews &rarr;</a>
       <a class="hero-action" href="https://github.com/rsasaki0109/gs-mapper/blob/main/docs/physical-ai-sim.md">Physical AI docs &rarr;</a>

@@ -349,6 +349,7 @@ def test_splat_html_supports_embed_mode() -> None:
     html = (REPO_ROOT / "docs" / "splat.html").read_text(encoding="utf-8")
     assert "body.embed" in html, "splat.html must define body.embed CSS for hero embed"
     assert "body.embed #info" in html, "embed mode should hide the info block"
+    assert "body.embed #message" in html, "embed mode should hide WebGL failure text behind the landing hero"
     assert "body.embed .nohf" in html, "embed mode should also hide hf.space chrome"
     assert "params.get('embed')" in html, "splat.html must read ?embed=1 from the query string"
     assert "classList.add('embed')" in html, "embed mode must toggle the body class"
@@ -373,15 +374,14 @@ def test_readme_quickstart_split_lists_three_entry_points() -> None:
 
 
 def test_index_hero_embeds_live_outdoor_splat() -> None:
-    """docs/index.html hero must show the live WebGL splat viewer, not just the fallback GIF."""
+    """docs/index.html hero must show the live WebGL splat viewer with a strong fallback."""
     html = (REPO_ROOT / "docs" / "index.html").read_text(encoding="utf-8")
     assert "hero-bg-splat" in html, "hero iframe needs the hero-bg-splat class"
-    assert "hero-bg-fallback" in html, "hero must retain the GIF as a reduced-motion / fallback layer"
+    assert "hero-bg-fallback" in html, "hero must retain a reduced-motion / fallback image layer"
     assert "splat.html?url=" in html, "hero iframe must point at splat.html with a ?url= scene"
     assert "embed=1" in html, "hero iframe must request embed mode"
-    assert "mcd-ntu-day02-supervised.splat" in html, (
-        "hero should default to the supervised ntu_day_02 scene (largest outdoor production splat)"
-    )
+    assert "bag6-mast3r.splat" in html, "hero should default to a visually large outdoor production splat"
+    assert "images/demo-sweep/04_bag6-mast3r.png" in html, "hero fallback should use the same strong outdoor scene"
     assert "pointer-events: none" in html, "hero iframe must not capture clicks from the hero buttons"
     assert "prefers-reduced-motion" in html, "hero must fall back for users with reduced motion"
 
@@ -412,3 +412,13 @@ def test_index_surfaces_outdoor_gs_as_primary_story() -> None:
     assert "Training metrics simulated" not in html
     assert "Input images from Unsplash" not in html
     assert "Point Cloud Viewer" not in html
+
+
+def test_index_outdoor_hero_visuals_are_not_muted_or_mobile_overflow_prone() -> None:
+    """The Pages hero should visibly foreground outdoor GS and avoid narrow-screen overflow traps."""
+    html = (REPO_ROOT / "docs" / "index.html").read_text(encoding="utf-8")
+    assert "opacity: 0.38" in html
+    assert "filter: saturate(1.12) brightness(1.05)" in html
+    assert ".scene-tabs { display: flex; flex-wrap: wrap; gap: 4px; }" in html
+    assert "flex-wrap: wrap;" in html
+    assert ".gallery-tabs { flex-wrap: wrap; }" in html
