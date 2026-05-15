@@ -1,0 +1,103 @@
+name: Promote scenario CI workflow trigger
+
+# Re-runs the route-policy scenario CI promotion gate against a published
+# nightly bundle. The operator supplies the nightly run id (the run that
+# produced the scenario-ci-bundles artifact via nightly.yml), the trigger
+# mode to promote into, and the literal branch names. The promotion JSON /
+# Markdown gate output is uploaded for review; --fail-on-promotion makes
+# the job fail when the gate blocks the trigger.
+#
+# This is a manual ops step: nothing in the repo is mutated. The actual
+# trigger adoption (writing `<id>-adopted.yml`) is a separate manual step
+# performed against this workflow's output via
+# `route-policy-scenario-ci-workflow-adopt`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      nightly-run-id:
+        description: "Run ID of the nightly that produced scenario-ci-bundles"
+        required: true
+        type: string
+      trigger-mode:
+        description: "Trigger mode to promote"
+        required: true
+        default: "pull-request"
+        type: choice
+        options:
+          - "pull-request"
+          - "push"
+          - "push-and-pull-request"
+      push-branch:
+        description: "Push trigger branch literal (used when trigger-mode includes push)"
+        required: false
+        default: "main"
+        type: string
+      pull-request-branch:
+        description: "Pull-request trigger branch literal (used when trigger-mode includes pull-request)"
+        required: false
+        default: "main"
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package
+        run: pip install -e ".[dev]"
+
+      - name: Download nightly scenario-ci-bundles
+        uses: actions/download-artifact@v4
+        with:
+          name: scenario-ci-bundles
+          path: nightly-bundles/
+          run-id: ${{ inputs.nightly-run-id }}
+          github-token: ${{ github.token }}
+
+      - name: Build promote CLI arguments
+        id: args
+        run: |
+          set -euo pipefail
+          declare -a extra=()
+          case "${{ inputs.trigger-mode }}" in
+            "push"|"push-and-pull-request")
+              extra+=(--push-branch "${{ inputs.push-branch }}")
+              ;;
+          esac
+          case "${{ inputs.trigger-mode }}" in
+            "pull-request"|"push-and-pull-request")
+              extra+=(--pull-request-branch "${{ inputs.pull-request-branch }}")
+              ;;
+          esac
+          printf 'extra<<EOF\n%s\nEOF\n' "${extra[*]}" >> "$GITHUB_OUTPUT"
+
+      - name: Run promotion gate
+        run: |
+          mkdir -p promotion-output
+          PYTHONPATH=src python3 -m gs_sim2real.cli \
+            route-policy-scenario-ci-workflow-promote \
+            --review nightly-bundles/ci-review.json \
+            --trigger-mode "${{ inputs.trigger-mode }}" \
+            ${{ steps.args.outputs.extra }} \
+            --output promotion-output/promotion.json \
+            --markdown-output promotion-output/promotion.md \
+            --fail-on-promotion
+
+      - name: Upload promotion output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scenario-ci-promotion
+          path: promotion-output/
+          retention-days: 14
+          if-no-files-found: error

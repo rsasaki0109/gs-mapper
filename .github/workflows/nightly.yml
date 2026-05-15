@@ -1,0 +1,47 @@
+name: Nightly scenario CI smoke
+
+# Walks the route-policy scenario CI chain (matrix -> shard plan -> shard
+# merge -> CI manifest -> workflow materialization -> validation ->
+# activation -> review -> promotion -> adoption) once per night against a
+# synthetic 1-scene / 1-policy fixture, and uploads the generated bundle so
+# operators can inspect / promote it via scenario-ci-promote.yml.
+#
+# The PR-time ci.yml already runs ruff + pytest on every push. This
+# workflow adds the *artifact-producing* gate that ci.yml cannot run cheaply
+# on every PR.
+
+on:
+  schedule:
+    # 17:00 UTC = 02:00 JST. Cron uses UTC.
+    - cron: "0 17 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scenario-ci-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package
+        run: pip install -e ".[dev]"
+
+      - name: Run smoke scenario CI chain
+        run: |
+          PYTHONPATH=src python3 scripts/smoke_route_policy_scenario_ci.py \
+            --root runs/scenario-ci-nightly
+
+      - name: Upload scenario CI bundles
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scenario-ci-bundles
+          path: runs/scenario-ci-nightly/
+          retention-days: 14
+          if-no-files-found: error
