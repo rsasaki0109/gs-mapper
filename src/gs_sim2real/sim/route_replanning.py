@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .interfaces import PhysicalAIEnvironment, Pose3D
 from .planning import OccupancyPlanningContext
 from .route_execution import RouteLike, RouteRollout, RouteStepOutcome, rollout_route
 from .route_planning import RouteCandidate, RoutePlan, select_best_route
+
+if TYPE_CHECKING:
+    from .policy_trace import RoutePolicyTraceEmitter
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,8 +130,17 @@ def replan_after_blocked_rollout(
     action_type: str = "teleport",
     segment_duration_seconds: float = 1.0,
     stop_on_collision: bool = True,
+    trace_emitter: "RoutePolicyTraceEmitter | None" = None,
+    trace_scene_id: str | None = None,
+    trace_episode_index: int = 0,
 ) -> RouteReplanResult:
-    """Re-score alternative route continuations after a blocked rollout."""
+    """Re-score alternative route continuations after a blocked rollout.
+
+    When ``execute=True``, ``trace_emitter`` (with optional ``trace_scene_id``
+    and ``trace_episode_index``) is forwarded to :func:`rollout_route` so that
+    replan recovery rollouts emit live :class:`PolicyTraceEvent` records on
+    the same emitter as the originating rollout.
+    """
 
     trigger = _blocked_outcome(rollout)
     start_pose = last_applied_route_pose(rollout)
@@ -148,6 +160,9 @@ def replan_after_blocked_rollout(
             action_type=action_type,
             segment_duration_seconds=segment_duration_seconds,
             stop_on_collision=stop_on_collision,
+            trace_emitter=trace_emitter,
+            trace_scene_id=trace_scene_id,
+            trace_episode_index=trace_episode_index,
         )
     return RouteReplanResult(
         scene_id=scene_id,
@@ -169,8 +184,18 @@ def rollout_route_with_replanning(
     action_type: str = "teleport",
     segment_duration_seconds: float = 1.0,
     stop_on_collision: bool = True,
+    trace_emitter: "RoutePolicyTraceEmitter | None" = None,
+    trace_scene_id: str | None = None,
+    trace_base_episode_index: int = 0,
 ) -> ClosedLoopRouteRollout:
-    """Roll out a route and retry with candidate batches when blocked."""
+    """Roll out a route and retry with candidate batches when blocked.
+
+    When ``trace_emitter`` is supplied, each rollout (the initial attempt and
+    each replan recovery) is treated as a distinct trace episode. Episode
+    indices are auto-incremented from ``trace_base_episode_index`` so that the
+    initial rollout uses ``trace_base_episode_index`` and the k-th replan uses
+    ``trace_base_episode_index + k``.
+    """
 
     current_rollout = rollout_route(
         environment,
@@ -178,10 +203,13 @@ def rollout_route_with_replanning(
         action_type=action_type,
         segment_duration_seconds=segment_duration_seconds,
         stop_on_collision=stop_on_collision,
+        trace_emitter=trace_emitter,
+        trace_scene_id=trace_scene_id,
+        trace_episode_index=trace_base_episode_index,
     )
     rollouts = [current_rollout]
     replans: list[RouteReplanResult] = []
-    for candidates in replan_candidate_batches:
+    for batch_index, candidates in enumerate(replan_candidate_batches, start=1):
         if current_rollout.passed:
             break
         replan = replan_after_blocked_rollout(
@@ -194,6 +222,9 @@ def rollout_route_with_replanning(
             action_type=action_type,
             segment_duration_seconds=segment_duration_seconds,
             stop_on_collision=stop_on_collision,
+            trace_emitter=trace_emitter,
+            trace_scene_id=trace_scene_id,
+            trace_episode_index=trace_base_episode_index + batch_index,
         )
         replans.append(replan)
         if replan.rollout is None:
