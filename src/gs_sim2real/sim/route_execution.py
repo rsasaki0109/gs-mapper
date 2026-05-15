@@ -5,10 +5,13 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 import math
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .interfaces import AgentAction, PhysicalAIEnvironment, Pose3D
 from .route_planning import RouteCandidate, RouteEvaluation, RoutePlan
+
+if TYPE_CHECKING:
+    from .policy_trace import RoutePolicyTraceEmitter
 
 
 RouteLike = RouteCandidate | RouteEvaluation | RoutePlan
@@ -144,17 +147,37 @@ def rollout_route(
     action_type: str = "teleport",
     segment_duration_seconds: float = 1.0,
     stop_on_collision: bool = True,
+    trace_emitter: "RoutePolicyTraceEmitter | None" = None,
+    trace_scene_id: str | None = None,
+    trace_episode_index: int = 0,
 ) -> RouteRollout:
-    """Execute route actions in an environment and capture per-step outcomes."""
+    """Execute route actions in an environment and capture per-step outcomes.
 
+    When ``trace_emitter`` is supplied, one :class:`PolicyTraceEvent`
+    timeline is emitted per rollout: :meth:`begin_episode` is called once,
+    :meth:`record_step` is invoked after every executed segment, and the
+    last applied segment fires a ``goal_reached`` (clear) or ``collision``
+    (blocked) terminal event. ``trace_scene_id`` overrides the scene tag
+    used by the emitter; when omitted the route id is used so traces
+    remain identifiable per rollout.
+    """
+
+    candidate = _route_candidate(route)
     steps = build_route_actions(
         route,
         action_type=action_type,
         segment_duration_seconds=segment_duration_seconds,
     )
     normalized_action_type = _normalize_action_type(action_type)
+    effective_scene_id = trace_scene_id if trace_scene_id is not None else candidate.route_id
+    if trace_emitter is not None:
+        trace_emitter.begin_episode(
+            scene_id=effective_scene_id,
+            episode_index=int(trace_episode_index),
+        )
     outcomes: list[RouteStepOutcome] = []
-    for step in steps:
+    total_steps = len(steps)
+    for index, step in enumerate(steps):
         transition = environment.step(step.action)
         outcome = RouteStepOutcome(
             step=step,
@@ -163,10 +186,23 @@ def rollout_route(
             collides=_transition_collides(transition),
         )
         outcomes.append(outcome)
-        if stop_on_collision and (outcome.collides or not outcome.applied):
+        blocked = outcome.collides or not outcome.applied
+        if trace_emitter is not None:
+            will_terminate = (index == total_steps - 1) or (blocked and stop_on_collision)
+            trace_emitter.record_step(
+                scene_id=effective_scene_id,
+                episode_index=int(trace_episode_index),
+                step_index=index,
+                next_observation=outcome.transition,
+                blocked=will_terminate and blocked,
+                goal_reached=will_terminate and not blocked,
+                truncated=False,
+                terminated=False,
+            )
+        if stop_on_collision and blocked:
             break
     return RouteRollout(
-        route_id=_route_candidate(route).route_id,
+        route_id=candidate.route_id,
         action_type=normalized_action_type,
         steps=steps,
         outcomes=tuple(outcomes),
