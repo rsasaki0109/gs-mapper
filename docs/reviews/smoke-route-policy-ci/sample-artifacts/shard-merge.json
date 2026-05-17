@@ -4,7 +4,7 @@
       {
         "metrics": {
           "blocked-rate": {
-            "count": 2.0,
+            "count": 4.0,
             "delta": 0.0,
             "first": 0.0,
             "last": 0.0,
@@ -13,7 +13,7 @@
             "min": 0.0
           },
           "collision-count": {
-            "count": 2.0,
+            "count": 4.0,
             "delta": 0.0,
             "first": 0.0,
             "last": 0.0,
@@ -22,7 +22,7 @@
             "min": 0.0
           },
           "collision-rate": {
-            "count": 2.0,
+            "count": 4.0,
             "delta": 0.0,
             "first": 0.0,
             "last": 0.0,
@@ -31,7 +31,7 @@
             "min": 0.0
           },
           "episode-count": {
-            "count": 2.0,
+            "count": 4.0,
             "delta": 0.0,
             "first": 1.0,
             "last": 1.0,
@@ -40,7 +40,7 @@
             "min": 1.0
           },
           "mean-episode-length": {
-            "count": 2.0,
+            "count": 4.0,
             "delta": 0.0,
             "first": 1.0,
             "last": 1.0,
@@ -49,7 +49,7 @@
             "min": 1.0
           },
           "mean-reward": {
-            "count": 2.0,
+            "count": 4.0,
             "delta": 0.001279227133856864,
             "first": 2.4832269232125137,
             "last": 2.4845061503463706,
@@ -58,7 +58,7 @@
             "min": 2.4832269232125137
           },
           "mean-transition-reward": {
-            "count": 2.0,
+            "count": 4.0,
             "delta": 0.001279227133856864,
             "first": 2.4832269232125137,
             "last": 2.4845061503463706,
@@ -67,7 +67,7 @@
             "min": 2.4832269232125137
           },
           "scene-count": {
-            "count": 2.0,
+            "count": 4.0,
             "delta": 0.0,
             "first": 1.0,
             "last": 1.0,
@@ -76,7 +76,7 @@
             "min": 1.0
           },
           "success-rate": {
-            "count": 2.0,
+            "count": 4.0,
             "delta": 0.0,
             "first": 1.0,
             "last": 1.0,
@@ -85,7 +85,7 @@
             "min": 1.0
           },
           "termination-rate": {
-            "count": 2.0,
+            "count": 4.0,
             "delta": 0.0,
             "first": 1.0,
             "last": 1.0,
@@ -94,7 +94,7 @@
             "min": 1.0
           },
           "transition-count": {
-            "count": 2.0,
+            "count": 4.0,
             "delta": 0.0,
             "first": 1.0,
             "last": 1.0,
@@ -103,7 +103,7 @@
             "min": 1.0
           },
           "truncation-rate": {
-            "count": 2.0,
+            "count": 4.0,
             "delta": 0.0,
             "first": 0.0,
             "last": 0.0,
@@ -113,9 +113,9 @@
           }
         },
         "passRate": 1.0,
-        "passedCount": 2,
+        "passedCount": 4,
         "policyName": "direct",
-        "reportCount": 2
+        "reportCount": 4
       }
     ],
     "baselineReport": null,
@@ -124,12 +124,12 @@
     "metadata": {
       "baselineReport": null,
       "mergeId": "smoke-route-policy-ci-merge",
-      "shardCount": 2
+      "shardCount": 4
     },
     "passed": true,
     "recordType": "route-policy-benchmark-history",
     "regressionChecks": [],
-    "reportCount": 2,
+    "reportCount": 4,
     "reports": [
       {
         "benchmarkId": "smoke-route-policy-ci-matrix-direct-shard-001-unit-near-short",
@@ -224,6 +224,206 @@
         "recordType": "route-policy-benchmark-snapshot",
         "sourcePath": "sample-artifacts/reports/smoke-route-policy-ci-matrix-direct-shard-002/unit-far-short.json",
         "version": "gs-mapper-route-policy-benchmark/v1"
+      },
+      {
+        "benchmarkId": "smoke-route-policy-ci-matrix-direct-shard-003-crossing-near-short",
+        "bestPolicyName": "direct",
+        "metadata": {
+          "agents": [
+            {
+              "agentId": "ego",
+              "recordType": "route-policy-agent-role",
+              "role": "ego",
+              "seedOffset": 0,
+              "startPose": {
+                "frameId": "generic_world",
+                "orientationXyzw": [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ],
+                "position": [
+                  0.0,
+                  0.0,
+                  0.0
+                ]
+              },
+              "version": "gs-mapper-route-policy-agent-role-spec/v1"
+            },
+            {
+              "agentId": "peer-chase",
+              "builtinPolicy": "chase",
+              "recordType": "route-policy-agent-role",
+              "role": "peer-obstacle",
+              "seedOffset": 0,
+              "startPose": {
+                "frameId": "generic_world",
+                "orientationXyzw": [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ],
+                "position": [
+                  2.0,
+                  2.0,
+                  0.0
+                ]
+              },
+              "version": "gs-mapper-route-policy-agent-role-spec/v1"
+            }
+          ],
+          "configId": "short",
+          "configMetadata": {},
+          "goalSuiteKey": "near",
+          "goalSuiteMetadata": {},
+          "goalSuitePath": "sample-artifacts/shards/../near-goals.json",
+          "includeDirectBaseline": false,
+          "interactionMetrics": {
+            "aggregateKeys": [
+              "peer-count"
+            ],
+            "recordType": "route-policy-interaction-metrics",
+            "requireEgoSurvives": true,
+            "version": "gs-mapper-route-policy-interaction-metrics-spec/v1"
+          },
+          "matrixId": "smoke-route-policy-ci-matrix",
+          "registryId": "direct",
+          "scenarioId": "crossing-near-short",
+          "scenarioSetId": "smoke-route-policy-ci-matrix-direct-shard-003",
+          "sceneCatalog": "sample-artifacts/shards/../scenes.json",
+          "sceneId": "unit-scene",
+          "sceneKey": "crossing",
+          "sceneMetadata": {}
+        },
+        "passed": true,
+        "policies": [
+          {
+            "failedChecks": [],
+            "metrics": {
+              "blocked-rate": 0.0,
+              "collision-count": 0.0,
+              "collision-rate": 0.0,
+              "episode-count": 1.0,
+              "mean-episode-length": 1.0,
+              "mean-reward": 2.4832269232125137,
+              "mean-transition-reward": 2.4832269232125137,
+              "scene-count": 1.0,
+              "success-rate": 1.0,
+              "termination-rate": 1.0,
+              "transition-count": 1.0,
+              "truncation-rate": 0.0
+            },
+            "passed": true,
+            "policyName": "direct",
+            "recordType": "route-policy-benchmark-policy-snapshot"
+          }
+        ],
+        "policyCount": 1,
+        "recordType": "route-policy-benchmark-snapshot",
+        "sourcePath": "sample-artifacts/reports/smoke-route-policy-ci-matrix-direct-shard-003/crossing-near-short.json",
+        "version": "gs-mapper-route-policy-benchmark/v1"
+      },
+      {
+        "benchmarkId": "smoke-route-policy-ci-matrix-direct-shard-004-crossing-far-short",
+        "bestPolicyName": "direct",
+        "metadata": {
+          "agents": [
+            {
+              "agentId": "ego",
+              "recordType": "route-policy-agent-role",
+              "role": "ego",
+              "seedOffset": 0,
+              "startPose": {
+                "frameId": "generic_world",
+                "orientationXyzw": [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ],
+                "position": [
+                  0.0,
+                  0.0,
+                  0.0
+                ]
+              },
+              "version": "gs-mapper-route-policy-agent-role-spec/v1"
+            },
+            {
+              "agentId": "peer-chase",
+              "builtinPolicy": "chase",
+              "recordType": "route-policy-agent-role",
+              "role": "peer-obstacle",
+              "seedOffset": 0,
+              "startPose": {
+                "frameId": "generic_world",
+                "orientationXyzw": [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ],
+                "position": [
+                  2.0,
+                  2.0,
+                  0.0
+                ]
+              },
+              "version": "gs-mapper-route-policy-agent-role-spec/v1"
+            }
+          ],
+          "configId": "short",
+          "configMetadata": {},
+          "goalSuiteKey": "far",
+          "goalSuiteMetadata": {},
+          "goalSuitePath": "sample-artifacts/shards/../far-goals.json",
+          "includeDirectBaseline": false,
+          "interactionMetrics": {
+            "aggregateKeys": [
+              "peer-count"
+            ],
+            "recordType": "route-policy-interaction-metrics",
+            "requireEgoSurvives": true,
+            "version": "gs-mapper-route-policy-interaction-metrics-spec/v1"
+          },
+          "matrixId": "smoke-route-policy-ci-matrix",
+          "registryId": "direct",
+          "scenarioId": "crossing-far-short",
+          "scenarioSetId": "smoke-route-policy-ci-matrix-direct-shard-004",
+          "sceneCatalog": "sample-artifacts/shards/../scenes.json",
+          "sceneId": "unit-scene",
+          "sceneKey": "crossing",
+          "sceneMetadata": {}
+        },
+        "passed": true,
+        "policies": [
+          {
+            "failedChecks": [],
+            "metrics": {
+              "blocked-rate": 0.0,
+              "collision-count": 0.0,
+              "collision-rate": 0.0,
+              "episode-count": 1.0,
+              "mean-episode-length": 1.0,
+              "mean-reward": 2.4845061503463706,
+              "mean-transition-reward": 2.4845061503463706,
+              "scene-count": 1.0,
+              "success-rate": 1.0,
+              "termination-rate": 1.0,
+              "transition-count": 1.0,
+              "truncation-rate": 0.0
+            },
+            "passed": true,
+            "policyName": "direct",
+            "recordType": "route-policy-benchmark-policy-snapshot"
+          }
+        ],
+        "policyCount": 1,
+        "recordType": "route-policy-benchmark-snapshot",
+        "sourcePath": "sample-artifacts/reports/smoke-route-policy-ci-matrix-direct-shard-004/crossing-far-short.json",
+        "version": "gs-mapper-route-policy-benchmark/v1"
       }
     ],
     "thresholds": {
@@ -238,13 +438,26 @@
   },
   "historyMarkdownPath": "sample-artifacts/shard-history.md",
   "historyPath": "sample-artifacts/shard-history.json",
+  "interactionMetricsAggregate": {
+    "perKeyStats": {
+      "peer-count": {
+        "max": 1.0,
+        "mean": 1.0,
+        "p95": 1.0,
+        "sampleCount": 2
+      }
+    },
+    "recordType": "route-policy-interaction-metrics-aggregate",
+    "sampleScenarioCount": 2,
+    "version": "gs-mapper-route-policy-interaction-metrics-aggregate/v1"
+  },
   "mergeId": "smoke-route-policy-ci-merge",
   "metadata": {},
   "passed": true,
   "recordType": "route-policy-scenario-shard-merge",
-  "reportCount": 2,
-  "scenarioCount": 2,
-  "shardCount": 2,
+  "reportCount": 4,
+  "scenarioCount": 4,
+  "shardCount": 4,
   "shardRuns": [
     {
       "historyPath": "sample-artifacts/histories/smoke-route-policy-ci-matrix-direct-shard-001.json",
@@ -277,6 +490,38 @@
       "scenarioCount": 1,
       "scenarioSetId": "smoke-route-policy-ci-matrix-direct-shard-002",
       "shardId": "smoke-route-policy-ci-matrix-direct-shard-002"
+    },
+    {
+      "historyPath": "sample-artifacts/histories/smoke-route-policy-ci-matrix-direct-shard-003.json",
+      "metadata": {
+        "registryId": "smoke-route-policy-ci-registry"
+      },
+      "passed": true,
+      "recordType": "route-policy-scenario-shard-run-summary",
+      "reportCount": 1,
+      "reportPaths": [
+        "sample-artifacts/reports/smoke-route-policy-ci-matrix-direct-shard-003/crossing-near-short.json"
+      ],
+      "runPath": "sample-artifacts/runs/smoke-route-policy-ci-matrix-direct-shard-003.json",
+      "scenarioCount": 1,
+      "scenarioSetId": "smoke-route-policy-ci-matrix-direct-shard-003",
+      "shardId": "smoke-route-policy-ci-matrix-direct-shard-003"
+    },
+    {
+      "historyPath": "sample-artifacts/histories/smoke-route-policy-ci-matrix-direct-shard-004.json",
+      "metadata": {
+        "registryId": "smoke-route-policy-ci-registry"
+      },
+      "passed": true,
+      "recordType": "route-policy-scenario-shard-run-summary",
+      "reportCount": 1,
+      "reportPaths": [
+        "sample-artifacts/reports/smoke-route-policy-ci-matrix-direct-shard-004/crossing-far-short.json"
+      ],
+      "runPath": "sample-artifacts/runs/smoke-route-policy-ci-matrix-direct-shard-004.json",
+      "scenarioCount": 1,
+      "scenarioSetId": "smoke-route-policy-ci-matrix-direct-shard-004",
+      "shardId": "smoke-route-policy-ci-matrix-direct-shard-004"
     }
   ],
   "version": "gs-mapper-route-policy-scenario-shard-merge/v1"

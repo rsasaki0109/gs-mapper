@@ -31,7 +31,10 @@ from .policy_benchmark_history import (
     write_route_policy_benchmark_history_json,
 )
 from .policy_dynamic_obstacles import load_route_policy_dynamic_obstacle_timeline_json
-from .policy_scenario_multi_agent import synthesize_peer_roster_from_scenario_metadata
+from .policy_scenario_multi_agent import (
+    SCENARIO_INTERACTION_METRIC_VALUES_KEY,
+    synthesize_peer_roster_from_scenario_metadata,
+)
 from .policy_quality import RoutePolicyQualityThresholds
 from .policy_sensor_noise import load_route_policy_sensor_noise_profile_json
 from .raw_sensor_noise import load_raw_sensor_noise_profile_json
@@ -682,6 +685,16 @@ def _run_scenario(
     markdown_path = output_dir / f"{slug}.md" if write_markdown else None
     if markdown_path is not None:
         markdown_path.write_text(render_route_policy_benchmark_markdown(report), encoding="utf-8")
+    result_metadata = _json_mapping(scenario.metadata)
+    if dynamic_obstacles is not None:
+        # Sprint 4 / PR D6: write a minimal interaction-metrics mapping so
+        # the shard-merge aggregator (PR D4) has something to roll up for
+        # multi-agent runs. ``peer-count`` is a structural metric that
+        # does not need env-side per-step hooks; richer values
+        # (min-peer-separation etc.) will land alongside the env hook.
+        result_metadata[SCENARIO_INTERACTION_METRIC_VALUES_KEY] = {
+            "peer-count": float(dynamic_obstacles.obstacle_count),
+        }
     return RoutePolicyScenarioRunResult(
         scenario_id=scenario.scenario_id,
         benchmark_id=benchmark_id,
@@ -695,7 +708,7 @@ def _run_scenario(
         episode_count=episode_count,
         seed_start=seed_start,
         max_steps=max_steps,
-        metadata=_json_mapping(scenario.metadata),
+        metadata=result_metadata,
     )
 
 

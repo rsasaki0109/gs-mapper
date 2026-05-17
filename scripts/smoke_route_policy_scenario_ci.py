@@ -33,6 +33,9 @@ from pathlib import Path
 from typing import Callable
 
 from gs_sim2real.sim import (
+    AgentRoleSpec,
+    InteractionMetricsSpec,
+    Pose3D,
     RoutePolicyGoalSpec,
     RoutePolicyGoalSuite,
     RoutePolicyMatrixConfigSpec,
@@ -131,12 +134,42 @@ def _seed_fixture(root: Path) -> tuple[Path, Path]:
             goals=(RoutePolicyGoalSpec("far", (0.5, 0.0, 0.0)),),
         ),
     )
+    # Sprint 4 / PR D6: alongside the original ego-only "unit" scene, the
+    # smoke chain now exercises a 2-agent deterministic crossing scene
+    # (ego + one chase peer). This produces multi-agent scenarios that
+    # flow end-to-end through expansion → shard → merge → review so the
+    # `interactionMetricsAggregate` and `multiAgent` review surfaces have
+    # production-shaped exercise.
+    crossing_scene = RoutePolicyMatrixSceneSpec(
+        "crossing",
+        "scenes.json",
+        scene_id="unit-scene",
+        agents=(
+            AgentRoleSpec(
+                agent_id="ego",
+                role="ego",
+                start_pose=_unit_pose((0.0, 0.0, 0.0)),
+            ),
+            AgentRoleSpec(
+                agent_id="peer-chase",
+                role="peer-obstacle",
+                start_pose=_unit_pose((2.0, 2.0, 0.0)),
+                builtin_policy="chase",
+            ),
+        ),
+        interaction_metrics=InteractionMetricsSpec(
+            aggregate_keys=("peer-count",),
+        ),
+    )
     matrix_path = write_route_policy_scenario_matrix_json(
         root / "matrix.json",
         RoutePolicyScenarioMatrix(
             matrix_id=f"{SMOKE_PREFIX}-matrix",
             registries=(RoutePolicyMatrixRegistrySpec("direct", "registry.json"),),
-            scenes=(RoutePolicyMatrixSceneSpec("unit", "scenes.json", scene_id="unit-scene"),),
+            scenes=(
+                RoutePolicyMatrixSceneSpec("unit", "scenes.json", scene_id="unit-scene"),
+                crossing_scene,
+            ),
             goal_suites=(
                 RoutePolicyMatrixGoalSuiteSpec("near", "near-goals.json"),
                 RoutePolicyMatrixGoalSuiteSpec("far", "far-goals.json"),
@@ -145,6 +178,14 @@ def _seed_fixture(root: Path) -> tuple[Path, Path]:
         ),
     )
     return matrix_path, registry_path
+
+
+def _unit_pose(position: tuple[float, float, float]) -> Pose3D:
+    return Pose3D(
+        position=position,
+        orientation_xyzw=(0.0, 0.0, 0.0, 1.0),
+        frame_id="generic_world",
+    )
 
 
 def _gate(log: Callable[[str], None], name: str, ok: bool, detail: str = "") -> None:
@@ -278,6 +319,12 @@ def run_smoke(root: Path, *, log: Callable[[str], None] = print) -> dict[str, Pa
     review_json_path = write_route_policy_scenario_ci_review_json(root / "ci-review.json", review)
     bundle_paths = write_route_policy_scenario_ci_review_bundle(root / "pages" / SMOKE_PREFIX, review)
     _gate(log, "review artifact", review.passed)
+    _gate(
+        log,
+        "review multi-agent surface",
+        review.multi_agent and review.interaction_metrics_aggregate is not None,
+        "crossing scene contributed interactionMetricsAggregate" if review.multi_agent else "no aggregate attached",
+    )
     log(
         f"[stage] review bundle -> json={bundle_paths['json']} "
         f"md={bundle_paths['markdown']} html={bundle_paths['html']}"
@@ -351,6 +398,7 @@ def run_smoke(root: Path, *, log: Callable[[str], None] = print) -> dict[str, Pa
         "active_workflow": active_workflow_path,
         "review": review_json_path,
         "review_bundle_html": Path(bundle_paths["html"]),
+        "review_bundle_markdown": Path(bundle_paths["markdown"]),
         "promotion": promotion_path,
         "adoption": adoption_path,
         "adopted_source_workflow": adopted_source_path,

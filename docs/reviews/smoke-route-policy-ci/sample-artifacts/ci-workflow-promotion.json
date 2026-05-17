@@ -126,9 +126,9 @@
   "manifestId": "smoke-route-policy-ci-manifest",
   "metadata": {
     "reviewPassed": true,
-    "reviewReportCount": 2,
-    "reviewScenarioCount": 2,
-    "reviewShardCount": 2
+    "reviewReportCount": 4,
+    "reviewScenarioCount": 4,
+    "reviewShardCount": 4
   },
   "passed": true,
   "promoted": true,

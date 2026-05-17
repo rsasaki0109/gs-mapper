@@ -41,7 +41,7 @@
       "registryId": "direct"
     }
   ],
-  "scenarioCountPerSet": 2,
+  "scenarioCountPerSet": 4,
   "scenarioSetCount": 1,
   "scenes": [
     {
@@ -50,6 +50,67 @@
       "sceneCatalog": "scenes.json",
       "sceneId": "unit-scene",
       "sceneKey": "unit",
+      "siteUrl": null
+    },
+    {
+      "agents": [
+        {
+          "agentId": "ego",
+          "recordType": "route-policy-agent-role",
+          "role": "ego",
+          "seedOffset": 0,
+          "startPose": {
+            "frameId": "generic_world",
+            "orientationXyzw": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "version": "gs-mapper-route-policy-agent-role-spec/v1"
+        },
+        {
+          "agentId": "peer-chase",
+          "builtinPolicy": "chase",
+          "recordType": "route-policy-agent-role",
+          "role": "peer-obstacle",
+          "seedOffset": 0,
+          "startPose": {
+            "frameId": "generic_world",
+            "orientationXyzw": [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "position": [
+              2.0,
+              2.0,
+              0.0
+            ]
+          },
+          "version": "gs-mapper-route-policy-agent-role-spec/v1"
+        }
+      ],
+      "interactionMetrics": {
+        "aggregateKeys": [
+          "peer-count"
+        ],
+        "recordType": "route-policy-interaction-metrics",
+        "requireEgoSurvives": true,
+        "version": "gs-mapper-route-policy-interaction-metrics-spec/v1"
+      },
+      "metadata": {},
+      "recordType": "route-policy-matrix-scene",
+      "sceneCatalog": "scenes.json",
+      "sceneId": "unit-scene",
+      "sceneKey": "crossing",
       "siteUrl": null
     }
   ],

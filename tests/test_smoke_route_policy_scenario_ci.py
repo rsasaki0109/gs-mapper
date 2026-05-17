@@ -113,6 +113,17 @@ def test_run_smoke_produces_passing_chain(tmp_path: Path) -> None:
     assert '<pre class="diff">' in bundle_html
     assert '<span class="add">+  pull_request:</span>' in bundle_html
 
+    # PR D6: the smoke fixture's crossing scene contributes an
+    # interactionMetricsAggregate via the D3 → D4 → D5 chain. The review
+    # JSON / Markdown / HTML must reflect the multi-agent surface.
+    assert review_payload.get("multiAgent") is True
+    aggregate = review_payload.get("interactionMetricsAggregate")
+    assert aggregate is not None and "perKeyStats" in aggregate
+    assert "peer-count" in aggregate["perKeyStats"]
+    bundle_md = artifacts["review_bundle_markdown"].read_text(encoding="utf-8")
+    assert "## Multi-agent interaction metrics" in bundle_md
+    assert "Multi-agent" in bundle_html
+
 
 def test_main_returns_zero_on_clean_run(tmp_path: Path) -> None:
     module = _load_script_module()

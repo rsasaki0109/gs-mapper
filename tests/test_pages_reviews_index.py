@@ -360,11 +360,15 @@ def test_published_docs_reviews_index_includes_smoke_sample_bundle() -> None:
     sample = entries["smoke-route-policy-ci-review"]
     assert sample["passed"] is True
     assert sample["bundleHtml"] == "smoke-route-policy-ci/index.html"
-    assert sample["shardCount"] == 2
-    assert sample["scenarioCount"] == 2
-    assert sample["reportCount"] == 2
+    # PR D6 adds the multi-agent crossing scene to the smoke matrix
+    # (2 scenes × 2 goal suites × 1 config = 4 scenarios), and a peer
+    # roster makes the sample bundle multi-agent.
+    assert sample["shardCount"] == 4
+    assert sample["scenarioCount"] == 4
+    assert sample["reportCount"] == 4
     assert sample["adoptionTriggerMode"] == "pull-request"
     assert sample["adoptionAdopted"] is True
+    assert sample["multiAgent"] is True
 
     review_payload = json.loads((reviews_dir / "smoke-route-policy-ci" / "review.json").read_text(encoding="utf-8"))
     assert review_payload["metadata"]["sampleBundle"] is True

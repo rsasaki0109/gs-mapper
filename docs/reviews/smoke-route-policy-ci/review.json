@@ -19,6 +19,19 @@
   "failedShards": [],
   "historyFailedChecks": [],
   "historyPassed": true,
+  "interactionMetricsAggregate": {
+    "perKeyStats": {
+      "peer-count": {
+        "max": 1.0,
+        "mean": 1.0,
+        "p95": 1.0,
+        "sampleCount": 2
+      }
+    },
+    "recordType": "route-policy-interaction-metrics-aggregate",
+    "sampleScenarioCount": 2,
+    "version": "gs-mapper-route-policy-interaction-metrics-aggregate/v1"
+  },
   "manifestId": "smoke-route-policy-ci-manifest",
   "mergeId": "smoke-route-policy-ci-merge",
   "metadata": {
@@ -31,6 +44,7 @@
     "sampleSource": "scripts/smoke_route_policy_scenario_ci.py",
     "validationFailedChecks": []
   },
+  "multiAgent": true,
   "passed": true,
   "provenance": {
     "assetSource": "scripts/smoke_route_policy_scenario_ci.py",
@@ -45,10 +59,10 @@
     "version": "gs-mapper-route-policy-scenario-ci-review-provenance/v1"
   },
   "recordType": "route-policy-scenario-ci-review",
-  "reportCount": 2,
+  "reportCount": 4,
   "reviewId": "smoke-route-policy-ci-review",
-  "scenarioCount": 2,
-  "shardCount": 2,
+  "scenarioCount": 4,
+  "shardCount": 4,
   "shardMergePassed": true,
   "shards": [
     {
@@ -80,6 +94,36 @@
       "runPath": "sample-artifacts/runs/smoke-route-policy-ci-matrix-direct-shard-002.json",
       "scenarioCount": 1,
       "shardId": "smoke-route-policy-ci-matrix-direct-shard-002"
+    },
+    {
+      "historyPath": "sample-artifacts/histories/smoke-route-policy-ci-matrix-direct-shard-003.json",
+      "metadata": {
+        "registryId": "smoke-route-policy-ci-registry"
+      },
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-review-shard",
+      "reportCount": 1,
+      "reportPaths": [
+        "sample-artifacts/reports/smoke-route-policy-ci-matrix-direct-shard-003/crossing-near-short.json"
+      ],
+      "runPath": "sample-artifacts/runs/smoke-route-policy-ci-matrix-direct-shard-003.json",
+      "scenarioCount": 1,
+      "shardId": "smoke-route-policy-ci-matrix-direct-shard-003"
+    },
+    {
+      "historyPath": "sample-artifacts/histories/smoke-route-policy-ci-matrix-direct-shard-004.json",
+      "metadata": {
+        "registryId": "smoke-route-policy-ci-registry"
+      },
+      "passed": true,
+      "recordType": "route-policy-scenario-ci-review-shard",
+      "reportCount": 1,
+      "reportPaths": [
+        "sample-artifacts/reports/smoke-route-policy-ci-matrix-direct-shard-004/crossing-far-short.json"
+      ],
+      "runPath": "sample-artifacts/runs/smoke-route-policy-ci-matrix-direct-shard-004.json",
+      "scenarioCount": 1,
+      "shardId": "smoke-route-policy-ci-matrix-direct-shard-004"
     }
   ],
   "sourceWorkflowPath": "sample-artifacts/ci-workflow.generated.yml",

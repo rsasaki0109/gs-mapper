@@ -7,7 +7,7 @@
     "maxScenariosPerShard": 1,
     "registryId": "direct",
     "registryMetadata": {},
-    "shardCount": 2,
+    "shardCount": 4,
     "shardIndex": 1,
     "sourceScenarioIds": [
       "unit-near-short"

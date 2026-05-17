@@ -8,13 +8,13 @@
       "policyRegistryPath": "registry.json",
       "recordType": "route-policy-scenario-matrix-output",
       "registryId": "direct",
-      "scenarioCount": 2,
+      "scenarioCount": 4,
       "scenarioSetId": "smoke-route-policy-ci-matrix-direct",
       "scenarioSetPath": "sample-artifacts/generated/smoke-route-policy-ci-matrix-direct.json"
     }
   ],
   "recordType": "route-policy-scenario-matrix-expansion",
-  "scenarioCount": 2,
+  "scenarioCount": 4,
   "scenarioSetCount": 1,
   "scenarioSets": [
     {
@@ -28,7 +28,7 @@
       },
       "policyRegistryPath": "../registry.json",
       "recordType": "route-policy-scenario-set",
-      "scenarioCount": 2,
+      "scenarioCount": 4,
       "scenarioSetId": "smoke-route-policy-ci-matrix-direct",
       "scenarios": [
         {
@@ -74,6 +74,162 @@
           "rawSensorNoiseProfilePath": null,
           "recordType": "route-policy-scenario",
           "scenarioId": "unit-far-short",
+          "sceneCatalog": "../scenes.json",
+          "sceneId": "unit-scene",
+          "seedStart": 0,
+          "sensorNoiseProfilePath": null,
+          "siteUrl": null,
+          "thresholds": null
+        },
+        {
+          "dynamicObstaclesPath": null,
+          "episodeCount": 1,
+          "goalSuitePath": "../near-goals.json",
+          "maxSteps": 4,
+          "metadata": {
+            "agents": [
+              {
+                "agentId": "ego",
+                "recordType": "route-policy-agent-role",
+                "role": "ego",
+                "seedOffset": 0,
+                "startPose": {
+                  "frameId": "generic_world",
+                  "orientationXyzw": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                  ],
+                  "position": [
+                    0.0,
+                    0.0,
+                    0.0
+                  ]
+                },
+                "version": "gs-mapper-route-policy-agent-role-spec/v1"
+              },
+              {
+                "agentId": "peer-chase",
+                "builtinPolicy": "chase",
+                "recordType": "route-policy-agent-role",
+                "role": "peer-obstacle",
+                "seedOffset": 0,
+                "startPose": {
+                  "frameId": "generic_world",
+                  "orientationXyzw": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                  ],
+                  "position": [
+                    2.0,
+                    2.0,
+                    0.0
+                  ]
+                },
+                "version": "gs-mapper-route-policy-agent-role-spec/v1"
+              }
+            ],
+            "configId": "short",
+            "configMetadata": {},
+            "goalSuiteKey": "near",
+            "goalSuiteMetadata": {},
+            "interactionMetrics": {
+              "aggregateKeys": [
+                "peer-count"
+              ],
+              "recordType": "route-policy-interaction-metrics",
+              "requireEgoSurvives": true,
+              "version": "gs-mapper-route-policy-interaction-metrics-spec/v1"
+            },
+            "matrixId": "smoke-route-policy-ci-matrix",
+            "registryId": "direct",
+            "sceneKey": "crossing",
+            "sceneMetadata": {}
+          },
+          "rawSensorNoiseProfilePath": null,
+          "recordType": "route-policy-scenario",
+          "scenarioId": "crossing-near-short",
+          "sceneCatalog": "../scenes.json",
+          "sceneId": "unit-scene",
+          "seedStart": 0,
+          "sensorNoiseProfilePath": null,
+          "siteUrl": null,
+          "thresholds": null
+        },
+        {
+          "dynamicObstaclesPath": null,
+          "episodeCount": 1,
+          "goalSuitePath": "../far-goals.json",
+          "maxSteps": 4,
+          "metadata": {
+            "agents": [
+              {
+                "agentId": "ego",
+                "recordType": "route-policy-agent-role",
+                "role": "ego",
+                "seedOffset": 0,
+                "startPose": {
+                  "frameId": "generic_world",
+                  "orientationXyzw": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                  ],
+                  "position": [
+                    0.0,
+                    0.0,
+                    0.0
+                  ]
+                },
+                "version": "gs-mapper-route-policy-agent-role-spec/v1"
+              },
+              {
+                "agentId": "peer-chase",
+                "builtinPolicy": "chase",
+                "recordType": "route-policy-agent-role",
+                "role": "peer-obstacle",
+                "seedOffset": 0,
+                "startPose": {
+                  "frameId": "generic_world",
+                  "orientationXyzw": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                  ],
+                  "position": [
+                    2.0,
+                    2.0,
+                    0.0
+                  ]
+                },
+                "version": "gs-mapper-route-policy-agent-role-spec/v1"
+              }
+            ],
+            "configId": "short",
+            "configMetadata": {},
+            "goalSuiteKey": "far",
+            "goalSuiteMetadata": {},
+            "interactionMetrics": {
+              "aggregateKeys": [
+                "peer-count"
+              ],
+              "recordType": "route-policy-interaction-metrics",
+              "requireEgoSurvives": true,
+              "version": "gs-mapper-route-policy-interaction-metrics-spec/v1"
+            },
+            "matrixId": "smoke-route-policy-ci-matrix",
+            "registryId": "direct",
+            "sceneKey": "crossing",
+            "sceneMetadata": {}
+          },
+          "rawSensorNoiseProfilePath": null,
+          "recordType": "route-policy-scenario",
+          "scenarioId": "crossing-far-short",
           "sceneCatalog": "../scenes.json",
           "sceneId": "unit-scene",
           "seedStart": 0,

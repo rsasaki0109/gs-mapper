@@ -6,9 +6,9 @@
 - Validation: smoke-route-policy-ci-validation (PASS)
 - Activation: smoke-route-policy-ci-activation (ACTIVE)
 - Active workflow: sample-artifacts/workflows/smoke-route-policy-ci.yml
-- Shards: 2
-- Scenarios: 2
-- Reports: 2
+- Shards: 4
+- Scenarios: 4
+- Reports: 4
 
 > Synthetic smoke fixture generated from scripts/smoke_route_policy_scenario_ci.py; it proves the scenario-CI review bundle contract but is not a production benchmark run.
 
@@ -25,6 +25,16 @@
 | --- | --- | ---: | ---: | --- |
 | smoke-route-policy-ci-matrix-direct-shard-001 | yes | 1 | 1 | sample-artifacts/runs/smoke-route-policy-ci-matrix-direct-shard-001.json |
 | smoke-route-policy-ci-matrix-direct-shard-002 | yes | 1 | 1 | sample-artifacts/runs/smoke-route-policy-ci-matrix-direct-shard-002.json |
+| smoke-route-policy-ci-matrix-direct-shard-003 | yes | 1 | 1 | sample-artifacts/runs/smoke-route-policy-ci-matrix-direct-shard-003.json |
+| smoke-route-policy-ci-matrix-direct-shard-004 | yes | 1 | 1 | sample-artifacts/runs/smoke-route-policy-ci-matrix-direct-shard-004.json |
+
+## Multi-agent interaction metrics
+
+- Contributing scenarios: 2
+
+| Key | Mean | p95 | Max | Sample count |
+| --- | ---: | ---: | ---: | ---: |
+| `peer-count` | 1.0000 | 1.0000 | 1.0000 | 2 |
 
 ## Adopted Workflow
 

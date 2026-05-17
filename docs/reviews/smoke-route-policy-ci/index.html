@@ -22,6 +22,7 @@
     .synthetic { background: #fff1c1; color: #6a4d00; }
     .production { background: #dcefd8; color: #1e5a2b; }
     .unknown { background: #e3e5df; color: #424940; }
+    .multi-agent { background: #d8e6f7; color: #1f3f6e; margin-left: 6px; }
     table { width: 100%; border-collapse: collapse; background: #ffffff; border: 1px solid #dfe4da; border-radius: 8px; overflow: hidden; }
     th, td { padding: 10px 12px; border-bottom: 1px solid #e9ede5; text-align: left; vertical-align: top; }
     th { background: #eef2ea; font-size: 13px; color: #424940; }
@@ -37,14 +38,14 @@
 <body>
   <main>
     <h1>Route Policy Scenario CI Review</h1>
-    <p class="subtitle"><span class="pill pass">PASS</span> smoke-route-policy-ci-review</p>
+    <p class="subtitle"><span class="pill pass">PASS</span> <span class="pill multi-agent">Multi-agent</span> smoke-route-policy-ci-review</p>
     <p class="notice">Synthetic smoke fixture generated from scripts/smoke_route_policy_scenario_ci.py; it proves the scenario-CI review bundle contract but is not a production benchmark run.</p>
     <section class="grid">
       <div class="metric"><span>Workflow</span><strong>smoke-route-policy-ci-workflow</strong></div>
       <div class="metric"><span>Manifest</span><strong>smoke-route-policy-ci-manifest</strong></div>
-      <div class="metric"><span>Shards</span><strong>2</strong></div>
-      <div class="metric"><span>Scenarios</span><strong>2</strong></div>
-      <div class="metric"><span>Reports</span><strong>2</strong></div>
+      <div class="metric"><span>Shards</span><strong>4</strong></div>
+      <div class="metric"><span>Scenarios</span><strong>4</strong></div>
+      <div class="metric"><span>Reports</span><strong>4</strong></div>
     </section>
     <section><h2>Run Provenance</h2><table><tbody><tr><th>Kind</th><td><span class="pill synthetic">SYNTHETIC</span></td></tr>
 <tr><th>Generated at</th><td><code>2026-05-15T00:00:00+00:00</code></td></tr>
@@ -66,10 +67,13 @@
         <tbody>
 <tr><td>smoke-route-policy-ci-matrix-direct-shard-001</td><td><span class="pill pass">PASS</span></td><td>1</td><td>1</td><td><a href="sample-artifacts/runs/smoke-route-policy-ci-matrix-direct-shard-001.json">sample-artifacts/runs/smoke-route-policy-ci-matrix-direct-shard-001.json</a></td></tr>
 <tr><td>smoke-route-policy-ci-matrix-direct-shard-002</td><td><span class="pill pass">PASS</span></td><td>1</td><td>1</td><td><a href="sample-artifacts/runs/smoke-route-policy-ci-matrix-direct-shard-002.json">sample-artifacts/runs/smoke-route-policy-ci-matrix-direct-shard-002.json</a></td></tr>
+<tr><td>smoke-route-policy-ci-matrix-direct-shard-003</td><td><span class="pill pass">PASS</span></td><td>1</td><td>1</td><td><a href="sample-artifacts/runs/smoke-route-policy-ci-matrix-direct-shard-003.json">sample-artifacts/runs/smoke-route-policy-ci-matrix-direct-shard-003.json</a></td></tr>
+<tr><td>smoke-route-policy-ci-matrix-direct-shard-004</td><td><span class="pill pass">PASS</span></td><td>1</td><td>1</td><td><a href="sample-artifacts/runs/smoke-route-policy-ci-matrix-direct-shard-004.json">sample-artifacts/runs/smoke-route-policy-ci-matrix-direct-shard-004.json</a></td></tr>
         </tbody>
       </table>
     </section>
     
+    <section><h2>Multi-agent interaction metrics</h2><p>Contributing scenarios: 2</p><table><thead><tr><th>Key</th><th>Mean</th><th>p95</th><th>Max</th><th>Sample count</th></tr></thead><tbody><tr><td><code>peer-count</code></td><td>1.0000</td><td>1.0000</td><td>1.0000</td><td>2</td></tr></tbody></table></section>
     
     <section>
       <h2>Adopted Workflow</h2>

@@ -7,15 +7,17 @@
       "bundleHtml": "smoke-route-policy-ci/index.html",
       "generatedAt": "2026-05-15T00:00:00+00:00",
       "kind": "synthetic",
+      "multiAgent": true,
       "passed": true,
-      "reportCount": 2,
+      "reportCount": 4,
       "reviewId": "smoke-route-policy-ci-review",
-      "scenarioCount": 2,
+      "scenarioCount": 4,
       "sceneId": "smoke-route-policy-ci",
-      "shardCount": 2
+      "shardCount": 4
     }
   ],
   "failCount": 0,
+  "multiAgentCount": 1,
   "passCount": 1,
   "productionCount": 0,
   "recordType": "gs-mapper-route-policy-scenario-ci-reviews-index/v1",
